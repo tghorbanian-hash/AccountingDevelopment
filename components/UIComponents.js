@@ -1,13 +1,15 @@
 /* Filename: components/UIComponents.js */
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
+import * as LucideIcons from 'lucide-react';
+
+const { 
   Loader2, ChevronDown, ChevronRight, Search, X, 
   Check, Filter, Settings, ChevronLeft,
   ChevronsLeft, ChevronsRight, List, MoreVertical,
   Plus, Trash2, Download, Printer, Edit, Eye, 
   Maximize2, Minimize2, FolderOpen, Folder, FileText,
   AlertCircle, ArrowRight, ArrowUp, ArrowDown, Info
-} from 'lucide-react';
+} = LucideIcons;
 
 // --- ENTERPRISE THEME TOKENS ---
 const THEME = {
