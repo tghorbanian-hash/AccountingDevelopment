@@ -2,14 +2,36 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import * as LucideIcons from 'lucide-react';
 
-const { 
-  Loader2, ChevronDown, ChevronRight, Search, X, 
-  Check, Filter, Settings, ChevronLeft,
-  ChevronsLeft, ChevronsRight, List, MoreVertical,
-  Plus, Trash2, Download, Printer, Edit, Eye, 
-  Maximize2, Minimize2, FolderOpen, Folder, FileText,
-  AlertCircle, ArrowRight, ArrowUp, ArrowDown, Info
-} = LucideIcons;
+// Extract icons safely
+const Loader2 = LucideIcons.Loader2;
+const ChevronDown = LucideIcons.ChevronDown;
+const ChevronRight = LucideIcons.ChevronRight;
+const Search = LucideIcons.Search;
+const X = LucideIcons.X;
+const Check = LucideIcons.Check;
+const Filter = LucideIcons.Filter;
+const Settings = LucideIcons.Settings;
+const ChevronLeft = LucideIcons.ChevronLeft;
+const ChevronsLeft = LucideIcons.ChevronsLeft;
+const ChevronsRight = LucideIcons.ChevronsRight;
+const List = LucideIcons.List;
+const MoreVertical = LucideIcons.MoreVertical;
+const Plus = LucideIcons.Plus;
+const Trash2 = LucideIcons.Trash2;
+const Download = LucideIcons.Download;
+const Printer = LucideIcons.Printer;
+const Edit = LucideIcons.Edit;
+const Eye = LucideIcons.Eye;
+const Maximize2 = LucideIcons.Maximize2;
+const Minimize2 = LucideIcons.Minimize2;
+const FolderOpen = LucideIcons.FolderOpen;
+const Folder = LucideIcons.Folder;
+const FileText = LucideIcons.FileText;
+const AlertCircle = LucideIcons.AlertCircle;
+const ArrowRight = LucideIcons.ArrowRight;
+const ArrowUp = LucideIcons.ArrowUp;
+const ArrowDown = LucideIcons.ArrowDown;
+const Info = LucideIcons.Info;
 
 // --- ENTERPRISE THEME TOKENS ---
 const THEME = {
@@ -40,7 +62,7 @@ const THEME = {
 // --- 1. ATOMIC COMPONENTS ---
 
 const Button = ({ 
-  children, variant = 'primary', icon: Icon, isLoading, className = '', onClick, disabled, size = 'default', title
+  children, variant = 'primary', icon, isLoading, className = '', onClick, disabled, size = 'default', title
 }) => {
   const baseStyle = `flex items-center justify-center gap-1.5 px-3 ${THEME.metrics.radius} font-medium ${THEME.metrics.fontSize} transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed select-none whitespace-nowrap active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-100`;
   
@@ -59,6 +81,19 @@ const Button = ({
     icon: 'h-8 w-8 px-0',
     iconSm: 'h-6 w-6 px-0',
   };
+  
+  // Determine Icon Element
+  let IconElement = null;
+  const iconSize = size === 'sm' || size === 'iconSm' ? 14 : 16;
+  
+  if (isLoading) {
+    IconElement = <Loader2 size={iconSize} className="animate-spin" />;
+  } else if (React.isValidElement(icon)) {
+    IconElement = React.cloneElement(icon, { size: iconSize, strokeWidth: 2 });
+  } else if (icon) {
+    const IconComp = icon;
+    IconElement = <IconComp size={iconSize} strokeWidth={2} />;
+  }
 
   return (
     <button 
@@ -68,7 +103,7 @@ const Button = ({
       type="button"
       className={`${baseStyle} ${variants[variant]} ${sizes[size]} ${className}`}
     >
-      {isLoading ? <Loader2 size={size === 'sm' || size === 'iconSm' ? 12 : 14} className="animate-spin" /> : (Icon && <Icon size={size === 'sm' || size === 'iconSm' ? 14 : 16} strokeWidth={2} />)}
+      {IconElement}
       {children}
     </button>
   );
