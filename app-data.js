@@ -3,12 +3,16 @@
 import * as LucideIcons from 'lucide-react';
 
 const { 
-  LayoutDashboard, Component, Briefcase, Users, GitBranch, Settings, Key,
-  Wallet, ArrowUpRight, ArrowDownLeft, UserCheck, BarChart3, Building2, 
-  Network, Banknote, MapPin, Layers, ListTodo
+  LayoutDashboard, Receipt, Wallet, BarChart3, Settings, Languages, Bell, Search, 
+  ArrowUpRight, ArrowDownLeft, Plus, MoreVertical, ChevronRight, ChevronLeft, Users, 
+  CreditCard, Lock, Mail, User, LogOut, ShieldCheck, Building2, Phone, CheckCircle2, 
+  RefreshCw, ChevronDown, Briefcase, UserCheck, GitBranch, Key, Globe, Filter, X, 
+  Calendar, Layers, ChevronRightSquare, LayoutGrid, Edit, Trash2, Save, MoreHorizontal,
+  XCircle, FileText, CheckSquare, Eye, MousePointerClick, Component, Info, Moon, Sun,
+  Shield, Database, Network, Banknote, MapPin, ListTodo, ArrowLeftRight, Coins, Check,
+  Link2, AlertTriangle, Workflow, GitMerge, ChevronsDown, ChevronsUp, FolderTree
 } = LucideIcons;
 
-// --- Helper for Flattening Menu ---
 window.flattenMenu = (items, parentModuleId = null) => {
   return items.reduce((acc, item) => {
     const currentModuleId = parentModuleId || item.id;
@@ -20,7 +24,7 @@ window.flattenMenu = (items, parentModuleId = null) => {
   }, []);
 };
 
-// --- CORE MENU STRUCTURE ---
+// --- CORE MENU STRUCTURE (Accounting removed to be loaded dynamically) ---
 const CORE_MENU = [
   {
     id: 'showcase',
@@ -48,7 +52,7 @@ const CORE_MENU = [
       { id: 'workspace_spec', label: { en: 'Specific Workspace', fa: 'میزکار اختصاصی' } }
     ]
   },
-  // GL_MENU_ITEMS will be injected here if available
+  // --- ACCOUNTING MODULE PLACEHOLDER (Will be injected here) ---
   {
     id: 'hr',
     label: { en: 'Human Capital', fa: 'سرمایه انسانی' },
@@ -109,19 +113,20 @@ const CORE_MENU = [
 
 // --- SAFELY MERGE MODULES ---
 const COMBINED_MENU = [...CORE_MENU];
-const glData = window.GL_DATA;
+const glData = window.GL_DATA || {}; // Safe check
 
-if (glData && glData.menuItems) {
-  // Restore icon object from name
-  const glMenu = { ...glData.menuItems, icon: LucideIcons[glData.menuItems.iconName] || BarChart3 };
+if (glData.menuItems) {
+  // Restore icon object from name safely
+  const iconComp = glData.menuItems.iconName ? (LucideIcons[glData.menuItems.iconName] || BarChart3) : BarChart3;
+  const glMenu = { ...glData.menuItems, icon: iconComp };
+  // Insert at index 3 (after Workspace)
   COMBINED_MENU.splice(3, 0, glMenu);
 }
 
-// EXPOSE TO WINDOW
 window.MENU_DATA = COMBINED_MENU;
 
 
-// --- MOCK DATA (Global) ---
+// --- MOCK DATA ---
 window.MOCK_TRANSACTIONS = [
   { id: 1, title: { en: 'Monthly Server Hosting', fa: 'هزینه میزبانی سرور ماهانه' }, amount: 1200, type: 'expense', date: '2024-03-01', category: 'IT' },
   { id: 2, title: { en: 'Consultancy Fee', fa: 'هزینه مشاوره' }, amount: 4500, type: 'income', date: '2024-03-02', category: 'Service' },
@@ -136,7 +141,7 @@ window.MOCK_STATS = [
   { id: 4, label: { en: 'Active Accounts', fa: 'حساب‌های فعال' }, value: '18', change: '0', icon: UserCheck, color: 'text-purple-600' },
 ];
 
-// --- DEFAULT SCHEMAS ---
+// --- CORE SCHEMAS (Accounting removed) ---
 const CORE_SCHEMAS = [
   {
     moduleId: 'hr',
@@ -154,12 +159,15 @@ const CORE_SCHEMAS = [
   }
 ];
 
-// Combine Core Schemas with Module Schemas
-const glSchema = (glData && glData.schema) ? [{...glData.schema, icon: LucideIcons[glData.schema.iconName] || BarChart3}] : [];
+// Combine Core Schemas with Module Schemas Safely
+let glSchema = [];
+if (glData.schema) {
+    const iconComp = glData.schema.iconName ? (LucideIcons[glData.schema.iconName] || BarChart3) : BarChart3;
+    glSchema = [{...glData.schema, icon: iconComp}];
+}
 window.DEFAULT_VALUES_SCHEMA = [...glSchema, ...CORE_SCHEMAS];
 
-
-// --- TRANSLATIONS ---
+// --- TRANSLATIONS (Full Core Translation Set) ---
 const coreTranslations = {
   en: {
     // --- BRANCHES ---
@@ -376,7 +384,7 @@ const coreTranslations = {
     pt_province: "Province",
     pt_comp_name: "Company Name",
     pt_website: "Website",
-    pt_nationality: "Nationality",
+    pt_nationality: "تابعیت",
     pt_phone: "Phone",
     pt_mobile: "Mobile",
     pt_email: "Email",
@@ -894,7 +902,15 @@ const coreTranslations = {
     btn_save_data: "ذخیره اطلاعات",
     ph_name: "نام طرف حساب",
     ph_phone: "شماره تماس"
-  },
-  fa: { ...coreTranslations.fa, ...(glData && glData.translations ? glData.translations.fa : {}) },
-  en: { ...coreTranslations.en, ...(glData && glData.translations ? glData.translations.en : {}) }
+  }
+};
+
+// --- SAFE TRANSLATION MERGING ---
+// Extract translations safely to avoid "reading 'fa' of undefined" error
+const glEn = (glData.translations && glData.translations.en) ? glData.translations.en : {};
+const glFa = (glData.translations && glData.translations.fa) ? glData.translations.fa : {};
+
+window.translations = {
+  en: Object.assign({}, coreTranslations.en, glEn),
+  fa: Object.assign({}, coreTranslations.fa, glFa)
 };
