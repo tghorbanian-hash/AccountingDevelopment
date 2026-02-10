@@ -2,14 +2,6 @@
 import React, { useState } from 'react';
 import * as LucideIcons from 'lucide-react';
 
-// --- FIXED: Direct Access to ensure availability ---
-const Plus = LucideIcons.Plus;
-const Edit = LucideIcons.Edit;
-const Trash2 = LucideIcons.Trash2;
-const Save = LucideIcons.Save;
-const Search = LucideIcons.Search;
-const X = LucideIcons.X;
-
 const Ledgers = ({ t, isRtl }) => {
   const UI = window.UI || {};
   const { 
@@ -138,8 +130,8 @@ const Ledgers = ({ t, isRtl }) => {
           onDoubleClick={handleEdit}
           actions={(row) => (
              <>
-               <Button variant="ghost" size="iconSm" icon={Edit} className="text-indigo-600 hover:bg-indigo-50" onClick={() => handleEdit(row)} title={t.ledgers_edit} />
-               <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDelete([row.id])} title={t.delete} />
+               <Button variant="ghost" size="iconSm" icon={LucideIcons.Edit} className="text-indigo-600 hover:bg-indigo-50" onClick={() => handleEdit(row)} title={t.ledgers_edit} />
+               <Button variant="ghost" size="iconSm" icon={LucideIcons.Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDelete([row.id])} title={t.delete} />
              </>
           )}
         />
@@ -148,7 +140,7 @@ const Ledgers = ({ t, isRtl }) => {
       <Modal 
          isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} 
          title={editingItem ? t.ledgers_edit : t.ledgers_new} size="md"
-         footer={<><Button variant="secondary" onClick={() => setIsModalOpen(false)}>{t.btn_cancel}</Button><Button variant="primary" icon={Save} onClick={handleSave}>{t.btn_save}</Button></>}
+         footer={<><Button variant="secondary" onClick={() => setIsModalOpen(false)}>{t.btn_cancel}</Button><Button variant="primary" icon={LucideIcons.Save} onClick={handleSave}>{t.btn_save}</Button></>}
       >
          <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
