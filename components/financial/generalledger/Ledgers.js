@@ -2,9 +2,15 @@
 import React, { useState } from 'react';
 import * as LucideIcons from 'lucide-react';
 
+// --- FIXED: Direct Access to ensure availability ---
+const Plus = LucideIcons.Plus;
+const Edit = LucideIcons.Edit;
+const Trash2 = LucideIcons.Trash2;
+const Save = LucideIcons.Save;
+const Search = LucideIcons.Search;
+const X = LucideIcons.X;
+
 const Ledgers = ({ t, isRtl }) => {
-  const { Plus, Edit, Trash2, Save, Search, X } = LucideIcons;
-  
   const UI = window.UI || {};
   const { 
     Button, InputField, SelectField, Toggle, Badge, 
@@ -103,7 +109,6 @@ const Ledgers = ({ t, isRtl }) => {
             <h1 className="text-2xl font-black text-slate-800">{t.ledgers_title}</h1>
             <p className="text-slate-500 text-sm mt-1">{t.ledgers_subtitle}</p>
          </div>
-         {/* Button Removed per request */}
       </div>
 
       <FilterSection 
