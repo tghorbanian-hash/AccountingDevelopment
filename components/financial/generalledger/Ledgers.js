@@ -1,8 +1,10 @@
 /* Filename: components/financial/generalledger/Ledgers.js */
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Save, Search, X } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 
 const Ledgers = ({ t, isRtl }) => {
+  const { Plus, Edit, Trash2, Save, Search, X } = LucideIcons;
+  
   const UI = window.UI || {};
   const { 
     Button, InputField, SelectField, Toggle, Badge, 
