@@ -16,11 +16,11 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [lang, setLang] = useState('fa'); 
   const [activeModuleId, setActiveModuleId] = useState('accounting');
-  const [activeId, setActiveId] = useState('gl_docs');
+  const [activeId, setActiveId] = useState('ledgers'); // Default set to new page for ease
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Authentication States
-  const [authView, setAuthView] = useState('login'); // login, forgot, otp, reset
+  const [authView, setAuthView] = useState('login'); 
   const [loginMethod, setLoginMethod] = useState('standard');
   const [loginData, setLoginData] = useState({ identifier: '', password: '' });
   const [recoveryData, setRecoveryData] = useState({ otp: '', newPass: '', confirmPass: '' });
@@ -48,10 +48,9 @@ const App = () => {
 
   const handleVerifyOtp = (e) => {
     e.preventDefault();
-    // MOCK LOGIC: Accept '123456' as the valid code
     if (recoveryData.otp === '123456') {
       setError('');
-      setAuthView('reset'); // Go to Change Password Page
+      setAuthView('reset');
     } else {
       setError(t.invalidOtp || 'Invalid OTP code');
     }
@@ -59,13 +58,10 @@ const App = () => {
 
   const handleUpdatePassword = (e) => {
     e.preventDefault();
-    // MOCK LOGIC: Validate passwords match
     if (!recoveryData.newPass || recoveryData.newPass !== recoveryData.confirmPass) {
        setError(isRtl ? 'رمز عبور و تکرار آن مطابقت ندارند' : 'Passwords do not match');
        return;
     }
-    
-    // Success scenario
     alert(t.resetSuccess || 'Password updated successfully');
     setAuthView('login');
     setError('');
@@ -79,7 +75,6 @@ const App = () => {
   }, [activeModuleId, MENU_DATA]);
   
   const renderContent = () => {
-    // دریافت کامپوننت‌ها از window
     const { 
       KpiDashboard, 
       UserManagement, 
@@ -94,15 +89,20 @@ const App = () => {
       CostCenters,
       Projects,
       Branches,
-      OrgChart
+      OrgChart,
+      // NEW COMPONENTS
+      Ledgers
     } = window;
 
-    // --- مسیردهی صفحات (Routing) ---
+    // --- ROUTING ---
     
-    // 1. پروفایل کاربری
+    // 1. General Ledger & Accounting
+    if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
+
+    // 2. User Profile
     if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error: UserProfile Component Not Loaded</div>;
 
-    // 2. اطلاعات پایه (Base Info)
+    // 3. Base Information
     if (activeId === 'org_info') return OrganizationInfo ? <OrganizationInfo t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrganizationInfo Component Not Loaded</div>;
     if (activeId === 'currency_settings') return CurrencySettings ? <CurrencySettings t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: CurrencySettings Component Not Loaded</div>;
     if (activeId === 'parties') return Parties ? <Parties t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Parties Component Not Loaded</div>;
@@ -111,16 +111,16 @@ const App = () => {
     if (activeId === 'branches') return Branches ? <Branches t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Branches Component Not Loaded</div>;
     if (activeId === 'org_chart') return OrgChart ? <OrgChart t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrgChart Component Not Loaded</div>;
 
-    // 3. امنیت و دسترسی (Security)
+    // 4. Security
     if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
     if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Roles Component Not Loaded</div>;
 
-    // 4. فضای کار و داشبوردها (Workspace)
+    // 5. Workspaces
     if (activeId === 'workspace_gen') return GeneralWorkspace ? <GeneralWorkspace t={t} isRtl={isRtl} /> : <div>Loading...</div>;
     if (activeId === 'dashboards_gen') return KpiDashboard ? <KpiDashboard t={t} isRtl={isRtl} /> : <div>Loading...</div>;
     if (activeId === 'ui_showcase') return ComponentShowcase ? <ComponentShowcase t={t} isRtl={isRtl} /> : <div>Loading...</div>;
+    if (activeId === 'gl_docs') return ComponentShowcase ? <ComponentShowcase t={t} isRtl={isRtl} /> : <div>Loading...</div>; // Temporarily map to Showcase
 
-    // 5. صفحه خالی (پیش‌فرض)
     return (
       <div className="flex flex-col items-center justify-center h-full text-center space-y-6 opacity-60">
           <div className="p-8 bg-white rounded-[2rem] shadow-sm border border-slate-200">
@@ -152,8 +152,6 @@ const App = () => {
         error={error} 
         handleLogin={handleLogin} 
         toggleLanguage={() => setLang(l => l === 'en' ? 'fa' : 'en')} 
-        
-        // --- Added Handlers ---
         handleVerifyOtp={handleVerifyOtp} 
         handleUpdatePassword={handleUpdatePassword} 
       />
@@ -162,7 +160,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      
       {/* SIDEBAR - Module Rail */}
       <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-40 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative overflow-x-hidden`}>
         <div className="bg-indigo-700 w-10 h-10 rounded-xl text-white mb-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
@@ -183,16 +180,8 @@ const App = () => {
                 `}
               >
                 {mod.icon ? <mod.icon size={20} strokeWidth={isActive ? 2 : 1.5} /> : <Circle size={10}/>}
-                
-                {isActive && (
-                  <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>
-                )}
-
-                <div className={`
-                  absolute ${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 
-                  bg-slate-900 text-white text-[11px] py-1.5 px-3 rounded-md opacity-0 invisible 
-                  group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-xl font-medium
-                `}>
+                {isActive && <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>}
+                <div className={`absolute ${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[11px] py-1.5 px-3 rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-xl font-medium`}>
                   {mod.label ? mod.label[lang] : mod.id}
                   <div className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-[-4px]' : 'left-[-4px]'} w-2 h-2 bg-slate-900 rotate-45`}></div>
                 </div>
@@ -213,38 +202,20 @@ const App = () => {
       </aside>
 
       {/* SIDEBAR - Sub Menu */}
-      <aside className={`
-        bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 
-        flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)]
-        ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}
-      `}>
+      <aside className={`bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)] ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}`}>
         <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 bg-slate-50/30">
            <h2 className="text-sm font-black text-slate-800 truncate leading-tight">
              {currentModule.label ? currentModule.label[lang] : 'Menu'}
            </h2>
         </div>
-        
         <div className="flex-1 overflow-hidden">
           {TreeMenu ? (
-            <TreeMenu 
-              items={currentModule.children || []} 
-              activeId={activeId} 
-              onSelect={setActiveId} 
-              isRtl={isRtl}
-            />
-          ) : (
-             <div className="p-4 text-center text-slate-400 text-xs">Loading Menu Component...</div>
-          )}
+            <TreeMenu items={currentModule.children || []} activeId={activeId} onSelect={setActiveId} isRtl={isRtl} />
+          ) : <div className="p-4 text-center text-slate-400 text-xs">Loading Menu...</div>}
         </div>
-        
         <div className="p-3 border-t border-slate-100 bg-slate-50/50 shrink-0">
-          <div 
-             onClick={() => setActiveId('user_profile')}
-             className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-100"
-          >
-             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-100 to-blue-50 border border-white shadow-sm flex items-center justify-center text-indigo-700 font-black text-xs">
-               AD
-             </div>
+          <div onClick={() => setActiveId('user_profile')} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-100">
+             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-100 to-blue-50 border border-white shadow-sm flex items-center justify-center text-indigo-700 font-black text-xs">AD</div>
              <div className="min-w-0">
                 <div className="text-[12px] font-bold text-slate-700 truncate">Admin User</div>
                 <div className="text-[10px] text-slate-400 truncate">Product Manager</div>
@@ -257,30 +228,19 @@ const App = () => {
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50 relative">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-20">
            <div className="flex items-center gap-4">
-             <button 
-               onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
-               className="p-2 -ml-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-             >
+             <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-2 -ml-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors">
                 {sidebarCollapsed ? <Menu size={20} /> : <ChevronRightSquare size={20} className={isRtl ? '' : 'rotate-180'} />}
              </button>
-             
              <div className="flex items-center gap-2 text-sm">
                 <span className="text-slate-400 font-medium hidden sm:inline">{currentModule.label ? currentModule.label[lang] : ''}</span>
                 <ChevronRight size={14} className={`text-slate-300 hidden sm:inline ${isRtl ? 'rotate-180' : ''}`} />
                 <span className="text-slate-800 font-bold">{activeId === 'user_profile' ? (t.profileTitle || 'User Profile') : activeId}</span>
              </div>
            </div>
-
            <div className="flex items-center gap-3">
               <div className="relative hidden md:block">
                  <Search size={16} className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} text-slate-400`} />
-                 <input 
-                    placeholder={t.searchMenu || 'Search...'}
-                    className={`
-                       h-9 bg-slate-100 border-none rounded-full text-xs w-56 focus:w-72 transition-all
-                       ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} focus:ring-2 focus:ring-indigo-100 outline-none
-                    `}
-                 />
+                 <input placeholder={t.searchMenu || 'Search...'} className={`h-9 bg-slate-100 border-none rounded-full text-xs w-56 focus:w-72 transition-all ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} focus:ring-2 focus:ring-indigo-100 outline-none`} />
               </div>
               <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors relative">
                  <Bell size={18} />
