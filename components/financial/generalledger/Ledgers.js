@@ -1,6 +1,6 @@
 /* Filename: components/financial/generalledger/Ledgers.js */
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Save } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, Search, X } from 'lucide-react';
 
 const Ledgers = ({ t, isRtl }) => {
   const UI = window.UI || {};
@@ -17,7 +17,7 @@ const Ledgers = ({ t, isRtl }) => {
     { value: 'project', label: t.struct_project },
   ];
 
-  // Currency Options (Ideally fetched from Currency Settings)
+  // Currency Options
   const CURRENCY_OPTIONS = [
     { value: 'IRR', label: 'Rial (IRR)' },
     { value: 'USD', label: 'US Dollar (USD)' },
@@ -33,6 +33,13 @@ const Ledgers = ({ t, isRtl }) => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+
+  // Search/Filter State
+  const [filters, setFilters] = useState({
+    code: '',
+    title: '',
+    structure: ''
+  });
 
   // Form State
   const [formData, setFormData] = useState({
@@ -82,6 +89,14 @@ const Ledgers = ({ t, isRtl }) => {
     setIsModalOpen(false);
   };
 
+  // Filter Logic
+  const filteredData = data.filter(item => {
+    const matchCode = item.code.toLowerCase().includes(filters.code.toLowerCase());
+    const matchTitle = item.title.toLowerCase().includes(filters.title.toLowerCase());
+    const matchStructure = filters.structure ? item.structure === filters.structure : true;
+    return matchCode && matchTitle && matchStructure;
+  });
+
   // --- Columns ---
   const columns = [
     { header: t.gl_code, field: 'code', width: 'w-32', sortable: true },
@@ -110,24 +125,71 @@ const Ledgers = ({ t, isRtl }) => {
   ];
 
   return (
-    <div className={`flex flex-col h-full bg-slate-50/50 p-4 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+    <div className={`flex flex-col h-full bg-slate-50/50 p-6 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
       
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="flex items-center justify-between mb-6 shrink-0">
          <div>
-            <h1 className="text-xl font-black text-slate-800">{t.ledgers_title}</h1>
-            <p className="text-slate-500 text-xs mt-1">{t.ledgers_subtitle}</p>
+            <h1 className="text-2xl font-black text-slate-800">{t.ledgers_title}</h1>
+            <p className="text-slate-500 text-sm mt-1">{t.ledgers_subtitle}</p>
+         </div>
+         <Button variant="primary" icon={Plus} onClick={handleCreate}>
+            {t.ledgers_new}
+         </Button>
+      </div>
+
+      {/* ADVANCED SEARCH (Design System Standard) */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-6 shrink-0">
+         <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-sm">
+            <Search size={18} className="text-indigo-600" />
+            {t.filter_title || 'Advanced Search'}
+         </div>
+         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <InputField 
+               placeholder={t.gl_code} 
+               value={filters.code}
+               onChange={e => setFilters({...filters, code: e.target.value})}
+               isRtl={isRtl}
+               className="bg-slate-50"
+            />
+            <InputField 
+               placeholder={t.gl_title_field} 
+               value={filters.title}
+               onChange={e => setFilters({...filters, title: e.target.value})}
+               isRtl={isRtl}
+               className="bg-slate-50"
+            />
+            <SelectField
+               value={filters.structure}
+               onChange={e => setFilters({...filters, structure: e.target.value})}
+               isRtl={isRtl}
+               className="bg-slate-50"
+            >
+               <option value="">{t.all || 'All'} {t.gl_structure}</option>
+               {STRUCTURE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+            </SelectField>
+            
+            <div className="flex items-center gap-2">
+               <Button 
+                  variant="secondary" 
+                  className="flex-1" 
+                  icon={X} 
+                  onClick={() => setFilters({code: '', title: '', structure: ''})}
+               >
+                  {t.btn_clear || 'Clear'}
+               </Button>
+            </div>
          </div>
       </div>
 
       {/* DATA GRID */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
         <DataGrid 
           columns={columns}
-          data={data}
+          data={filteredData}
           isRtl={isRtl}
           selectedIds={selectedIds}
-          onSelectAll={(checked) => setSelectedIds(checked ? data.map(d => d.id) : [])}
+          onSelectAll={(checked) => setSelectedIds(checked ? filteredData.map(d => d.id) : [])}
           onSelectRow={(id, checked) => setSelectedIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))}
           onCreate={handleCreate}
           onDelete={handleDelete}
@@ -192,17 +254,21 @@ const Ledgers = ({ t, isRtl }) => {
                </SelectField>
             </div>
 
-            <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
-               <Toggle 
-                  label={t.gl_is_main} 
-                  checked={formData.isMain} 
-                  onChange={val => setFormData({...formData, isMain: val})} 
-               />
-               <Toggle 
-                  label={t.active_status} 
-                  checked={formData.isActive} 
-                  onChange={val => setFormData({...formData, isActive: val})} 
-               />
+            <div className="flex flex-col gap-3 pt-4 border-t border-slate-100">
+               <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-700">{t.gl_is_main}</span>
+                  <Toggle 
+                     checked={formData.isMain} 
+                     onChange={val => setFormData({...formData, isMain: val})} 
+                  />
+               </div>
+               <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-700">{t.active_status}</span>
+                  <Toggle 
+                     checked={formData.isActive} 
+                     onChange={val => setFormData({...formData, isActive: val})} 
+                  />
+               </div>
             </div>
          </div>
       </Modal>
