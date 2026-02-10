@@ -63,6 +63,7 @@ const Button = ({
       onClick={onClick} 
       disabled={isLoading || disabled} 
       title={title}
+      type="button"
       className={`${baseStyle} ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {isLoading ? <Loader2 size={size === 'sm' || size === 'iconSm' ? 12 : 14} className="animate-spin" /> : (Icon && <Icon size={size === 'sm' || size === 'iconSm' ? 14 : 16} strokeWidth={2} />)}
