@@ -546,7 +546,7 @@ const DataGrid = ({
                   </div>
                 </th>
               ))}
-              <th className="px-3 py-2 w-20 text-center sticky left-0 bg-slate-100 z-10 shadow-[-2px_0_5_rgba(0,0,0,0.05)] border-l border-slate-300">{txtOps}</th>
+              <th className="px-3 py-2 w-20 text-center bg-slate-100 border-l border-slate-300">{txtOps}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -606,7 +606,7 @@ const DataGrid = ({
                          )}
                       </td>
                     ))}
-                    <td className="px-1 py-1 text-center sticky left-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-2px_0_5_rgba(0,0,0,0.02)] z-10">
+                    <td className="px-1 py-1 text-center bg-white group-hover:bg-slate-50 border-l border-slate-100">
                       <div className="flex items-center justify-center gap-1 opacity-100">
                         {actions ? actions(row) : null}
                       </div>
