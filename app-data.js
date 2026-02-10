@@ -1,8 +1,6 @@
 /* Filename: app-data.js */
 
 import * as LucideIcons from 'lucide-react';
-// IMPORT SUB-MODULE DATA
-import { GL_MENU_ITEMS, GL_TRANSLATIONS, GL_DEFAULT_SCHEMA } from './components/financial/generalledger/gl-data.js';
 
 const { 
   LayoutDashboard, Component, Briefcase, Users, GitBranch, Settings, Key,
@@ -50,7 +48,7 @@ const CORE_MENU = [
       { id: 'workspace_spec', label: { en: 'Specific Workspace', fa: 'میزکار اختصاصی' } }
     ]
   },
-  // GL_MENU_ITEMS will be injected here
+  // GL_MENU_ITEMS will be injected here if available
   {
     id: 'hr',
     label: { en: 'Human Capital', fa: 'سرمایه انسانی' },
@@ -109,10 +107,15 @@ const CORE_MENU = [
   }
 ];
 
-// Combine Core Menu with Module Menus
-// Insert Accounting Menu at index 3 (after Workspace)
+// --- SAFELY MERGE MODULES ---
 const COMBINED_MENU = [...CORE_MENU];
-COMBINED_MENU.splice(3, 0, GL_MENU_ITEMS);
+const glData = window.GL_DATA;
+
+if (glData && glData.menuItems) {
+  // Restore icon object from name
+  const glMenu = { ...glData.menuItems, icon: LucideIcons[glData.menuItems.iconName] || BarChart3 };
+  COMBINED_MENU.splice(3, 0, glMenu);
+}
 
 // EXPOSE TO WINDOW
 window.MENU_DATA = COMBINED_MENU;
@@ -152,7 +155,8 @@ const CORE_SCHEMAS = [
 ];
 
 // Combine Core Schemas with Module Schemas
-window.DEFAULT_VALUES_SCHEMA = [GL_DEFAULT_SCHEMA, ...CORE_SCHEMAS];
+const glSchema = (glData && glData.schema) ? [{...glData.schema, icon: LucideIcons[glData.schema.iconName] || BarChart3}] : [];
+window.DEFAULT_VALUES_SCHEMA = [...glSchema, ...CORE_SCHEMAS];
 
 
 // --- TRANSLATIONS ---
@@ -407,6 +411,38 @@ const coreTranslations = {
     detail_assign_btn: "Assign",
     detail_assign_msg: "Detail code assigned.",
     active_status: "Active Status",
+    acc_mgmt_title: "Accounting Document Management",
+    acc_mgmt_subtitle: "List of all financial documents with search and batch operation capabilities",
+    grid_title: "Document List",
+    col_docNo: "Doc No",
+    col_date: "Date",
+    col_dept: "Department",
+    col_desc: "Description",
+    col_debtor: "Debtor",
+    col_status: "Status",
+    col_active: "Active",
+    col_actions: "Actions",
+    status_final: "Final",
+    status_draft: "Draft",
+    status_reviewed: "Reviewed",
+    filter_fromDoc: "From Doc No",
+    filter_toDoc: "To Doc No",
+    filter_fromDate: "From Date",
+    filter_toDate: "To Date",
+    filter_status: "Document Status",
+    filter_costCenter: "Cost Center",
+    filter_subsidiary: "Subsidiary Account",
+    filter_allStatus: "All Statuses",
+    modal_newDoc: "New Document",
+    modal_editDoc: "Edit Document",
+    modal_warning: "Note: Changes to final documents require financial manager approval.",
+    field_docType: "Document Type",
+    field_general: "General",
+    field_opening: "Opening",
+    field_party: "Party",
+    field_selectParty: "Select Person...",
+    field_amount: "Document Amount",
+    field_isActive: "Active Document",
     usersListTitle: 'User Management',
     usersListSubtitle: 'Manage system access and user profiles',
     createNewUser: 'New User',
@@ -742,6 +778,38 @@ const coreTranslations = {
     detail_assign_btn: "تخصیص کد",
     detail_assign_msg: "کد تفصیلی با موفقیت تخصیص یافت.",
     active_status: "وضعیت فعال",
+    acc_mgmt_title: "مدیریت اسناد حسابداری",
+    acc_mgmt_subtitle: "لیست کلیه اسناد مالی با قابلیت جستجو و عملیات گروهی",
+    grid_title: "لیست اسناد",
+    col_docNo: "شماره سند",
+    col_date: "تاریخ",
+    col_dept: "دپارتمان",
+    col_desc: "شرح سند",
+    col_debtor: "بدهکار (ریال)",
+    col_status: "وضعیت",
+    col_active: "فعال",
+    col_actions: "عملیات",
+    status_final: "نهایی",
+    status_draft: "پیش‌نویس",
+    status_reviewed: "بررسی شده",
+    filter_fromDoc: "از شماره سند",
+    filter_toDoc: "تا شماره سند",
+    filter_fromDate: "از تاریخ",
+    filter_toDate: "تا تاریخ",
+    filter_status: "وضعیت سند",
+    filter_costCenter: "مرکز هزینه",
+    filter_subsidiary: "معین",
+    filter_allStatus: "همه وضعیت‌ها",
+    modal_newDoc: "سند جدید",
+    modal_editDoc: "ویرایش سند",
+    modal_warning: "لطفاً دقت کنید: تغییرات در اسناد نهایی نیازمند تایید مدیر مالی می‌باشد.",
+    field_docType: "نوع سند",
+    field_general: "عمومی",
+    field_opening: "افتتاحیه",
+    field_party: "طرف حساب",
+    field_selectParty: "انتخاب شخص...",
+    field_amount: "مبلغ سند",
+    field_isActive: "سند فعال باشد",
     usersListTitle: 'مدیریت کاربران',
     usersListSubtitle: 'مدیریت دسترسی‌ها و پروفایل‌های کاربری سیستم',
     createNewUser: 'کاربر جدید',
@@ -827,5 +895,6 @@ const coreTranslations = {
     ph_name: "نام طرف حساب",
     ph_phone: "شماره تماس"
   },
-  fa: { ...coreTranslations.fa, ...GL_TRANSLATIONS.fa }
+  fa: { ...coreTranslations.fa, ...(glData && glData.translations ? glData.translations.fa : {}) },
+  en: { ...coreTranslations.en, ...(glData && glData.translations ? glData.translations.en : {}) }
 };
