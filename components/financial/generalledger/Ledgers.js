@@ -6,18 +6,16 @@ const Ledgers = ({ t, isRtl }) => {
   const UI = window.UI || {};
   const { 
     Button, InputField, SelectField, Toggle, Badge, 
-    DataGrid, Modal 
+    DataGrid, Modal, FilterSection 
   } = UI;
 
   // --- MOCK DATA ---
-  // Structure Options
   const STRUCTURE_OPTIONS = [
     { value: 'std', label: t.struct_std },
     { value: 'service', label: t.struct_service },
     { value: 'project', label: t.struct_project },
   ];
 
-  // Currency Options
   const CURRENCY_OPTIONS = [
     { value: 'IRR', label: 'Rial (IRR)' },
     { value: 'USD', label: 'US Dollar (USD)' },
@@ -121,7 +119,12 @@ const Ledgers = ({ t, isRtl }) => {
         </Badge>
       )
     },
-    { header: t.gl_status, field: 'isActive', type: 'toggle', width: 'w-24 text-center' },
+    { 
+       header: t.gl_status, 
+       field: 'isActive', 
+       width: 'w-24 text-center',
+       type: 'toggle' // DataGrid handles this automatically
+    },
   ];
 
   return (
@@ -138,52 +141,40 @@ const Ledgers = ({ t, isRtl }) => {
          </Button>
       </div>
 
-      {/* ADVANCED SEARCH (Design System Standard) */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-6 shrink-0">
-         <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold text-sm">
-            <Search size={18} className="text-indigo-600" />
-            {t.filter_title || 'Advanced Search'}
-         </div>
-         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <InputField 
-               placeholder={t.gl_code} 
-               value={filters.code}
-               onChange={e => setFilters({...filters, code: e.target.value})}
-               isRtl={isRtl}
-               className="bg-slate-50"
-            />
-            <InputField 
-               placeholder={t.gl_title_field} 
-               value={filters.title}
-               onChange={e => setFilters({...filters, title: e.target.value})}
-               isRtl={isRtl}
-               className="bg-slate-50"
-            />
-            <SelectField
-               value={filters.structure}
-               onChange={e => setFilters({...filters, structure: e.target.value})}
-               isRtl={isRtl}
-               className="bg-slate-50"
-            >
-               <option value="">{t.all || 'All'} {t.gl_structure}</option>
-               {STRUCTURE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-            </SelectField>
-            
-            <div className="flex items-center gap-2">
-               <Button 
-                  variant="secondary" 
-                  className="flex-1" 
-                  icon={X} 
-                  onClick={() => setFilters({code: '', title: '', structure: ''})}
-               >
-                  {t.btn_clear || 'Clear'}
-               </Button>
-            </div>
-         </div>
-      </div>
+      {/* 1. FILTER SECTION (Standard UI Component) */}
+      <FilterSection 
+         onSearch={() => {}} // Live search usually doesn't need explicit button but kept for standard
+         onClear={() => setFilters({code: '', title: '', structure: ''})}
+         isRtl={isRtl}
+         title={t.filter_title}
+      >
+         <InputField 
+            label={t.gl_code}
+            placeholder={t.gl_code} 
+            value={filters.code}
+            onChange={e => setFilters({...filters, code: e.target.value})}
+            isRtl={isRtl}
+         />
+         <InputField 
+            label={t.gl_title_field}
+            placeholder={t.gl_title_field} 
+            value={filters.title}
+            onChange={e => setFilters({...filters, title: e.target.value})}
+            isRtl={isRtl}
+         />
+         <SelectField
+            label={t.gl_structure}
+            value={filters.structure}
+            onChange={e => setFilters({...filters, structure: e.target.value})}
+            isRtl={isRtl}
+         >
+            <option value="">{t.all} {t.gl_structure}</option>
+            {STRUCTURE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+         </SelectField>
+      </FilterSection>
 
-      {/* DATA GRID */}
-      <div className="flex-1 min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+      {/* 3. DATA GRID (Standard UI Component with Actions) */}
+      <div className="flex-1 min-h-0">
         <DataGrid 
           columns={columns}
           data={filteredData}
@@ -196,14 +187,14 @@ const Ledgers = ({ t, isRtl }) => {
           onDoubleClick={handleEdit}
           actions={(row) => (
              <>
-               <Button variant="ghost" size="iconSm" icon={Edit} className="text-indigo-600" onClick={() => handleEdit(row)} title={t.ledgers_edit} />
-               <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500" onClick={() => handleDelete([row.id])} title={t.delete} />
+               <Button variant="ghost" size="iconSm" icon={Edit} className="text-indigo-600 hover:bg-indigo-50" onClick={() => handleEdit(row)} title={t.ledgers_edit} />
+               <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDelete([row.id])} title={t.delete} />
              </>
           )}
         />
       </div>
 
-      {/* MODAL */}
+      {/* 2. MODAL (Standard UI Component with Correct Layout) */}
       <Modal 
          isOpen={isModalOpen} 
          onClose={() => setIsModalOpen(false)} 
@@ -217,7 +208,8 @@ const Ledgers = ({ t, isRtl }) => {
          }
       >
          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            {/* Row 1 */}
+            <div className="grid grid-cols-2 gap-4">
                <InputField 
                   label={t.gl_code} 
                   value={formData.code} 
@@ -232,7 +224,8 @@ const Ledgers = ({ t, isRtl }) => {
                />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* Row 2 */}
+            <div className="grid grid-cols-2 gap-4">
                <SelectField 
                   label={t.gl_structure} 
                   value={formData.structure} 
@@ -254,17 +247,20 @@ const Ledgers = ({ t, isRtl }) => {
                </SelectField>
             </div>
 
-            <div className="flex flex-col gap-3 pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-700">{t.gl_is_main}</span>
+            {/* Row 3 - Status & Main Ledger Side-by-Side */}
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+               <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-bold text-slate-600">{t.gl_is_main}</span>
                   <Toggle 
+                     label={formData.isMain ? t.gl_main_yes : t.gl_main_no}
                      checked={formData.isMain} 
                      onChange={val => setFormData({...formData, isMain: val})} 
                   />
                </div>
-               <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-700">{t.active_status}</span>
+               <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-bold text-slate-600">{t.gl_status}</span>
                   <Toggle 
+                     label={formData.isActive ? t.active : t.inactive} // Uses core translations for Active/Inactive
                      checked={formData.isActive} 
                      onChange={val => setFormData({...formData, isActive: val})} 
                   />
