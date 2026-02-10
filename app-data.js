@@ -826,11 +826,6 @@ const coreTranslations = {
     btn_save_data: "ذخیره اطلاعات",
     ph_name: "نام طرف حساب",
     ph_phone: "شماره تماس"
-  }
-};
-
-// Merge translations
-window.translations = {
-  en: { ...coreTranslations.en, ...GL_TRANSLATIONS.en },
+  },
   fa: { ...coreTranslations.fa, ...GL_TRANSLATIONS.fa }
 };
