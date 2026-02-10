@@ -1,12 +1,11 @@
 /* Filename: components/financial/generalledger/gl-data.js */
 
-// استفاده از window برای جلوگیری از خطای ایمپورت
+// تعریف آبجکت داده به صورت گلوبال و ایمن
 window.GL_DATA = {
   // 1. GL SPECIFIC MENU ITEMS
   menuItems: {
     id: 'accounting', 
     label: { en: 'Accounting', fa: 'حسابداری و مالی' }, 
-    // آیکون را بعداً در app-data.js ست می‌کنیم چون اینجا دسترسی به Lucide نداریم
     iconName: 'BarChart3', 
     children: [
       { 
@@ -63,8 +62,7 @@ window.GL_DATA = {
             children: [
               { id: 'balance_control', label: { en: 'Balance Control', fa: 'کنترل مانده منابع' } }
             ]
-          },
-          // ... Other Treasury items
+          }
         ]
       },
       { id: 'budgeting', label: { en: 'Budgeting', fa: 'بودجه‌ریزی' } },
@@ -89,6 +87,11 @@ window.GL_DATA = {
       struct_std: "Standard Industrial",
       struct_service: "Service Based",
       struct_project: "Project Based",
+      btn_search: "Search",
+      btn_clear: "Clear Filters",
+      active_status: "Active Status",
+      filter_title: "Advanced Search",
+      all: "All"
     },
     fa: {
       ledgers_title: "دفاتر کل",
@@ -106,6 +109,11 @@ window.GL_DATA = {
       struct_std: "استاندارد صنعتی",
       struct_service: "خدماتی",
       struct_project: "پروژه محور",
+      btn_search: "جستجو",
+      btn_clear: "پاک کردن فیلترها",
+      active_status: "وضعیت فعال",
+      filter_title: "جستجوی پیشرفته",
+      all: "همه"
     }
   },
 
