@@ -1,6 +1,5 @@
 /* Filename: components/financial/generalledger/gl-data.js */
 
-// تعریف آبجکت داده به صورت گلوبال و ایمن
 window.GL_DATA = {
   // 1. GL SPECIFIC MENU ITEMS
   menuItems: {
@@ -78,7 +77,7 @@ window.GL_DATA = {
       ledgers_edit: "Edit Ledger",
       gl_code: "Ledger Code",
       gl_title_field: "Ledger Title",
-      gl_status: "Status",
+      gl_status: "Status", // Changed from Active Status
       gl_is_main: "Is Main Ledger",
       gl_structure: "Account Structure",
       gl_currency: "Base Currency",
@@ -89,7 +88,6 @@ window.GL_DATA = {
       struct_project: "Project Based",
       btn_search: "Search",
       btn_clear: "Clear Filters",
-      active_status: "Active Status",
       filter_title: "Advanced Search",
       all: "All"
     },
@@ -100,7 +98,7 @@ window.GL_DATA = {
       ledgers_edit: "ویرایش دفتر",
       gl_code: "کد دفتر",
       gl_title_field: "عنوان دفتر",
-      gl_status: "وضعیت",
+      gl_status: "وضعیت", // Changed from وضعیت فعال
       gl_is_main: "دفتر اصلی",
       gl_structure: "ساختار حساب",
       gl_currency: "ارز اصلی",
@@ -111,7 +109,6 @@ window.GL_DATA = {
       struct_project: "پروژه محور",
       btn_search: "جستجو",
       btn_clear: "پاک کردن فیلترها",
-      active_status: "وضعیت فعال",
       filter_title: "جستجوی پیشرفته",
       all: "همه"
     }
