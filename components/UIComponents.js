@@ -1,37 +1,13 @@
 /* Filename: components/UIComponents.js */
 import React, { useState, useMemo, useEffect } from 'react';
-import * as LucideIcons from 'lucide-react';
-
-// Extract icons safely
-const Loader2 = LucideIcons.Loader2;
-const ChevronDown = LucideIcons.ChevronDown;
-const ChevronRight = LucideIcons.ChevronRight;
-const Search = LucideIcons.Search;
-const X = LucideIcons.X;
-const Check = LucideIcons.Check;
-const Filter = LucideIcons.Filter;
-const Settings = LucideIcons.Settings;
-const ChevronLeft = LucideIcons.ChevronLeft;
-const ChevronsLeft = LucideIcons.ChevronsLeft;
-const ChevronsRight = LucideIcons.ChevronsRight;
-const List = LucideIcons.List;
-const MoreVertical = LucideIcons.MoreVertical;
-const Plus = LucideIcons.Plus;
-const Trash2 = LucideIcons.Trash2;
-const Download = LucideIcons.Download;
-const Printer = LucideIcons.Printer;
-const Edit = LucideIcons.Edit;
-const Eye = LucideIcons.Eye;
-const Maximize2 = LucideIcons.Maximize2;
-const Minimize2 = LucideIcons.Minimize2;
-const FolderOpen = LucideIcons.FolderOpen;
-const Folder = LucideIcons.Folder;
-const FileText = LucideIcons.FileText;
-const AlertCircle = LucideIcons.AlertCircle;
-const ArrowRight = LucideIcons.ArrowRight;
-const ArrowUp = LucideIcons.ArrowUp;
-const ArrowDown = LucideIcons.ArrowDown;
-const Info = LucideIcons.Info;
+import { 
+  Loader2, ChevronDown, ChevronRight, Search, X, 
+  Check, Filter, Settings, ChevronLeft,
+  ChevronsLeft, ChevronsRight, List, MoreVertical,
+  Plus, Trash2, Download, Printer, Edit, Eye, 
+  Maximize2, Minimize2, FolderOpen, Folder, FileText,
+  AlertCircle, ArrowRight, ArrowUp, ArrowDown, Info
+} from 'lucide-react';
 
 // --- ENTERPRISE THEME TOKENS ---
 const THEME = {
@@ -62,7 +38,7 @@ const THEME = {
 // --- 1. ATOMIC COMPONENTS ---
 
 const Button = ({ 
-  children, variant = 'primary', icon, isLoading, className = '', onClick, disabled, size = 'default', title
+  children, variant = 'primary', icon: Icon, isLoading, className = '', onClick, disabled, size = 'default', title
 }) => {
   const baseStyle = `flex items-center justify-center gap-1.5 px-3 ${THEME.metrics.radius} font-medium ${THEME.metrics.fontSize} transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed select-none whitespace-nowrap active:scale-[0.98] outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-100`;
   
@@ -81,29 +57,15 @@ const Button = ({
     icon: 'h-8 w-8 px-0',
     iconSm: 'h-6 w-6 px-0',
   };
-  
-  // Determine Icon Element
-  let IconElement = null;
-  const iconSize = size === 'sm' || size === 'iconSm' ? 14 : 16;
-  
-  if (isLoading) {
-    IconElement = <Loader2 size={iconSize} className="animate-spin" />;
-  } else if (React.isValidElement(icon)) {
-    IconElement = React.cloneElement(icon, { size: iconSize, strokeWidth: 2 });
-  } else if (icon) {
-    const IconComp = icon;
-    IconElement = <IconComp size={iconSize} strokeWidth={2} />;
-  }
 
   return (
     <button 
       onClick={onClick} 
       disabled={isLoading || disabled} 
       title={title}
-      type="button"
       className={`${baseStyle} ${variants[variant]} ${sizes[size]} ${className}`}
     >
-      {IconElement}
+      {isLoading ? <Loader2 size={size === 'sm' || size === 'iconSm' ? 12 : 14} className="animate-spin" /> : (Icon && <Icon size={size === 'sm' || size === 'iconSm' ? 14 : 16} strokeWidth={2} />)}
       {children}
     </button>
   );
@@ -584,7 +546,7 @@ const DataGrid = ({
                   </div>
                 </th>
               ))}
-              <th className="px-3 py-2 w-20 text-center bg-slate-100 border-l border-slate-300">{txtOps}</th>
+              <th className="px-3 py-2 w-20 text-center sticky left-0 bg-slate-100 z-10 shadow-[-2px_0_5_rgba(0,0,0,0.05)] border-l border-slate-300">{txtOps}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -644,7 +606,7 @@ const DataGrid = ({
                          )}
                       </td>
                     ))}
-                    <td className="px-1 py-1 text-center bg-white group-hover:bg-slate-50 border-l border-slate-100">
+                    <td className="px-1 py-1 text-center sticky left-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 shadow-[-2px_0_5_rgba(0,0,0,0.02)] z-10">
                       <div className="flex items-center justify-center gap-1 opacity-100">
                         {actions ? actions(row) : null}
                       </div>
