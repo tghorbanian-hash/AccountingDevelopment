@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Accounting System (Enterprise Edition)</title>
+    
+    <script>
+        // Redirect logic for GitHub Pages SPA
+        (function() {
+            var path = window.location.pathname;
+            if (!path.endsWith('/') && path.split('/').pop().indexOf('.') === -1) {
+                window.location.replace(path + '/' + window.location.search + window.location.hash);
+            }
+        })();
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
+    
+    <script>
+        var exports = {}; 
+        var process = { env: { NODE_ENV: 'development' } };
+    </script>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0"
+      }
+    }
+    </script>
+    
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+    <style>
+        #root { height: 100vh; }
+        body { 
+            font-family: 'Vazirmatn', sans-serif !important;
+            font-size: 13px; 
+            overflow: hidden;
+        }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module" src="./app-data.js"></script>
+    <script type="text/babel" data-type="module" src="./components/UIComponents.js"></script>
+
+    <script type="text/babel" data-type="module" src="./components/ComponentShowcase.js"></script>
+    <script type="text/babel" data-type="module" src="./components/LoginPage.js"></script>
+    <script type="text/babel" data-type="module" src="./components/UserProfile.js"></script>
+
+    <script type="text/babel" data-type="module" src="./components/KpiDashboard.js"></script>
+    <script type="text/babel" data-type="module" src="./components/GeneralWorkspace.js"></script>
+    
+    <script type="text/babel" data-type="module" src="./components/UserManagement.js"></script>
+    <script type="text/babel" data-type="module" src="./components/Roles.js"></script>
+    
+    <script type="text/babel" data-type="module" src="./components/Parties.js"></script>
+    <script type="text/babel" data-type="module" src="./components/OrganizationInfo.js"></script>
+    <script type="text/babel" data-type="module" src="./components/CurrencySettings.js"></script>
+    <script type="text/babel" data-type="module" src="./components/CostCenters.js"></script>
+    <script type="text/babel" data-type="module" src="./components/Projects.js"></script>
+    <script type="text/babel" data-type="module" src="./components/Branches.js"></script>
+    <script type="text/babel" data-type="module" src="./components/OrgChart.js"></script>
+
+    <script type="text/babel" data-type="module" src="./app.js"></script>
+</body>
+</html>
