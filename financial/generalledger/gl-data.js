@@ -198,7 +198,7 @@ export const GL_TRANS = {
     an_edit_dt: "Edit Detail Numbering",
     
     // AN - Accounts
-    an_acc_group: "Account Group",
+    an_acc_group: "Group Account",
     an_acc_general: "General Account",
     an_acc_subsidiary: "Subsidiary Account",
     an_mode: "Generation Mode",
@@ -210,6 +210,7 @@ export const GL_TRANS = {
     an_select_ledger: "Select Ledger",
     an_reset_year: "Reset Numbering on New Fiscal Year",
     an_unique_scope: "Uniqueness Control Scope",
+    an_scope_none: "None",
     an_scope_ledger: "Ledger",
     an_scope_branch: "Branch",
     an_scope_company: "Company",
@@ -392,6 +393,7 @@ export const GL_TRANS = {
     an_select_ledger: "انتخاب دفتر کل",
     an_reset_year: "ریست شماره‌گذاری در سال مالی جدید",
     an_unique_scope: "محدوده کنترل یکتایی شماره سند",
+    an_scope_none: "بدون کنترل",
     an_scope_ledger: "دفتر",
     an_scope_branch: "شعبه",
     an_scope_company: "شرکت",
