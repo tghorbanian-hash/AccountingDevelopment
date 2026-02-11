@@ -123,6 +123,9 @@ export const GL_TRANS = {
     fp_year_title: "Year Title",
     fp_start_date: "Start Date",
     fp_end_date: "End Date",
+    fp_calendar_type: "Calendar System",
+    fp_jalali: "Jalali (Persian)",
+    fp_gregorian: "Gregorian",
     fp_new_year: "New Fiscal Year",
     fp_edit_year: "Edit Fiscal Year",
     fp_ops_periods: "Operational Periods",
@@ -140,6 +143,7 @@ export const GL_TRANS = {
     fp_exc_desc: "Users allowed to bypass current period status",
     fp_add_user: "Add User to Exceptions",
     fp_user: "User",
+    fp_select_user: "Select User...",
 
     // System Detail Names
     sys_partner: "Business Partner",
@@ -232,6 +236,9 @@ export const GL_TRANS = {
     fp_year_title: "عنوان سال مالی",
     fp_start_date: "تاریخ شروع",
     fp_end_date: "تاریخ پایان",
+    fp_calendar_type: "نوع تقویم",
+    fp_jalali: "هجری شمسی",
+    fp_gregorian: "میلادی",
     fp_new_year: "تعریف سال مالی جدید",
     fp_edit_year: "ویرایش سال مالی",
     fp_ops_periods: "دوره‌های عملیاتی",
@@ -249,6 +256,7 @@ export const GL_TRANS = {
     fp_exc_desc: "کاربرانی که مجاز به فعالیت در وضعیت فعلی دوره هستند",
     fp_add_user: "افزودن کاربر به لیست استثنا",
     fp_user: "نام کاربر",
+    fp_select_user: "انتخاب کاربر...",
 
     // System Detail Names
     sys_partner: "طرف تجاری",
