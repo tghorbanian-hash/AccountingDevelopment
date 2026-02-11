@@ -131,6 +131,41 @@ export const GL_TRANS = {
     sys_sales_office: "Sales Office",
     sys_price_zone: "Pricing Zone",
     sys_item: "Item/Product",
+
+    // Ledgers & Other
+    acc_mgmt_title: "Accounting Document Management",
+    ledgers_title: "Ledgers Management",
+    lg_code: "Code",
+    lg_title: "Title",
+    
+    // Fiscal Periods Page
+    fp_title: "Fiscal Periods Management",
+    fp_subtitle: "Define fiscal years and their operational periods",
+    fp_year_code: "Year Code",
+    fp_year_title: "Year Title",
+    fp_start_date: "Start Date",
+    fp_end_date: "End Date",
+    fp_new_year: "New Fiscal Year",
+    fp_edit_year: "Edit Fiscal Year",
+    
+    // Operational Periods
+    fp_ops_periods: "Operational Periods",
+    fp_period_code: "Period Code",
+    fp_period_title: "Period Title",
+    fp_status: "Period Status",
+    fp_st_not_open: "Not Open",
+    fp_st_open: "Open",
+    fp_st_closed: "Closed",
+    fp_auto_gen: "Auto Generate Periods",
+    fp_gen_monthly: "Monthly",
+    fp_gen_quarterly: "Quarterly",
+    fp_gen_semi: "Semi-Annually",
+    
+    // Exceptions & Access
+    fp_exceptions: "Access Exceptions",
+    fp_exc_desc: "Users allowed to bypass current period status",
+    fp_add_user: "Add User to Exceptions",
+    fp_user: "User",
   },
   fa: {
     // Document Management
@@ -215,5 +250,40 @@ export const GL_TRANS = {
     sys_sales_office: "دفتر فروش",
     sys_price_zone: "حوزه قیمت‌گذاری",
     sys_item: "کالا/محصول",
+
+    // Ledgers & Other
+    acc_mgmt_title: "مدیریت اسناد حسابداری",
+    ledgers_title: "مدیریت دفاتر",
+    lg_code: "کد",
+    lg_title: "عنوان",
+
+    // Fiscal Periods Page
+    fp_title: "مدیریت دوره‌های مالی",
+    fp_subtitle: "تعریف سال‌های مالی و دوره‌های عملیاتی زیرمجموعه",
+    fp_year_code: "کد سال مالی",
+    fp_year_title: "عنوان سال مالی",
+    fp_start_date: "تاریخ شروع",
+    fp_end_date: "تاریخ پایان",
+    fp_new_year: "تعریف سال مالی جدید",
+    fp_edit_year: "ویرایش سال مالی",
+    
+    // Operational Periods
+    fp_ops_periods: "دوره‌های عملیاتی",
+    fp_period_code: "کد دوره",
+    fp_period_title: "عنوان دوره",
+    fp_status: "وضعیت دوره",
+    fp_st_not_open: "باز نشده",
+    fp_st_open: "باز",
+    fp_st_closed: "بسته شده",
+    fp_auto_gen: "تولید اتوماتیک دوره‌ها",
+    fp_gen_monthly: "ماهانه",
+    fp_gen_quarterly: "سه ماهه",
+    fp_gen_semi: "شش ماهه",
+    
+    // Exceptions & Access
+    fp_exceptions: "استثنائات دسترسی",
+    fp_exc_desc: "کاربرانی که مجاز به فعالیت در وضعیت فعلی دوره هستند",
+    fp_add_user: "افزودن کاربر به لیست استثنا",
+    fp_user: "نام کاربر",
   }
 };
