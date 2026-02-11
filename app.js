@@ -117,7 +117,7 @@ const App = () => {
     // 2.1 اطلاعات پایه مالی (Financial Base Info)
     if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
     if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Details Component Not Loaded</div>;
-    if (activeId === 'fiscalperiods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
+    if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
 
 
     // 3. امنیت و دسترسی (Security)
