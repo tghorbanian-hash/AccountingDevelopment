@@ -6,7 +6,6 @@
     <title>Financial Accounting System (Enterprise Edition)</title>
     
     <script>
-        // Redirect logic for GitHub Pages SPA
         (function() {
             var path = window.location.pathname;
             if (!path.endsWith('/') && path.split('/').pop().indexOf('.') === -1) {
@@ -16,7 +15,6 @@
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <script>
         tailwind.config = {
             theme: {
@@ -49,6 +47,7 @@
     </script>
     
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+
     <style>
         #root { height: 100vh; }
         body { 
@@ -56,6 +55,7 @@
             font-size: 13px; 
             overflow: hidden;
         }
+        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -68,18 +68,18 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module" src="./app-data.js"></script>
+    <script type="text/babel" data-type="module" src="./financial/generalledger/gl-data.js"></script>
+
     <script type="text/babel" data-type="module" src="./components/UIComponents.js"></script>
 
     <script type="text/babel" data-type="module" src="./components/ComponentShowcase.js"></script>
     <script type="text/babel" data-type="module" src="./components/LoginPage.js"></script>
     <script type="text/babel" data-type="module" src="./components/UserProfile.js"></script>
-
     <script type="text/babel" data-type="module" src="./components/KpiDashboard.js"></script>
     <script type="text/babel" data-type="module" src="./components/GeneralWorkspace.js"></script>
     
     <script type="text/babel" data-type="module" src="./components/UserManagement.js"></script>
     <script type="text/babel" data-type="module" src="./components/Roles.js"></script>
-    
     <script type="text/babel" data-type="module" src="./components/Parties.js"></script>
     <script type="text/babel" data-type="module" src="./components/OrganizationInfo.js"></script>
     <script type="text/babel" data-type="module" src="./components/CurrencySettings.js"></script>

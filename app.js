@@ -6,7 +6,9 @@ import {
   ChevronRight, LogOut, LayoutGrid, ChevronRightSquare,
   Menu, Circle
 } from 'lucide-react';
-import AutoNumbering from './financial/generalledger/AutoNumbering';
+
+// NOTE: Components are loaded via script tags in index.html and accessed via window object
+// Do NOT import custom components here using 'import ... from ...' statements.
 
 const App = () => {
   const MENU_DATA = window.MENU_DATA || [];
@@ -80,7 +82,7 @@ const App = () => {
   }, [activeModuleId, MENU_DATA]);
   
   const renderContent = () => {
-    // دریافت کامپوننت‌ها از window
+    // Retrieve components from window object (loaded via script tags)
     const { 
       KpiDashboard, 
       UserManagement, 
@@ -103,12 +105,12 @@ const App = () => {
       AutoNumbering
     } = window;
 
-    // --- مسیردهی صفحات (Routing) ---
+    // --- Routing Logic ---
     
-    // 1. پروفایل کاربری
+    // 1. User Profile
     if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error: UserProfile Component Not Loaded</div>;
 
-    // 2. اطلاعات پایه (Base Info)
+    // 2. Base Information
     if (activeId === 'org_info') return OrganizationInfo ? <OrganizationInfo t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrganizationInfo Component Not Loaded</div>;
     if (activeId === 'currency_settings') return CurrencySettings ? <CurrencySettings t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: CurrencySettings Component Not Loaded</div>;
     if (activeId === 'parties') return Parties ? <Parties t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Parties Component Not Loaded</div>;
@@ -117,24 +119,26 @@ const App = () => {
     if (activeId === 'branches') return Branches ? <Branches t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Branches Component Not Loaded</div>;
     if (activeId === 'org_chart') return OrgChart ? <OrgChart t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrgChart Component Not Loaded</div>;
 
-    // 2.1 اطلاعات پایه مالی (Financial Base Info)
+    // 2.1 Financial Base Info (General Ledger)
     if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
     if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Details Component Not Loaded</div>;
+    
+    // New Components Added Here:
     if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
     if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
     if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
 
 
-    // 3. امنیت و دسترسی (Security)
+    // 3. Security & Access
     if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
     if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Roles Component Not Loaded</div>;
 
-    // 4. فضای کار و داشبوردها (Workspace)
+    // 4. Workspaces & Dashboards
     if (activeId === 'workspace_gen') return GeneralWorkspace ? <GeneralWorkspace t={t} isRtl={isRtl} /> : <div>Loading...</div>;
     if (activeId === 'dashboards_gen') return KpiDashboard ? <KpiDashboard t={t} isRtl={isRtl} /> : <div>Loading...</div>;
     if (activeId === 'ui_showcase') return ComponentShowcase ? <ComponentShowcase t={t} isRtl={isRtl} /> : <div>Loading...</div>;
 
-    // 5. صفحه خالی (پیش‌فرض)
+    // 5. Default / Empty State
     return (
       <div className="flex flex-col items-center justify-center h-full text-center space-y-6 opacity-60">
           <div className="p-8 bg-white rounded-[2rem] shadow-sm border border-slate-200">
