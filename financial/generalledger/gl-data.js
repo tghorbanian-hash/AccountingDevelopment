@@ -113,7 +113,9 @@ export const GL_TRANS = {
     dt_entity_code: "Entity Code",
     dt_entity_title: "Entity Title",
     dt_alloc_code: "Allocated Detail Code",
-    dt_auto_map: "Auto Map Codes",
+    dt_assign_btn: "Assign Code",
+    dt_assign_title: "Assign Detail Code",
+    dt_enter_code: "Enter the new detail code for this entity:",
     
     // System Detail Names
     sys_partner: "Business Partner",
@@ -195,7 +197,9 @@ export const GL_TRANS = {
     dt_entity_code: "کد موجودیت",
     dt_entity_title: "عنوان موجودیت",
     dt_alloc_code: "کد تفصیلی تخصیص یافته",
-    dt_auto_map: "تولید خودکار کد تفصیلی",
+    dt_assign_btn: "تخصیص کد",
+    dt_assign_title: "تخصیص کد تفصیلی",
+    dt_enter_code: "کد تفصیلی مورد نظر برای این موجودیت را وارد کنید:",
     
     // System Detail Names
     sys_partner: "طرف تجاری",

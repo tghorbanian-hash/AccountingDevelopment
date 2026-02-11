@@ -1,6 +1,6 @@
 /* Filename: financial/generalledger/Details.js */
 import React, { useState, useMemo } from 'react';
-import { Edit, Trash2, List, Shield, UserCog, RefreshCw } from 'lucide-react';
+import { Edit, Trash2, List, Shield, UserCog, Key } from 'lucide-react';
 
 const Details = ({ t, isRtl }) => {
   const { 
@@ -33,26 +33,32 @@ const Details = ({ t, isRtl }) => {
 
   const [showTypeModal, setShowTypeModal] = useState(false);
   const [showInstanceModal, setShowInstanceModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [searchParams, setSearchParams] = useState({ title: '', type: 'all' });
   const [selectedDetailType, setSelectedDetailType] = useState(null);
   
-  // Mock Data for Instances (This simulates data fetched from Projects, CostCenters, etc.)
+  // Assignment State
+  const [assigningItem, setAssigningItem] = useState(null); // The instance being assigned a code
+  const [newDetailCode, setNewDetailCode] = useState('');
+
+  // Mock Data for Instances (Some have null detailCode to demonstrate "Assign" feature)
   const [mockInstances, setMockInstances] = useState({
     'sys_project': [
       { id: 1, entityCode: 'PRJ-101', title: isRtl ? 'پروژه برج آفتاب' : 'Sun Tower Project', status: true, detailCode: '209038' },
       { id: 2, entityCode: 'PRJ-102', title: isRtl ? 'پروژه اتوبان تهران-شمال' : 'Highway Project', status: true, detailCode: '209039' },
-      { id: 3, entityCode: 'PRJ-103', title: isRtl ? 'بازسازی دفتر مرکزی' : 'HQ Renovation', status: false, detailCode: '209040' },
+      { id: 3, entityCode: 'PRJ-103', title: isRtl ? 'بازسازی دفتر مرکزی' : 'HQ Renovation', status: false, detailCode: null }, // Needs assignment
     ],
     'sys_cost_center': [
       { id: 1, entityCode: 'CC-001', title: isRtl ? 'واحد اداری' : 'Admin Unit', status: true, detailCode: '101001' },
       { id: 2, entityCode: 'CC-002', title: isRtl ? 'واحد فروش' : 'Sales Unit', status: true, detailCode: '101002' },
-      { id: 3, entityCode: 'CC-003', title: isRtl ? 'واحد تولید' : 'Production Unit', status: true, detailCode: '101003' },
+      { id: 3, entityCode: 'CC-003', title: isRtl ? 'واحد تولید' : 'Production Unit', status: true, detailCode: null }, // Needs assignment
     ],
     'default': [
       { id: 1, entityCode: 'GEN-001', title: isRtl ? 'نمونه آیتم ۱' : 'Sample Item 1', status: true, detailCode: '900001' },
-      { id: 2, entityCode: 'GEN-002', title: isRtl ? 'نمونه آیتم ۲' : 'Sample Item 2', status: true, detailCode: '900002' },
+      { id: 2, entityCode: 'GEN-002', title: isRtl ? 'نمونه آیتم ۲' : 'Sample Item 2', status: true, detailCode: null }, // Needs assignment
     ]
   });
 
@@ -78,7 +84,6 @@ const Details = ({ t, isRtl }) => {
   };
 
   const handleEdit = (item) => {
-    // Only User types are editable
     if (item.type === 'system') return;
     setEditingItem(item);
     setFormData({ ...item });
@@ -86,7 +91,6 @@ const Details = ({ t, isRtl }) => {
   };
 
   const handleDelete = (ids) => {
-    // Filter out system types
     const idsToDelete = ids.filter(id => {
       const item = combinedDetails.find(d => d.id === id);
       return item && item.type === 'user';
@@ -113,6 +117,31 @@ const Details = ({ t, isRtl }) => {
   const handleViewInstances = (item) => {
     setSelectedDetailType(item);
     setShowInstanceModal(true);
+  };
+
+  // Open the small modal to assign code
+  const handleOpenAssign = (instance) => {
+    setAssigningItem(instance);
+    setNewDetailCode('');
+    setShowAssignModal(true);
+  };
+
+  // Save the code assignment
+  const handleSaveCode = () => {
+    if (!newDetailCode) return alert("Please enter a code");
+    
+    const typeId = selectedDetailType.id;
+    const groupKey = mockInstances[typeId] ? typeId : 'default';
+
+    setMockInstances(prev => ({
+      ...prev,
+      [groupKey]: prev[groupKey].map(inst => 
+        inst.id === assigningItem.id ? { ...inst, detailCode: newDetailCode } : inst
+      )
+    }));
+
+    setShowAssignModal(false);
+    setAssigningItem(null);
   };
 
   // --- 5. Column Definitions ---
@@ -158,7 +187,23 @@ const Details = ({ t, isRtl }) => {
       field: 'detailCode', 
       header: t.dt_alloc_code, 
       width: 'w-48',
-      render: (row) => <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded">{row.detailCode}</span>
+      render: (row) => {
+        if (row.detailCode) {
+           return <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-1 rounded">{row.detailCode}</span>;
+        } else {
+           return (
+             <Button 
+                variant="ghost" 
+                size="sm" 
+                icon={Key} 
+                onClick={() => handleOpenAssign(row)}
+                className="text-orange-600 hover:bg-orange-50 hover:text-orange-700 h-7 text-xs"
+             >
+                {t.dt_assign_btn}
+             </Button>
+           );
+        }
+      }
     },
   ];
 
@@ -277,14 +322,10 @@ const Details = ({ t, isRtl }) => {
         <div className="flex flex-col h-[400px]">
           <div className="mb-4 flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-100">
              <div className="text-sm text-slate-600">
-               {isRtl ? 'این کدها به صورت خودکار از فرم مربوطه (مانند پروژه یا مرکز هزینه) خوانده می‌شوند.' : 'These codes are auto-fetched from respective forms (e.g., Projects, Cost Centers).'}
+               {isRtl ? 'کدهای تفصیلی برای برقراری ارتباط با ماژول حسابداری استفاده می‌شوند.' : 'Detail codes are used to link entities with accounting records.'}
              </div>
-             <Button variant="ghost" size="sm" icon={RefreshCw} onClick={() => alert("Syncing codes...")}>
-                {t.dt_auto_map}
-             </Button>
           </div>
           <div className="flex-1 border rounded-lg overflow-hidden relative">
-            {/* Reusing DataGrid but without Create/Delete actions since these are read-only views of other entities */}
             <DataGrid 
               columns={instanceColumns}
               data={currentInstances}
@@ -294,6 +335,35 @@ const Details = ({ t, isRtl }) => {
           </div>
         </div>
       </Modal>
+
+      {/* Modal: Assign Code */}
+      <Modal
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        title={t.dt_assign_title}
+        size="sm"
+        footer={
+           <>
+             <Button variant="outline" onClick={() => setShowAssignModal(false)}>{t.btn_cancel}</Button>
+             <Button variant="primary" onClick={handleSaveCode}>{t.btn_save}</Button>
+           </>
+        }
+      >
+         <div className="flex flex-col gap-4">
+            <div className="text-sm text-slate-600 mb-2">
+               {t.dt_enter_code}
+               <div className="font-bold text-slate-800 mt-1">{assigningItem?.title}</div>
+            </div>
+            <InputField 
+               value={newDetailCode}
+               onChange={(e) => setNewDetailCode(e.target.value)}
+               placeholder="e.g. 201005"
+               isRtl={isRtl}
+               autoFocus
+            />
+         </div>
+      </Modal>
+
     </div>
   );
 };
