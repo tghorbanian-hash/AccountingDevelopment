@@ -48,7 +48,6 @@ export const GL_MENU = {
 
 export const GL_TRANS = {
   en: {
-    // Document Management
     acc_mgmt_title: "Accounting Document Management",
     acc_mgmt_subtitle: "List of all financial documents with search and batch operation capabilities",
     grid_title: "Document List",
