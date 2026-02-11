@@ -48,6 +48,21 @@ export const GL_MENU = {
 
 export const GL_TRANS = {
   en: {
+    // Buttons & Common
+    btn_save: "Save",
+    btn_cancel: "Cancel",
+    btn_add: "Add",
+    btn_close: "Close",
+    edit: "Edit",
+    delete: "Delete",
+    active: "Active",
+    inactive: "Inactive",
+    filter: "Filter",
+    active_status: "Status",
+    alert_req_fields: "Please fill all required fields.",
+    confirm_delete: "Are you sure you want to delete {0} items?",
+
+    // Document Management
     acc_mgmt_title: "Accounting Document Management",
     acc_mgmt_subtitle: "List of all financial documents with search and batch operation capabilities",
     grid_title: "Document List",
@@ -160,6 +175,20 @@ export const GL_TRANS = {
     sys_item: "Item/Product",
   },
   fa: {
+    // Buttons & Common
+    btn_save: "ذخیره",
+    btn_cancel: "انصراف",
+    btn_add: "افزودن",
+    btn_close: "بستن",
+    edit: "ویرایش",
+    delete: "حذف",
+    active: "فعال",
+    inactive: "غیرفعال",
+    filter: "فیلتر",
+    active_status: "وضعیت",
+    alert_req_fields: "لطفاً تمام فیلدهای اجباری را پر کنید.",
+    confirm_delete: "آیا از حذف {0} مورد اطمینان دارید؟",
+
     // Document Management
     acc_mgmt_title: "مدیریت اسناد حسابداری",
     acc_mgmt_subtitle: "لیست کلیه اسناد مالی با قابلیت جستجو و عملیات گروهی",
