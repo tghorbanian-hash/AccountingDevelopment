@@ -49,6 +49,7 @@ export const GL_MENU = {
 
 export const GL_TRANS = {
   en: {
+    // Document Management
     acc_mgmt_title: "Accounting Document Management",
     acc_mgmt_subtitle: "List of all financial documents with search and batch operation capabilities",
     grid_title: "Document List",
@@ -81,8 +82,24 @@ export const GL_TRANS = {
     field_selectParty: "Select Person...",
     field_amount: "Document Amount",
     field_isActive: "Active Document",
+
+    // Ledgers Page
+    ledgers_title: "Ledgers Management",
+    ledgers_subtitle: "Define and manage organization ledgers and their configurations",
+    lg_code: "Ledger Code",
+    lg_title: "Ledger Title",
+    lg_structure: "Account Structure",
+    lg_currency: "Base Currency",
+    lg_main: "Main Ledger",
+    lg_main_desc: "Is this the main ledger?",
+    lg_status: "Status",
+    lg_new: "New Ledger",
+    lg_edit: "Edit Ledger",
+    lg_structure_ph: "Select Account Structure...",
+    lg_currency_ph: "Select Currency...",
   },
   fa: {
+    // Document Management
     acc_mgmt_title: "مدیریت اسناد حسابداری",
     acc_mgmt_subtitle: "لیست کلیه اسناد مالی با قابلیت جستجو و عملیات گروهی",
     grid_title: "لیست اسناد",
@@ -115,5 +132,20 @@ export const GL_TRANS = {
     field_selectParty: "انتخاب شخص...",
     field_amount: "مبلغ سند",
     field_isActive: "سند فعال باشد",
+
+    // Ledgers Page
+    ledgers_title: "مدیریت دفاتر",
+    ledgers_subtitle: "تعریف و مدیریت دفاتر کل سازمان و تنظیمات آنها",
+    lg_code: "کد دفتر",
+    lg_title: "عنوان دفتر",
+    lg_structure: "ساختار حساب",
+    lg_currency: "ارز اصلی",
+    lg_main: "دفتر اصلی",
+    lg_main_desc: "آیا این دفتر اصلی است؟",
+    lg_status: "وضعیت",
+    lg_new: "دفتر جدید",
+    lg_edit: "ویرایش دفتر",
+    lg_structure_ph: "انتخاب ساختار حساب...",
+    lg_currency_ph: "انتخاب ارز...",
   }
 };
