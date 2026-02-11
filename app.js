@@ -6,6 +6,7 @@ import {
   ChevronRight, LogOut, LayoutGrid, ChevronRightSquare,
   Menu, Circle
 } from 'lucide-react';
+import AutoNumbering from './financial/generalledger/AutoNumbering';
 
 const App = () => {
   const MENU_DATA = window.MENU_DATA || [];
@@ -98,7 +99,8 @@ const App = () => {
       Ledgers,
       Details,
       FiscalPeriods,
-      DocTypes
+      DocTypes,
+      AutoNumbering
     } = window;
 
     // --- مسیردهی صفحات (Routing) ---
@@ -120,6 +122,7 @@ const App = () => {
     if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Details Component Not Loaded</div>;
     if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
     if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
+    if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
 
 
     // 3. امنیت و دسترسی (Security)

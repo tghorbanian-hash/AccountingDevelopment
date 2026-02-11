@@ -62,6 +62,7 @@ export const GL_TRANS = {
     alert_req_fields: "Please fill all required fields.",
     confirm_delete: "Are you sure you want to delete {0} items?",
     description: "Description",
+    save_success: "Settings saved successfully.",
 
     // Document Management
     acc_mgmt_title: "Accounting Document Management",
@@ -181,6 +182,38 @@ export const GL_TRANS = {
     dt_new_doc: "New Document Type",
     dt_edit_doc: "Edit Document Type",
 
+    // Auto Numbering Page
+    an_title: "Auto Numbering Settings",
+    an_subtitle: "Configure numbering logic for Details, Accounts, and Documents",
+    an_tab_details: "Detail Numbering",
+    an_tab_accounts: "Account Numbering",
+    an_tab_docs: "Document Numbering",
+    
+    // AN - Details
+    an_dt_type: "Detail Type",
+    an_dt_length: "Max Length",
+    an_dt_start: "Start Code",
+    an_dt_end: "End Code",
+    an_dt_last: "Last Generated",
+    an_edit_dt: "Edit Detail Numbering",
+    
+    // AN - Accounts
+    an_acc_group: "Account Group",
+    an_acc_general: "General Account",
+    an_acc_subsidiary: "Subsidiary Account",
+    an_mode: "Generation Mode",
+    an_mode_auto: "Automatic",
+    an_mode_manual: "Manual",
+    an_acc_len: "Digit Length",
+    
+    // AN - Docs
+    an_select_ledger: "Select Ledger",
+    an_reset_year: "Reset Numbering on New Fiscal Year",
+    an_unique_scope: "Uniqueness Control Scope",
+    an_scope_ledger: "Ledger",
+    an_scope_branch: "Branch",
+    an_scope_company: "Company",
+
     // System Detail Names
     sys_partner: "Business Partner",
     sys_cost_center: "Cost Center",
@@ -211,6 +244,7 @@ export const GL_TRANS = {
     alert_req_fields: "لطفاً تمام فیلدهای اجباری را پر کنید.",
     confirm_delete: "آیا از حذف {0} مورد اطمینان دارید؟",
     description: "توضیحات",
+    save_success: "تنظیمات با موفقیت ذخیره شد.",
 
     // Document Management
     acc_mgmt_title: "مدیریت اسناد حسابداری",
@@ -329,6 +363,38 @@ export const GL_TRANS = {
     dt_auto_type: "سیستمی",
     dt_new_doc: "تعریف نوع سند جدید",
     dt_edit_doc: "ویرایش نوع سند",
+
+    // Auto Numbering Page
+    an_title: "تنظیمات شماره‌گذاری اتوماتیک",
+    an_subtitle: "پیکربندی منطق شماره‌گذاری برای تفصیل‌ها، حساب‌ها و اسناد",
+    an_tab_details: "شماره‌گذاری تفصیل‌ها",
+    an_tab_accounts: "شماره‌گذاری حساب‌ها",
+    an_tab_docs: "شماره‌گذاری اسناد",
+    
+    // AN - Details
+    an_dt_type: "نوع تفصیل",
+    an_dt_length: "طول مجاز (رقم)",
+    an_dt_start: "کد شروع",
+    an_dt_end: "کد پایان",
+    an_dt_last: "آخرین کد ایجاد شده",
+    an_edit_dt: "ویرایش تنظیمات تفصیل",
+    
+    // AN - Accounts
+    an_acc_group: "حساب گروه",
+    an_acc_general: "حساب کل",
+    an_acc_subsidiary: "حساب معین",
+    an_mode: "نحوه تولید",
+    an_mode_auto: "اتوماتیک",
+    an_mode_manual: "دستی",
+    an_acc_len: "تعداد ارقام",
+    
+    // AN - Docs
+    an_select_ledger: "انتخاب دفتر کل",
+    an_reset_year: "ریست شماره‌گذاری در سال مالی جدید",
+    an_unique_scope: "محدوده کنترل یکتایی شماره سند",
+    an_scope_ledger: "دفتر",
+    an_scope_branch: "شعبه",
+    an_scope_company: "شرکت",
 
     // System Detail Names
     sys_partner: "طرف تجاری",
