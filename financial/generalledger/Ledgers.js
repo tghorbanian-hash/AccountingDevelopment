@@ -263,4 +263,5 @@ const Ledgers = ({ t, isRtl }) => {
   );
 };
 
+window.Ledgers = Ledgers;
 export default Ledgers;
