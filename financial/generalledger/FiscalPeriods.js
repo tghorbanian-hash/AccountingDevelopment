@@ -121,15 +121,35 @@ const FiscalPeriods = ({ t, isRtl }) => {
     setOperationalPeriods(prev => [...prev.filter(p => p.yearId !== activeYear.id), ...generated]);
   };
 
+  const deletePeriod = (id) => {
+    const period = operationalPeriods.find(p => p.id === id);
+    if (period && period.status !== 'not_open') {
+      return alert(isRtl ? "فقط دوره‌های 'باز نشده' قابل حذف هستند." : "Only 'Not Open' periods can be deleted.");
+    }
+    if (window.confirm(isRtl ? "آیا این دوره حذف شود؟" : "Delete this period?")) {
+      setOperationalPeriods(prev => prev.filter(p => p.id !== id));
+      if (selectedPeriod?.id === id) setShowExPanel(false);
+    }
+  };
+
   // --- Handlers: Exceptions ---
   const toggleStatusInEx = (status) => {
     setExStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
   };
 
   const addEx = () => {
-    if (!exUser || exStatuses.length === 0) return;
-    const newEx = { user: exUser, allowedStatuses: exStatuses };
-    const updated = [...(selectedPeriod.exceptions || []), newEx];
+    if (!exUser || exStatuses.length === 0) return alert(isRtl ? "کاربر و وضعیت را انتخاب کنید" : "Select user and status");
+    // Check if user already exists, if so update, else add
+    const existingIndex = selectedPeriod.exceptions.findIndex(e => e.user === exUser);
+    let updated;
+    
+    if (existingIndex >= 0) {
+       updated = [...selectedPeriod.exceptions];
+       updated[existingIndex] = { user: exUser, allowedStatuses: exStatuses };
+    } else {
+       updated = [...(selectedPeriod.exceptions || []), { user: exUser, allowedStatuses: exStatuses }];
+    }
+
     setOperationalPeriods(prev => prev.map(p => p.id === selectedPeriod.id ? { ...p, exceptions: updated } : p));
     setSelectedPeriod(prev => ({ ...prev, exceptions: updated }));
     setExUser(''); setExStatuses([]);
@@ -183,6 +203,7 @@ const FiscalPeriods = ({ t, isRtl }) => {
         />
       </div>
 
+      {/* Modal: Year Definition */}
       <Modal isOpen={showYearModal} onClose={()=>setShowYearModal(false)} title={editingItem ? t.fp_edit_year : t.fp_new_year}
         footer={<><Button variant="outline" onClick={()=>setShowYearModal(false)}>{t.btn_cancel}</Button><Button variant="primary" onClick={handleSaveYear}>{t.btn_save}</Button></>}>
         <div className="grid grid-cols-2 gap-4">
@@ -198,18 +219,29 @@ const FiscalPeriods = ({ t, isRtl }) => {
         </div>
       </Modal>
 
+      {/* Modal: Period Manager */}
       <Modal isOpen={showPeriodModal} onClose={()=>{setShowPeriodModal(false); setShowExPanel(false);}} title={activeYear?.title} size="lg">
         <div className="flex flex-col gap-4 h-[650px] relative overflow-hidden">
+          
+          {/* Top Panel: Auto Generation Guide & Tools */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-            <div className="flex gap-2 mb-3 items-center">
-               <Info size={14} className="text-indigo-600"/>
-               <span className="text-[10px] text-slate-500 font-bold">{isRtl ? 'تولید اتوماتیک بر اساس تاریخ شروع سال:' : 'Auto-gen based on year start:'}</span>
-               <div className="flex gap-1 ml-auto">
-                  <Button variant="white" size="xs" onClick={()=>generateAuto(1)}>1</Button>
-                  <Button variant="white" size="xs" onClick={()=>generateAuto(3)}>3</Button>
-                  <Button variant="white" size="xs" onClick={()=>generateAuto(6)}>6</Button>
+            <div className="flex flex-col gap-2 mb-4 border-b border-slate-200 pb-3">
+               <div className="flex items-center gap-2">
+                 <div className="flex items-center gap-1.5 text-[11px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100 uppercase tracking-tighter">
+                    <Info size={14}/> {t.fp_auto_gen}
+                 </div>
+                 <span className="text-[11px] text-slate-500 leading-none">
+                    {isRtl ? 'با کلیک بر روی دکمه‌های زیر، سیستم دوره‌های زمانی را بر اساس تاریخ شروع سال تولید می‌کند.' : 'Click buttons below to auto-generate periods starting from year begin date.'}
+                 </span>
+               </div>
+               <div className="flex gap-2 mt-1">
+                  <Button variant="white" size="sm" onClick={()=>generateAuto(1)}>{t.fp_gen_monthly}</Button>
+                  <Button variant="white" size="sm" onClick={()=>generateAuto(3)}>{t.fp_gen_quarterly}</Button>
+                  <Button variant="white" size="sm" onClick={()=>generateAuto(6)}>{t.fp_gen_semi}</Button>
                </div>
             </div>
+
+            {/* Manual Entry */}
             <div className="grid grid-cols-5 gap-2 items-end">
               <InputField label={t.fp_period_code} size="sm" value={newPeriodData.code} onChange={e=>setNewPeriodData({...newPeriodData, code:e.target.value})} isRtl={isRtl} />
               <InputField label={t.fp_period_title} size="sm" value={newPeriodData.title} onChange={e=>setNewPeriodData({...newPeriodData, title:e.target.value})} isRtl={isRtl} />
@@ -258,7 +290,7 @@ const FiscalPeriods = ({ t, isRtl }) => {
 
           <div className={`absolute top-0 ${isRtl ? 'left-0 border-r' : 'right-0 border-l'} w-80 h-full bg-white shadow-2xl z-20 flex flex-col transition-all duration-300 transform ${showExPanel ? 'translate-x-0' : (isRtl ? '-translate-x-full' : 'translate-x-full')}`}>
              <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
-                <div className="flex items-center gap-2 font-black text-xs text-indigo-700 italic"><Users size={16}/> {t.fp_exceptions}</div>
+                <div className="flex items-center gap-2 font-black text-xs text-indigo-700 uppercase italic"><Users size={16}/> {t.fp_exceptions}</div>
                 <button onClick={()=>setShowExPanel(false)} className="text-slate-400 hover:text-slate-800"><X size={18}/></button>
              </div>
              <div className="p-4 flex flex-col gap-4 flex-1 overflow-hidden">
@@ -282,14 +314,16 @@ const FiscalPeriods = ({ t, isRtl }) => {
                 </div>
                 <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar mt-2">
                    {selectedPeriod?.exceptions.map(ex => (
-                     <div key={ex.user} className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm relative group">
-                        <button onClick={()=>removeEx(ex.user)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><X size={14}/></button>
-                        <div className="text-[11px] font-black text-slate-800 mb-2">{ex.user}</div>
-                        <div className="flex flex-wrap gap-1">
-                           {ex.allowedStatuses.map(st => (
-                              <span key={st} className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${statusStyles[st]}`}>{t[`fp_st_${st}`]}</span>
-                           ))}
+                     <div key={ex.user} className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm flex justify-between items-start group">
+                        <div>
+                           <div className="text-[11px] font-black text-slate-800 mb-2">{ex.user}</div>
+                           <div className="flex flex-wrap gap-1">
+                              {ex.allowedStatuses.map(st => (
+                                 <span key={st} className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${statusStyles[st]}`}>{t[`fp_st_${st}`]}</span>
+                              ))}
+                           </div>
                         </div>
+                        <button onClick={()=>removeEx(ex.user)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><Trash2 size={14}/></button>
                      </div>
                    ))}
                 </div>
