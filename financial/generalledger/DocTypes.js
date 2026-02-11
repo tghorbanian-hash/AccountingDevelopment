@@ -5,9 +5,10 @@ import {
 } from 'lucide-react';
 
 const DocTypes = ({ t, isRtl }) => {
+  // TextArea removed from destructuring because it's undefined in window.UI
   const { 
     Button, InputField, SelectField, Toggle, DataGrid, 
-    FilterSection, Modal, Badge, TextArea 
+    FilterSection, Modal, Badge 
   } = window.UI;
 
   // --- 1. Initial Data (System Types are fixed) ---
@@ -195,13 +196,19 @@ const DocTypes = ({ t, isRtl }) => {
             isRtl={isRtl} 
             required
           />
-          <TextArea 
-            label={t.description} 
-            value={formData.description} 
-            onChange={e => setFormData({...formData, description: e.target.value})} 
-            isRtl={isRtl} 
-            rows={3}
-          />
+          
+          {/* Replaced undefined TextArea component with HTML textarea */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-bold text-slate-700">{t.description}</label>
+            <textarea
+               className={`w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-500 text-sm transition-colors ${isRtl ? 'text-right' : 'text-left'}`}
+               rows={3}
+               value={formData.description || ''}
+               onChange={e => setFormData({...formData, description: e.target.value})}
+               dir={isRtl ? 'rtl' : 'ltr'}
+            />
+          </div>
+
           <Toggle 
             label={t.active_status} 
             checked={formData.isActive} 
