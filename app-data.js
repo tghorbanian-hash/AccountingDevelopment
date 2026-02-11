@@ -2,15 +2,18 @@
 
 import * as LucideIcons from 'lucide-react';
 
+// --- IMPORTING MODULE DATA ---
+import { GL_MENU, GL_TRANS } from './financial/generalledger/gl-data.js';
+import { TR_MENU, TR_TRANS } from './financial/treasury/tr-data.js';
+import { BD_MENU, BD_TRANS } from './financial/budgeting/bd-data.js';
+import { WF_MENU, WF_TRANS } from './tools/workflow/wf-data.js';
+import { WB_MENU, WB_TRANS, WB_MOCK_TRANSACTIONS, WB_MOCK_STATS } from './tools/workbench/wb-data.js';
+import { DASH_MENU, DASH_TRANS } from './tools/dashboard/dash-data.js';
+import { REP_MENU, REP_TRANS } from './tools/reportbuilder/rep-data.js';
+
 const { 
-  LayoutDashboard, Receipt, Wallet, BarChart3, Settings, Languages, Bell, Search, 
-  ArrowUpRight, ArrowDownLeft, Plus, MoreVertical, ChevronRight, ChevronLeft, Users, 
-  CreditCard, Lock, Mail, User, LogOut, ShieldCheck, Building2, Phone, CheckCircle2, 
-  RefreshCw, ChevronDown, Briefcase, UserCheck, GitBranch, Key, Globe, Filter, X, 
-  Calendar, Layers, ChevronRightSquare, LayoutGrid, Edit, Trash2, Save, MoreHorizontal,
-  XCircle, FileText, CheckSquare, Eye, MousePointerClick, Component, Info, Moon, Sun,
-  Shield, Database, Network, Banknote, MapPin, ListTodo, ArrowLeftRight, Coins, Check,
-  Link2, AlertTriangle, Workflow, GitMerge, ChevronsDown, ChevronsUp, FolderTree
+  Component, Briefcase, BarChart3, Users, Settings, Key, Building2, 
+  Network, Banknote, MapPin, Layers, ListTodo
 } = LucideIcons;
 
 window.flattenMenu = (items, parentModuleId = null) => {
@@ -33,142 +36,16 @@ window.MENU_DATA = [
       { id: 'ui_showcase', label: { en: 'All Components', fa: 'نمونه تمام کامپوننت‌ها' } }
     ]
   },
-  { 
-    id: 'dashboards', 
-    label: { en: 'Dashboards', fa: 'داشبوردها' }, 
-    icon: LayoutDashboard,
-    children: [
-      { id: 'dashboards_gen', label: { en: 'General Dashboards', fa: 'داشبوردهای عمومی' } },
-      { id: 'dashboards_spec', label: { en: 'Specific Dashboards', fa: 'داشبوردهای اختصاصی' } }
-    ]
-  },
-  { 
-    id: 'workspace', 
-    label: { en: 'Workspace', fa: 'میز کار' }, 
-    icon: Briefcase,
-    children: [
-      { id: 'workspace_gen', label: { en: 'General Workspace', fa: 'میزکار عمومی' } },
-      { id: 'workspace_spec', label: { en: 'Specific Workspace', fa: 'میزکار اختصاصی' } }
-    ]
-  },
+  DASH_MENU,
+  WB_MENU,
   { 
     id: 'accounting', 
     label: { en: 'Accounting', fa: 'حسابداری و مالی' }, 
     icon: BarChart3,
     children: [
-      { 
-        id: 'gl', 
-        label: { en: 'General Ledger', fa: 'دفتر کل' },
-        children: [
-          {
-            id: 'gl_settings',
-            label: { en: 'GL Settings', fa: 'تنظیمات دفتر کل' },
-            children: [
-              { id: 'auto_num', label: { en: 'Auto Numbering', fa: 'شماره‌گذاری اتوماتیک' } },
-              { id: 'year_end_setup', label: { en: 'Year-end Settings', fa: 'تنظیمات عملیات پایان سال' } },
-              { id: 'allowed_modules', label: { en: 'Allowed Modules', fa: 'ماژول‌های مجاز' } },
-            ]
-          },
-          {
-            id: 'gl_base_info',
-            label: { en: 'Base Information', fa: 'اطلاعات پایه' },
-            children: [
-              { id: 'ledgers', label: { en: 'Ledgers', fa: 'دفاتر' } },
-              { id: 'acc_structure', label: { en: 'Account Structure', fa: 'ساختار حساب' } },
-              { id: 'details', label: { en: 'Details', fa: 'تفصیل‌ها' } },
-              { id: 'fiscal_periods', label: { en: 'Fiscal Periods', fa: 'دوره‌های مالی' } },
-              { id: 'doc_types', label: { en: 'Document Types', fa: 'انواع اسناد' } },
-              { id: 'std_desc', label: { en: 'Standard Descriptions', fa: 'شرح‌های استاندارد' } },
-            ]
-          },
-          {
-            id: 'gl_docs',
-            label: { en: 'Document Management', fa: 'مدیریت اسناد' },
-            children: [
-              { id: 'doc_list', label: { en: 'Document List', fa: 'فهرست اسناد' } },
-              { id: 'doc_review', label: { en: 'Document Review', fa: 'بررسی اسناد' } },
-              { id: 'doc_finalize', label: { en: 'Finalize Documents', fa: 'قطعی کردن اسناد' } },
-            ]
-          },
-          {
-            id: 'gl_reports',
-            label: { en: 'Reports & Analytics', fa: 'گزارش‌ها و تحلیل‌ها' },
-            children: [
-              { id: 'print_doc', label: { en: 'Print Accounting Doc', fa: 'چاپ سند حسابداری' } },
-              { id: 'acc_review', label: { en: 'Account Review', fa: 'مرور حساب‌ها' } },
-            ]
-          }
-        ]
-      },
-      { 
-        id: 'treasury', 
-        label: { en: 'Treasury', fa: 'خزانه‌داری' },
-        children: [
-          {
-            id: 'tr_settings',
-            label: { en: 'Treasury Settings', fa: 'تنظیمات خزانه‌داری' },
-            children: [
-              { id: 'balance_control', label: { en: 'Balance Control', fa: 'کنترل مانده منابع' } }
-            ]
-          },
-          {
-            id: 'tr_base_info',
-            label: { en: 'Base Information', fa: 'اطلاعات پایه' },
-            children: [
-              { id: 'banks', label: { en: 'Banks', fa: 'بانک‌ها' } },
-              { id: 'acc_types', label: { en: 'Account Types', fa: 'انواع حساب‌های بانکی' } },
-              { id: 'acc_setup', label: { en: 'Account Setup', fa: 'استقرار حساب‌ها' } },
-              { id: 'safes', label: { en: 'Safes', fa: 'صندوق‌ها' } },
-              { id: 'promissory', label: { en: 'Promissory Notes', fa: 'سفته‌ها' } },
-              { id: 'cheque_types', label: { en: 'Cheque Types', fa: 'انواع چک' } },
-              { id: 'petty_cashiers', label: { en: 'Petty Cashiers', fa: 'تنخواه دارها' } },
-              { id: 'cheque_books', label: { en: 'Cheque Books', fa: 'دسته چک' } },
-              { id: 'print_template', label: { en: 'Print Templates', fa: 'الگوی چاپ چک' } },
-              { id: 'reasons', label: { en: 'Reasons/Descriptions', fa: 'بابت‌ها/ شرح‌ها' } },
-              { id: 'blank_promissory', label: { en: 'Blank Promissory', fa: 'سفته سفید' } },
-            ]
-          },
-          {
-            id: 'tr_init',
-            label: { en: 'Initial Operations', fa: 'عملیات ابتدای دوره/ سال' },
-            children: [
-              { id: 'ap_setup', label: { en: 'A/P Setup', fa: 'استقرار حساب‌های پرداختنی' } },
-              { id: 'ar_setup', label: { en: 'A/R Setup', fa: 'استقرار اسناد دریافتنی' } },
-              { id: 'opening_balance', label: { en: 'Opening Balance', fa: 'موجودی ابتدای دوره' } },
-            ]
-          },
-          {
-            id: 'tr_ops',
-            label: { en: 'Receipt & Payment', fa: 'عملیات دریافت و پرداخت' },
-            children: [
-              { id: 'receipts', label: { en: 'Receipts', fa: 'دریافت‌ها' } },
-              { id: 'payments', label: { en: 'پرداخت‌ها', fa: 'پرداخت‌ها' } },
-              { id: 'transfers', label: { en: 'Transfers', fa: 'عملیات انتقال' } },
-              { id: 'petty_summary', label: { en: 'Petty Cash Summary', fa: 'صورت خلاصه تنخواه' } },
-              { id: 'batch_ops', label: { en: 'Batch Operations', fa: 'عملیات گروهی' } },
-            ]
-          },
-          {
-            id: 'tr_requests',
-            label: { en: 'Request Management', fa: 'مدیریت درخواست‌ها' },
-            children: [
-              { id: 'payment_req', label: { en: 'Payment Requests', fa: 'درخواست پرداخت' } },
-              { id: 'my_requests', label: { en: 'My Requests', fa: 'درخواست‌های من' } },
-            ]
-          },
-          {
-            id: 'tr_reports',
-            label: { en: 'Reports & Analytics', fa: 'گزارش‌ها و تحلیل‌ها' },
-            children: [
-              { id: 'print_req', label: { en: 'Print Request', fa: 'چاپ درخواست' } },
-              { id: 'print_cheque', label: { en: 'Print Cheque', fa: 'چاپ چک' } },
-              { id: 'review_req', label: { en: 'Review Requests', fa: 'مرور درخواست‌ها' } },
-              { id: 'review_rp', label: { en: 'Review R/P', fa: 'مرور دریافت/ پرداخت' } },
-            ]
-          }
-        ]
-      },
-      { id: 'budgeting', label: { en: 'Budgeting', fa: 'بودجه‌ریزی' } },
+      GL_MENU,
+      TR_MENU,
+      BD_MENU
     ]
   },
   {
@@ -180,16 +57,8 @@ window.MENU_DATA = [
       { id: 'compensation', label: { en: 'Compensation', fa: 'جبران خدمات' } },
     ]
   },
-  {
-    id: 'workflow',
-    label: { en: 'Workflow', fa: 'مدیریت گردش کار' },
-    icon: GitBranch,
-    children: [
-      { id: 'processes', label: { en: 'Process Management', fa: 'مدیریت فرایندها' } },
-      { id: 'inbox', label: { en: 'Inbox Management', fa: 'مدیریت کارتابل' } },
-      { id: 'tasks', label: { en: 'Task Management', fa: 'مدیریت کارها' } },
-    ]
-  },
+  WF_MENU,
+  REP_MENU,
   {
     id: 'system_settings',
     label: { en: 'Settings', fa: 'تنظیمات سیستم' },
@@ -229,20 +98,11 @@ window.MENU_DATA = [
   }
 ];
 
-window.MOCK_TRANSACTIONS = [
-  { id: 1, title: { en: 'Monthly Server Hosting', fa: 'هزینه میزبانی سرور ماهانه' }, amount: 1200, type: 'expense', date: '2024-03-01', category: 'IT' },
-  { id: 2, title: { en: 'Consultancy Fee', fa: 'هزینه مشاوره' }, amount: 4500, type: 'income', date: '2024-03-02', category: 'Service' },
-  { id: 3, title: { en: 'Office Supplies', fa: 'لوازم اداری' }, amount: 350, type: 'expense', date: '2024-03-03', category: 'Admin' },
-  { id: 4, title: { en: 'Client Payment', fa: 'پرداخت مشتری' }, amount: 12500, type: 'income', date: '2024-03-04', category: 'Sales' },
-];
+// --- MOCK DATA ASSIGNMENT ---
+window.MOCK_TRANSACTIONS = WB_MOCK_TRANSACTIONS;
+window.MOCK_STATS = WB_MOCK_STATS;
 
-window.MOCK_STATS = [
-  { id: 1, label: { en: 'Total Balance', fa: 'موجودی کل' }, value: '$124,500.00', change: '+12.5%', icon: Wallet, color: 'text-blue-600' },
-  { id: 2, label: { en: 'Monthly Revenue', fa: 'درآمد ماهانه' }, value: '$45,200.00', change: '+8.2%', icon: ArrowUpRight, color: 'text-green-600' },
-  { id: 3, label: { en: 'Total Expenses', fa: 'مجموع هزینه‌ها' }, value: '$12,800.00', change: '-2.4%', icon: ArrowDownLeft, color: 'text-red-600' },
-  { id: 4, label: { en: 'Active Accounts', fa: 'حساب‌های فعال' }, value: '18', change: '0', icon: UserCheck, color: 'text-purple-600' },
-];
-
+// --- DEFAULT VALUES (KEPT IN APP-DATA AS CORE SETTINGS) ---
 window.DEFAULT_VALUES_SCHEMA = [
   {
     moduleId: 'accounting',
@@ -283,7 +143,8 @@ window.DEFAULT_VALUES_SCHEMA = [
   }
 ];
 
-window.translations = {
+// --- CORE TRANSLATIONS (System Settings, Auth, Common UI) ---
+const CORE_TRANS = {
   en: {
     // --- BRANCHES ---
     br_title: "Branches",
@@ -342,7 +203,6 @@ window.translations = {
     oc_back_list: "Back to List",
     oc_design_btn: "Design Structure",
 
-    // ... (Previous translations remain same)
     loginTitle: 'Secure Sign In',
     loginSubtitle: 'Enter your credentials to access the financial portal',
     usernameLabel: 'Username',
@@ -535,38 +395,6 @@ window.translations = {
     detail_assign_btn: "Assign",
     detail_assign_msg: "Detail code assigned.",
     active_status: "Active Status",
-    acc_mgmt_title: "Accounting Document Management",
-    acc_mgmt_subtitle: "List of all financial documents with search and batch operation capabilities",
-    grid_title: "Document List",
-    col_docNo: "Doc No",
-    col_date: "Date",
-    col_dept: "Department",
-    col_desc: "Description",
-    col_debtor: "Debtor",
-    col_status: "Status",
-    col_active: "Active",
-    col_actions: "Actions",
-    status_final: "Final",
-    status_draft: "Draft",
-    status_reviewed: "Reviewed",
-    filter_fromDoc: "From Doc No",
-    filter_toDoc: "To Doc No",
-    filter_fromDate: "From Date",
-    filter_toDate: "To Date",
-    filter_status: "Document Status",
-    filter_costCenter: "Cost Center",
-    filter_subsidiary: "Subsidiary Account",
-    filter_allStatus: "All Statuses",
-    modal_newDoc: "New Document",
-    modal_editDoc: "Edit Document",
-    modal_warning: "Note: Changes to final documents require financial manager approval.",
-    field_docType: "Document Type",
-    field_general: "General",
-    field_opening: "Opening",
-    field_party: "Party",
-    field_selectParty: "Select Person...",
-    field_amount: "Document Amount",
-    field_isActive: "Active Document",
     usersListTitle: 'User Management',
     usersListSubtitle: 'Manage system access and user profiles',
     createNewUser: 'New User',
@@ -613,44 +441,6 @@ window.translations = {
     permSelectForm: 'Select a Form',
     perm_click_hint: 'Click on roles to view details',
     perm_details_for: 'Access details for:',
-    ws_title: "User Workspace",
-    ws_subtitle: "Exchange & Accounting Management System",
-    kpi_cash: "Cash & Bank Balance",
-    kpi_receivable: "Accounts Receivable",
-    kpi_payable: "Accounts Payable",
-    kpi_profit: "Monthly Net Profit",
-    btn_invoice: "+ Buy/Sell Currency",
-    btn_check: "Receive Check",
-    btn_payment_req: "Payment Request",
-    btn_expense: "Record Expense",
-    btn_account: "New Contact/Account",
-    table_title: "Recent Transactions",
-    th_id: "ID",
-    th_date: "Date",
-    th_desc: "Description",
-    th_amount: "Amount",
-    th_status: "Status",
-    row1_desc: "USD Purchase - 5,000$",
-    row2_desc: "Office Rent - Jan 2026",
-    row3_desc: "EUR Sale - 2,200€",
-    status_paid: "Paid",
-    status_pending: "Pending",
-    sidebar_title: "Critical Alerts",
-    alert1_title: "Check Due Soon",
-    alert1_sub: "Mellat Bank - Tomorrow",
-    alert2_title: "Overdue Invoice",
-    alert2_sub: "Client A - 10 Days Delay",
-    alert3_title: "Credit Limit Warning",
-    alert3_sub: "Exchange Partner B - Near Limit",
-    mod_exp_title: "Record New Expense",
-    mod_acc_title: "New Contact",
-    lbl_category: "Category",
-    lbl_amount: "Amount",
-    opt_rent: "Rent",
-    opt_salary: "Salary",
-    btn_save_data: "Save Data",
-    ph_name: "Contact Name",
-    ph_phone: "Phone Number"
   },
   fa: {
     // --- BRANCHES ---
@@ -710,7 +500,6 @@ window.translations = {
     oc_back_list: "بازگشت به فهرست",
     oc_design_btn: "طراحی ساختار",
 
-    // ... (Previous translations remain same)
     loginTitle: 'ورود ایمن به سیستم',
     loginSubtitle: 'برای دسترسی به پرتال مالی، اطلاعات خود را وارد کنید',
     usernameLabel: 'نام کاربری',
@@ -903,38 +692,6 @@ window.translations = {
     detail_assign_btn: "تخصیص کد",
     detail_assign_msg: "کد تفصیلی با موفقیت تخصیص یافت.",
     active_status: "وضعیت فعال",
-    acc_mgmt_title: "مدیریت اسناد حسابداری",
-    acc_mgmt_subtitle: "لیست کلیه اسناد مالی با قابلیت جستجو و عملیات گروهی",
-    grid_title: "لیست اسناد",
-    col_docNo: "شماره سند",
-    col_date: "تاریخ",
-    col_dept: "دپارتمان",
-    col_desc: "شرح سند",
-    col_debtor: "بدهکار (ریال)",
-    col_status: "وضعیت",
-    col_active: "فعال",
-    col_actions: "عملیات",
-    status_final: "نهایی",
-    status_draft: "پیش‌نویس",
-    status_reviewed: "بررسی شده",
-    filter_fromDoc: "از شماره سند",
-    filter_toDoc: "تا شماره سند",
-    filter_fromDate: "از تاریخ",
-    filter_toDate: "تا تاریخ",
-    filter_status: "وضعیت سند",
-    filter_costCenter: "مرکز هزینه",
-    filter_subsidiary: "معین",
-    filter_allStatus: "همه وضعیت‌ها",
-    modal_newDoc: "سند جدید",
-    modal_editDoc: "ویرایش سند",
-    modal_warning: "لطفاً دقت کنید: تغییرات در اسناد نهایی نیازمند تایید مدیر مالی می‌باشد.",
-    field_docType: "نوع سند",
-    field_general: "عمومی",
-    field_opening: "افتتاحیه",
-    field_party: "طرف حساب",
-    field_selectParty: "انتخاب شخص...",
-    field_amount: "مبلغ سند",
-    field_isActive: "سند فعال باشد",
     usersListTitle: 'مدیریت کاربران',
     usersListSubtitle: 'مدیریت دسترسی‌ها و پروفایل‌های کاربری سیستم',
     createNewUser: 'کاربر جدید',
@@ -981,43 +738,10 @@ window.translations = {
     permSelectForm: 'یک فرم را انتخاب کنید',
     perm_click_hint: 'برای مشاهده جزئیات روی نقش‌ها کلیک کنید',
     perm_details_for: 'جزئیات دسترسی برای:',
-    ws_title: "میز کار کاربر",
-    ws_subtitle: "سیستم مدیریت حسابداری و صرافی",
-    kpi_cash: "موجودی نقد و بانک",
-    kpi_receivable: "مطالبات (بدهکاران)",
-    kpi_payable: "بدهی‌ها (بستانکاران)",
-    kpi_profit: "سود خالص ماهانه",
-    btn_invoice: "+ خرید و فروش ارز",
-    btn_check: "ثبت چک دریافتی",
-    btn_payment_req: "درخواست پرداخت",
-    btn_expense: "ثبت هزینه",
-    btn_account: "تعریف طرف حساب",
-    table_title: "آخرین تراکنش‌ها",
-    th_id: "شناسه",
-    th_date: "تاریخ",
-    th_desc: "شرح",
-    th_amount: "مبلغ",
-    th_status: "وضعیت",
-    row1_desc: "خرید دلار - ۵۰۰۰ واحد",
-    row2_desc: "اجاره دفتر - ژانویه ۲۰۲۶",
-    row3_desc: "فروش یورو - ۲۲۰۰ واحد",
-    status_paid: "تسویه شده",
-    status_pending: "در انتظار",
-    sidebar_title: "هشدارهای حساس",
-    alert1_title: "سررسید چک",
-    alert1_sub: "بانک ملت - موعد فردا",
-    alert2_title: "فاکتور معوقه",
-    alert2_sub: "مشتری الف - ۱۰ روز تاخیر",
-    alert3_title: "هشدار حد اعتبار",
-    alert3_sub: "همکار صراف ب - نزدیک سقف",
-    mod_exp_title: "ثبت هزینه جدید",
-    mod_acc_title: "تعریف طرف حساب جدید",
-    lbl_category: "دسته بندی",
-    lbl_amount: "مبلغ",
-    opt_rent: "اجاره",
-    opt_salary: "حقوق",
-    btn_save_data: "ذخیره اطلاعات",
-    ph_name: "نام طرف حساب",
-    ph_phone: "شماره تماس"
   }
+};
+
+window.translations = {
+  en: { ...CORE_TRANS.en, ...GL_TRANS.en, ...TR_TRANS.en, ...BD_TRANS.en, ...WF_TRANS.en, ...WB_TRANS.en, ...DASH_TRANS.en, ...REP_TRANS.en },
+  fa: { ...CORE_TRANS.fa, ...GL_TRANS.fa, ...TR_TRANS.fa, ...BD_TRANS.fa, ...WF_TRANS.fa, ...WB_TRANS.fa, ...DASH_TRANS.fa, ...REP_TRANS.fa }
 };
