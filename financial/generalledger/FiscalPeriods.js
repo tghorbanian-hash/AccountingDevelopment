@@ -11,7 +11,7 @@ const FiscalPeriods = ({ t, isRtl }) => {
     FilterSection, Modal, Badge, Callout 
   } = window.UI;
 
-  // --- Mock Data ---
+  // --- State: Data ---
   const [fiscalYears, setFiscalYears] = useState([
     { id: 1, code: '1403', title: 'سال مالی ۱۴۰۳', startDate: '2024-03-20', endDate: '2025-03-20', calendarType: 'jalali', isActive: true },
     { id: 2, code: '2025', title: 'Fiscal Year 2025', startDate: '2025-01-01', endDate: '2025-12-31', calendarType: 'gregorian', isActive: true },
@@ -26,32 +26,37 @@ const FiscalPeriods = ({ t, isRtl }) => {
       startDate: '2024-03-20', 
       endDate: '2024-04-20', 
       status: 'open', 
-      exceptions: [
-        { user: 'Financial Manager', allowedStatuses: ['closed', 'not_open'] }
-      ] 
+      exceptions: [{ user: 'Financial Manager', allowedStatuses: ['closed', 'not_open'] }] 
     },
   ]);
 
-  // --- States ---
+  // --- State: UI ---
   const [showYearModal, setShowYearModal] = useState(false);
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [showExPanel, setShowExPanel] = useState(false);
-  
   const [activeYear, setActiveYear] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({});
   const [searchParams, setSearchParams] = useState({ code: '', title: '' });
-  
   const [newPeriodData, setNewPeriodData] = useState({ code: '', title: '', startDate: '', endDate: '', status: 'not_open' });
-  
-  // Exception Sidebar States
   const [exUser, setExUser] = useState('');
   const [exStatuses, setExStatuses] = useState([]);
 
-  // --- Handlers: Year & Period ---
+  // --- Logic Helpers ---
+  const checkOverlap = (start, end, list, excludeId = null) => {
+    return list.some(p => {
+      if (excludeId && p.id === excludeId) return false;
+      return (start <= p.endDate && end >= p.startDate);
+    });
+  };
+
+  // --- Handlers: Year ---
   const handleSaveYear = () => {
     if (!formData.code || !formData.startDate || !formData.endDate) return alert(t.alert_req_fields);
+    if (checkOverlap(formData.startDate, formData.endDate, fiscalYears, editingItem?.id)) {
+      return alert(isRtl ? "این بازه زمانی با سال مالی دیگری تداخل دارد" : "Date range overlaps with another year");
+    }
     if (editingItem) {
       setFiscalYears(prev => prev.map(y => y.id === editingItem.id ? { ...formData, id: y.id } : y));
     } else {
@@ -60,48 +65,83 @@ const FiscalPeriods = ({ t, isRtl }) => {
     setShowYearModal(false);
   };
 
-  const deletePeriod = (id) => {
-    const period = operationalPeriods.find(p => p.id === id);
-    if (period && period.status !== 'not_open') {
-      return alert(isRtl ? "فقط دوره‌های 'باز نشده' قابل حذف هستند." : "Only 'Not Open' periods can be deleted.");
+  const handleDeleteYear = (id) => {
+    const yearPeriods = operationalPeriods.filter(p => p.yearId === id);
+    if (yearPeriods.some(p => p.status !== 'not_open')) {
+      return alert(isRtl ? "به دلیل وجود دوره‌های باز یا بسته، حذف سال امکان‌پذیر نیست" : "Cannot delete year with open/closed periods");
     }
-    if (window.confirm(isRtl ? "آیا این دوره حذف شود؟" : "Delete this period?")) {
-      setOperationalPeriods(prev => prev.filter(p => p.id !== id));
-      if (selectedPeriod?.id === id) setShowExPanel(false);
+    if (window.confirm(isRtl ? "آیا از حذف این سال مالی و تمام دوره‌های آن اطمینان دارید؟" : "Delete year and all its periods?")) {
+      setFiscalYears(prev => prev.filter(y => y.id !== id));
+      setOperationalPeriods(prev => prev.filter(p => p.yearId !== id));
     }
   };
 
-  // --- Exception Handlers ---
-  const toggleStatusInException = (status) => {
-    setExStatuses(prev => 
-      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
-    );
+  // --- Handlers: Periods ---
+  const handleSavePeriod = () => {
+    if (!newPeriodData.code || !newPeriodData.startDate || !newPeriodData.endDate) return alert(t.alert_req_fields);
+    const yearPeriods = operationalPeriods.filter(p => p.yearId === activeYear.id);
+    if (checkOverlap(newPeriodData.startDate, newPeriodData.endDate, yearPeriods, newPeriodData.id)) {
+      return alert(isRtl ? "تداخل با دوره‌های موجود" : "Overlaps with existing periods");
+    }
+
+    if (newPeriodData.id) {
+      setOperationalPeriods(prev => prev.map(p => p.id === newPeriodData.id ? { ...newPeriodData } : p));
+    } else {
+      setOperationalPeriods(prev => [...prev, { ...newPeriodData, id: Date.now(), yearId: activeYear.id, exceptions: [] }]);
+    }
+    setNewPeriodData({ code: '', title: '', startDate: '', endDate: '', status: 'not_open' });
   };
 
-  const addException = () => {
-    if (!exUser || exStatuses.length === 0) return alert(isRtl ? "لطفاً کاربر و حداقل یک وضعیت را انتخاب کنید" : "Please select user and at least one status");
-    
+  const generateAuto = (months) => {
+    const existing = operationalPeriods.filter(p => p.yearId === activeYear.id);
+    if (existing.some(p => p.status !== 'not_open')) {
+      return alert(isRtl ? "به دلیل وجود دوره باز/بسته، امکان تولید مجدد نیست" : "Regeneration blocked by open/closed periods");
+    }
+    if (!window.confirm(isRtl ? "دوره‌های فعلی حذف و جایگزین شوند؟" : "Replace current periods?")) return;
+
+    const generated = [];
+    let start = new Date(activeYear.startDate);
+    const total = Math.ceil(12 / months);
+    for (let i = 1; i <= total; i++) {
+      let currentStart = new Date(start);
+      let currentEnd = new Date(start.setMonth(start.getMonth() + months));
+      currentEnd.setDate(currentEnd.getDate() - 1);
+      generated.push({
+        id: Date.now() + i,
+        yearId: activeYear.id,
+        code: i.toString().padStart(2, '0'),
+        title: (isRtl ? "دوره " : "Period ") + i,
+        startDate: currentStart.toISOString().split('T')[0],
+        endDate: currentEnd.toISOString().split('T')[0],
+        status: 'not_open',
+        exceptions: []
+      });
+      start.setDate(start.getDate() + 1);
+    }
+    setOperationalPeriods(prev => [...prev.filter(p => p.yearId !== activeYear.id), ...generated]);
+  };
+
+  // --- Handlers: Exceptions ---
+  const toggleStatusInEx = (status) => {
+    setExStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
+  };
+
+  const addEx = () => {
+    if (!exUser || exStatuses.length === 0) return;
     const newEx = { user: exUser, allowedStatuses: exStatuses };
-    const updatedExList = [...(selectedPeriod.exceptions || []), newEx];
-
-    setOperationalPeriods(prev => prev.map(p => 
-      p.id === selectedPeriod.id ? { ...p, exceptions: updatedExList } : p
-    ));
-    setSelectedPeriod(prev => ({ ...prev, exceptions: updatedExList }));
-    
-    setExUser('');
-    setExStatuses([]);
+    const updated = [...(selectedPeriod.exceptions || []), newEx];
+    setOperationalPeriods(prev => prev.map(p => p.id === selectedPeriod.id ? { ...p, exceptions: updated } : p));
+    setSelectedPeriod(prev => ({ ...prev, exceptions: updated }));
+    setExUser(''); setExStatuses([]);
   };
 
-  const removeException = (userName) => {
-    const updatedExList = selectedPeriod.exceptions.filter(e => e.user !== userName);
-    setOperationalPeriods(prev => prev.map(p => 
-      p.id === selectedPeriod.id ? { ...p, exceptions: updatedExList } : p
-    ));
-    setSelectedPeriod(prev => ({ ...prev, exceptions: updatedExList }));
+  const removeEx = (userName) => {
+    const updated = selectedPeriod.exceptions.filter(e => e.user !== userName);
+    setOperationalPeriods(prev => prev.map(p => p.id === selectedPeriod.id ? { ...p, exceptions: updated } : p));
+    setSelectedPeriod(prev => ({ ...prev, exceptions: updated }));
   };
 
-  // --- UI Constants ---
+  // --- Constants ---
   const statusStyles = {
     open: "text-green-600 font-black bg-green-50 border-green-200",
     closed: "text-red-600 font-black bg-red-50 border-red-200",
@@ -137,13 +177,12 @@ const FiscalPeriods = ({ t, isRtl }) => {
             <div className="flex gap-1">
               <button onClick={() => { setActiveYear(row); setShowPeriodModal(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"><Calendar size={16}/></button>
               <button onClick={() => { setEditingItem(row); setFormData({...row}); setShowYearModal(true); }} className="p-1.5 text-slate-600 hover:bg-slate-50 rounded"><Edit size={16}/></button>
-              <button onClick={() => {}} className="p-1.5 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
+              <button onClick={() => handleDeleteYear(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
             </div>
           )}
         />
       </div>
 
-      {/* Modal: Year Definition */}
       <Modal isOpen={showYearModal} onClose={()=>setShowYearModal(false)} title={editingItem ? t.fp_edit_year : t.fp_new_year}
         footer={<><Button variant="outline" onClick={()=>setShowYearModal(false)}>{t.btn_cancel}</Button><Button variant="primary" onClick={handleSaveYear}>{t.btn_save}</Button></>}>
         <div className="grid grid-cols-2 gap-4">
@@ -159,17 +198,24 @@ const FiscalPeriods = ({ t, isRtl }) => {
         </div>
       </Modal>
 
-      {/* Modal: Operational Periods */}
       <Modal isOpen={showPeriodModal} onClose={()=>{setShowPeriodModal(false); setShowExPanel(false);}} title={activeYear?.title} size="lg">
         <div className="flex flex-col gap-4 h-[650px] relative overflow-hidden">
-          
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-             <div className="grid grid-cols-5 gap-2 items-end">
+            <div className="flex gap-2 mb-3 items-center">
+               <Info size={14} className="text-indigo-600"/>
+               <span className="text-[10px] text-slate-500 font-bold">{isRtl ? 'تولید اتوماتیک بر اساس تاریخ شروع سال:' : 'Auto-gen based on year start:'}</span>
+               <div className="flex gap-1 ml-auto">
+                  <Button variant="white" size="xs" onClick={()=>generateAuto(1)}>1</Button>
+                  <Button variant="white" size="xs" onClick={()=>generateAuto(3)}>3</Button>
+                  <Button variant="white" size="xs" onClick={()=>generateAuto(6)}>6</Button>
+               </div>
+            </div>
+            <div className="grid grid-cols-5 gap-2 items-end">
               <InputField label={t.fp_period_code} size="sm" value={newPeriodData.code} onChange={e=>setNewPeriodData({...newPeriodData, code:e.target.value})} isRtl={isRtl} />
               <InputField label={t.fp_period_title} size="sm" value={newPeriodData.title} onChange={e=>setNewPeriodData({...newPeriodData, title:e.target.value})} isRtl={isRtl} />
               <InputField label={t.fp_start_date} type="date" size="sm" value={newPeriodData.startDate} onChange={e=>setNewPeriodData({...newPeriodData, startDate:e.target.value})} isRtl={isRtl} />
               <InputField label={t.fp_end_date} type="date" size="sm" value={newPeriodData.endDate} onChange={e=>setNewPeriodData({...newPeriodData, endDate:e.target.value})} isRtl={isRtl} />
-              <Button variant="primary" size="sm" icon={Plus} onClick={() => setOperationalPeriods(prev => [...prev, {...newPeriodData, id: Date.now(), yearId: activeYear.id, exceptions: []}])}>{t.btn_add}</Button>
+              <Button variant="primary" size="sm" icon={Plus} onClick={handleSavePeriod}>{t.btn_add}</Button>
             </div>
           </div>
 
@@ -201,7 +247,8 @@ const FiscalPeriods = ({ t, isRtl }) => {
                         </td>
                         <td className="p-2 flex gap-1 justify-center">
                            <button onClick={()=>{setSelectedPeriod(p); setShowExPanel(true);}} className={`p-1.5 rounded bg-white border border-slate-200 shadow-sm ${p.exceptions.length > 0 ? 'text-indigo-600 border-indigo-200' : 'text-slate-400'}`}><Users size={14}/></button>
-                           <button onClick={()=>deletePeriod(p.id)} disabled={p.status !== 'not_open'} className={`p-1.5 rounded bg-white border border-slate-200 shadow-sm ${p.status === 'not_open' ? 'text-red-500 hover:bg-red-50' : 'text-slate-200'}`}><Trash size={14}/></button>
+                           <button onClick={()=>setNewPeriodData(p)} className="p-1.5 rounded bg-white border border-slate-200 shadow-sm text-slate-600"><Edit size={14}/></button>
+                           <button onClick={()=>deletePeriod(p.id)} disabled={p.status !== 'not_open'} className={`p-1.5 rounded bg-white border border-slate-200 shadow-sm ${p.status === 'not_open' ? 'text-red-500' : 'text-slate-200'}`}><Trash size={14}/></button>
                         </td>
                      </tr>
                    ))}
@@ -209,19 +256,11 @@ const FiscalPeriods = ({ t, isRtl }) => {
              </table>
           </div>
 
-          {/* SIDEBAR: Advanced Exceptions */}
-          <div className={`
-             absolute top-0 ${isRtl ? 'left-0 border-r' : 'right-0 border-l'} w-80 h-full bg-white shadow-2xl z-20 
-             flex flex-col transition-all duration-300 transform
-             ${showExPanel ? 'translate-x-0' : (isRtl ? '-translate-x-full' : 'translate-x-full')}
-          `}>
+          <div className={`absolute top-0 ${isRtl ? 'left-0 border-r' : 'right-0 border-l'} w-80 h-full bg-white shadow-2xl z-20 flex flex-col transition-all duration-300 transform ${showExPanel ? 'translate-x-0' : (isRtl ? '-translate-x-full' : 'translate-x-full')}`}>
              <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
-                <div className="flex items-center gap-2 font-black text-xs text-indigo-700 uppercase italic">
-                   <Users size={16}/> {t.fp_exceptions}
-                </div>
+                <div className="flex items-center gap-2 font-black text-xs text-indigo-700 italic"><Users size={16}/> {t.fp_exceptions}</div>
                 <button onClick={()=>setShowExPanel(false)} className="text-slate-400 hover:text-slate-800"><X size={18}/></button>
              </div>
-             
              <div className="p-4 flex flex-col gap-4 flex-1 overflow-hidden">
                 <div className="space-y-4 bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-inner">
                    <SelectField label={t.fp_user} size="sm" value={exUser} onChange={e=>setExUser(e.target.value)}>
@@ -230,26 +269,21 @@ const FiscalPeriods = ({ t, isRtl }) => {
                       <option value="System Admin">System Admin</option>
                       <option value="Audit Team">Audit Team</option>
                    </SelectField>
-                   
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase px-1">{isRtl ? 'وضعیت‌های مجاز استثنا' : 'Allowed Status Exceptions'}</label>
-                      <div className="flex flex-col gap-1.5">
-                         {['open', 'not_open', 'closed'].map(st => (
-                           <div key={st} onClick={() => toggleStatusInException(st)} className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-all ${exStatuses.includes(st) ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>
-                              <span className="text-[11px] font-bold">{t[`fp_st_${st}`]}</span>
-                              {exStatuses.includes(st) && <CheckCircle2 size={14}/>}
-                           </div>
-                         ))}
-                      </div>
+                   <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase px-1">{isRtl ? 'وضعیت‌های مجاز' : 'Allowed Statuses'}</label>
+                      {['open', 'not_open', 'closed'].map(st => (
+                        <div key={st} onClick={() => toggleStatusInEx(st)} className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-all mb-1 ${exStatuses.includes(st) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
+                           <span className="text-[11px] font-bold">{t[`fp_st_${st}`]}</span>
+                           {exStatuses.includes(st) && <CheckCircle2 size={14}/>}
+                        </div>
+                      ))}
                    </div>
-                   
-                   <Button variant="primary" size="sm" className="w-full" icon={UserPlus} onClick={addException}>{t.btn_add}</Button>
+                   <Button variant="primary" size="sm" className="w-full" icon={UserPlus} onClick={addEx}>{t.btn_add}</Button>
                 </div>
-
-                <div className="flex-1 overflow-y-auto space-y-2 mt-2 no-scrollbar">
+                <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar mt-2">
                    {selectedPeriod?.exceptions.map(ex => (
                      <div key={ex.user} className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm relative group">
-                        <button onClick={()=>removeException(ex.user)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><X size={14}/></button>
+                        <button onClick={()=>removeEx(ex.user)} className="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><X size={14}/></button>
                         <div className="text-[11px] font-black text-slate-800 mb-2">{ex.user}</div>
                         <div className="flex flex-wrap gap-1">
                            {ex.allowedStatuses.map(st => (
@@ -258,11 +292,6 @@ const FiscalPeriods = ({ t, isRtl }) => {
                         </div>
                      </div>
                    ))}
-                   {(!selectedPeriod?.exceptions || selectedPeriod.exceptions.length === 0) && (
-                     <div className="flex flex-col items-center justify-center h-40 opacity-20 italic text-[10px]">
-                        <Users size={32} strokeWidth={1} className="mb-2"/> {isRtl ? 'هیچ کاربری ثبت نشده' : 'NO EXCEPTIONS REGISTERED'}
-                     </div>
-                   )}
                 </div>
              </div>
           </div>
