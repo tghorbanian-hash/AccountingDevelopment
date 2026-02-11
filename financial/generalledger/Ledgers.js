@@ -197,6 +197,7 @@ const Ledgers = ({ t, isRtl }) => {
         }
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+           {/* Row 1: Code & Title */}
            <InputField 
              label={t.lg_code} 
              value={formData.code} 
@@ -212,19 +213,18 @@ const Ledgers = ({ t, isRtl }) => {
              placeholder="e.g. Central Ledger"
            />
            
-           <div className="md:col-span-2">
-             <SelectField 
-               label={t.lg_structure} 
-               value={formData.structure}
-               onChange={e => setFormData({...formData, structure: e.target.value})}
-               isRtl={isRtl}
-             >
-                <option value="">{t.lg_structure_ph || '- Select -'}</option>
-                {structureOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-             </SelectField>
-           </div>
+           {/* Row 2: Structure & Currency (Side by Side) */}
+           <SelectField 
+             label={t.lg_structure} 
+             value={formData.structure}
+             onChange={e => setFormData({...formData, structure: e.target.value})}
+             isRtl={isRtl}
+           >
+              <option value="">{t.lg_structure_ph || '- Select -'}</option>
+              {structureOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+           </SelectField>
 
            <SelectField 
              label={t.lg_currency} 
@@ -237,7 +237,8 @@ const Ledgers = ({ t, isRtl }) => {
               ))}
            </SelectField>
 
-           <div className="flex flex-col gap-4 mt-6">
+           {/* Row 3: Toggles (Side by Side) */}
+           <div className="md:col-span-2 flex flex-row items-center gap-8 mt-4 p-2 bg-slate-50 rounded-lg border border-slate-100">
               <Toggle 
                 label={t.lg_main} 
                 checked={formData.isMain} 
