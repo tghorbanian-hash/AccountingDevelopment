@@ -61,6 +61,7 @@ export const GL_TRANS = {
     active_status: "Status",
     alert_req_fields: "Please fill all required fields.",
     confirm_delete: "Are you sure you want to delete {0} items?",
+    description: "Description",
 
     // Document Management
     acc_mgmt_title: "Accounting Document Management",
@@ -158,6 +159,27 @@ export const GL_TRANS = {
     fp_add_user: "Add User to Exceptions",
     fp_user: "User",
     fp_select_user: "Select User...",
+    
+    // Document Types Page
+    doctype_title: "Accounting Document Types",
+    doctype_subtitle: "Manage system and user-defined document types for categorization",
+    dt_doc_title: "Document Type Title",
+    dt_sys_opening: "Opening",
+    dt_sys_general: "General",
+    dt_sys_closing: "Closing",
+    dt_sys_close_acc: "Closing Accounts",
+    dt_sys_adj_begin: "Beginning Year Adjustment",
+    dt_sys_adj_end: "End Year Adjustment",
+    dt_sys_rev_mon: "Monetary Item Revaluation",
+    dt_sys_rev_rep: "Reporting Currency Revaluation",
+    dt_sys_warehouse: "Warehouse",
+    dt_sys_treasury: "Receipt & Payment",
+    dt_sys_sales: "Sales",
+    dt_sys_budget: "Budget",
+    dt_manual_type: "User Defined",
+    dt_auto_type: "System",
+    dt_new_doc: "New Document Type",
+    dt_edit_doc: "Edit Document Type",
 
     // System Detail Names
     sys_partner: "Business Partner",
@@ -188,6 +210,7 @@ export const GL_TRANS = {
     active_status: "وضعیت",
     alert_req_fields: "لطفاً تمام فیلدهای اجباری را پر کنید.",
     confirm_delete: "آیا از حذف {0} مورد اطمینان دارید؟",
+    description: "توضیحات",
 
     // Document Management
     acc_mgmt_title: "مدیریت اسناد حسابداری",
@@ -285,6 +308,27 @@ export const GL_TRANS = {
     fp_add_user: "افزودن کاربر به لیست استثنا",
     fp_user: "نام کاربر",
     fp_select_user: "انتخاب کاربر...",
+    
+    // Document Types Page
+    doctype_title: "انواع اسناد حسابداری",
+    doctype_subtitle: "مدیریت انواع سندهای سیستمی و کاربری جهت دسته‌بندی اسناد",
+    dt_doc_title: "عنوان نوع سند",
+    dt_sys_opening: "افتتاحیه",
+    dt_sys_general: "عمومی",
+    dt_sys_closing: "اختتامیه",
+    dt_sys_close_acc: "بستن حساب‌ها",
+    dt_sys_adj_begin: "تعدیل ماهیت ابتدای سال",
+    dt_sys_adj_end: "تعدیل ماهیت پایان سال",
+    dt_sys_rev_mon: "تسعیر ارز اقلام پولی",
+    dt_sys_rev_rep: "تسعیر به ارز گزارشگری",
+    dt_sys_warehouse: "انبار",
+    dt_sys_treasury: "دریافت و پرداخت",
+    dt_sys_sales: "فروش",
+    dt_sys_budget: "بودجه",
+    dt_manual_type: "کاربری",
+    dt_auto_type: "سیستمی",
+    dt_new_doc: "تعریف نوع سند جدید",
+    dt_edit_doc: "ویرایش نوع سند",
 
     // System Detail Names
     sys_partner: "طرف تجاری",
