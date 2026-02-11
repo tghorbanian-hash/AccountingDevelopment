@@ -94,7 +94,9 @@ const App = () => {
       CostCenters,
       Projects,
       Branches,
-      OrgChart
+      OrgChart,
+      // --- New Components ---
+      Ledgers
     } = window;
 
     // --- مسیردهی صفحات (Routing) ---
@@ -110,6 +112,9 @@ const App = () => {
     if (activeId === 'projects') return Projects ? <Projects t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Projects Component Not Loaded</div>;
     if (activeId === 'branches') return Branches ? <Branches t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Branches Component Not Loaded</div>;
     if (activeId === 'org_chart') return OrgChart ? <OrgChart t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrgChart Component Not Loaded</div>;
+
+    // 2.1 اطلاعات پایه مالی (Financial Base Info)
+    if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
 
     // 3. امنیت و دسترسی (Security)
     if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
