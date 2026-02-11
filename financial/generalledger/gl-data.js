@@ -1,1 +1,119 @@
+/* Filename: financial/generalledger/gl-data.js */
+import { BarChart3 } from 'lucide-react';
 
+export const GL_MENU = {
+  id: 'gl', 
+  label: { en: 'General Ledger', fa: 'دفتر کل' },
+  // icon: BarChart3, // Optional here as parent has icon
+  children: [
+    {
+      id: 'gl_settings',
+      label: { en: 'GL Settings', fa: 'تنظیمات دفتر کل' },
+      children: [
+        { id: 'auto_num', label: { en: 'Auto Numbering', fa: 'شماره‌گذاری اتوماتیک' } },
+        { id: 'year_end_setup', label: { en: 'Year-end Settings', fa: 'تنظیمات عملیات پایان سال' } },
+        { id: 'allowed_modules', label: { en: 'Allowed Modules', fa: 'ماژول‌های مجاز' } },
+      ]
+    },
+    {
+      id: 'gl_base_info',
+      label: { en: 'Base Information', fa: 'اطلاعات پایه' },
+      children: [
+        { id: 'ledgers', label: { en: 'Ledgers', fa: 'دفاتر' } },
+        { id: 'acc_structure', label: { en: 'Account Structure', fa: 'ساختار حساب' } },
+        { id: 'details', label: { en: 'Details', fa: 'تفصیل‌ها' } },
+        { id: 'fiscal_periods', label: { en: 'Fiscal Periods', fa: 'دوره‌های مالی' } },
+        { id: 'doc_types', label: { en: 'Document Types', fa: 'انواع اسناد' } },
+        { id: 'std_desc', label: { en: 'Standard Descriptions', fa: 'شرح‌های استاندارد' } },
+      ]
+    },
+    {
+      id: 'gl_docs',
+      label: { en: 'Document Management', fa: 'مدیریت اسناد' },
+      children: [
+        { id: 'doc_list', label: { en: 'Document List', fa: 'فهرست اسناد' } },
+        { id: 'doc_review', label: { en: 'Document Review', fa: 'بررسی اسناد' } },
+        { id: 'doc_finalize', label: { en: 'Finalize Documents', fa: 'قطعی کردن اسناد' } },
+      ]
+    },
+    {
+      id: 'gl_reports',
+      label: { en: 'Reports & Analytics', fa: 'گزارش‌ها و تحلیل‌ها' },
+      children: [
+        { id: 'print_doc', label: { en: 'Print Accounting Doc', fa: 'چاپ سند حسابداری' } },
+        { id: 'acc_review', label: { en: 'Account Review', fa: 'مرور حساب‌ها' } },
+      ]
+    }
+  ]
+};
+
+export const GL_TRANS = {
+  en: {
+    acc_mgmt_title: "Accounting Document Management",
+    acc_mgmt_subtitle: "List of all financial documents with search and batch operation capabilities",
+    grid_title: "Document List",
+    col_docNo: "Doc No",
+    col_date: "Date",
+    col_dept: "Department",
+    col_desc: "Description",
+    col_debtor: "Debtor",
+    col_status: "Status",
+    col_active: "Active",
+    col_actions: "Actions",
+    status_final: "Final",
+    status_draft: "Draft",
+    status_reviewed: "Reviewed",
+    filter_fromDoc: "From Doc No",
+    filter_toDoc: "To Doc No",
+    filter_fromDate: "From Date",
+    filter_toDate: "To Date",
+    filter_status: "Document Status",
+    filter_costCenter: "Cost Center",
+    filter_subsidiary: "Subsidiary Account",
+    filter_allStatus: "All Statuses",
+    modal_newDoc: "New Document",
+    modal_editDoc: "Edit Document",
+    modal_warning: "Note: Changes to final documents require financial manager approval.",
+    field_docType: "Document Type",
+    field_general: "General",
+    field_opening: "Opening",
+    field_party: "Party",
+    field_selectParty: "Select Person...",
+    field_amount: "Document Amount",
+    field_isActive: "Active Document",
+  },
+  fa: {
+    acc_mgmt_title: "مدیریت اسناد حسابداری",
+    acc_mgmt_subtitle: "لیست کلیه اسناد مالی با قابلیت جستجو و عملیات گروهی",
+    grid_title: "لیست اسناد",
+    col_docNo: "شماره سند",
+    col_date: "تاریخ",
+    col_dept: "دپارتمان",
+    col_desc: "شرح سند",
+    col_debtor: "بدهکار (ریال)",
+    col_status: "وضعیت",
+    col_active: "فعال",
+    col_actions: "عملیات",
+    status_final: "نهایی",
+    status_draft: "پیش‌نویس",
+    status_reviewed: "بررسی شده",
+    filter_fromDoc: "از شماره سند",
+    filter_toDoc: "تا شماره سند",
+    filter_fromDate: "از تاریخ",
+    filter_toDate: "تا تاریخ",
+    filter_status: "وضعیت سند",
+    filter_costCenter: "مرکز هزینه",
+    filter_subsidiary: "معین",
+    filter_allStatus: "همه وضعیت‌ها",
+    modal_newDoc: "سند جدید",
+    modal_editDoc: "ویرایش سند",
+    modal_warning: "لطفاً دقت کنید: تغییرات در اسناد نهایی نیازمند تایید مدیر مالی می‌باشد.",
+    field_docType: "نوع سند",
+    field_general: "عمومی",
+    field_opening: "افتتاحیه",
+    field_party: "طرف حساب",
+    field_selectParty: "انتخاب شخص...",
+    field_amount: "مبلغ سند",
+    field_isActive: "سند فعال باشد",
+  }
+};
