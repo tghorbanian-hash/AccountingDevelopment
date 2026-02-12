@@ -6,7 +6,7 @@ import {
   AlertCircle, Layout, List, CreditCard, DollarSign,
   Package, Hash, Layers, FileDigit, ArrowRight, Edit,
   TreeDeciduous, MoreVertical, ShieldCheck, X, User,
-  ChevronsDown, ChevronsUp, Minimize2, Maximize2 // Updated Icons
+  ChevronsDown, ChevronsUp, Minimize2, Maximize2 
 } from 'lucide-react';
 
 // --- DATA CONSTANTS ---
@@ -40,7 +40,8 @@ const ALL_TAFSIL_TYPES = [
 const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
   <div 
     className={`flex items-center gap-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'} ${className}`} 
-    onClick={() => {
+    onClick={(e) => {
+      e.stopPropagation(); // Prevent bubbling issues
       if (!disabled && onChange) onChange(!checked);
     }}
   >
@@ -171,7 +172,7 @@ const AccountForm = ({
            <div className="col-span-1 md:col-span-2">
               <Checkbox 
                  label={isRtl ? "فعال" : "Active"}
-                 checked={formData.isActive !== false} // Default true
+                 checked={formData.isActive !== false}
                  onChange={v => setFormData(prev => ({...prev, isActive: v}))}
                  className="mb-4"
               />
@@ -616,6 +617,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
       setActiveTab('info');
     };
 
+    // Recursive Updaters
     const addNodeToTree = (nodes, parentId, newNode) => {
       return nodes.map(node => {
         if (node.id === parentId) {
@@ -638,13 +640,12 @@ const ChartofAccounts = ({ t, isRtl }) => {
       });
     };
 
-    // Find full path of IDs to a node (for auto-expanding)
-    const findPathIds = (nodes, targetId, path = []) => {
+    // Find all ancestor IDs for a given node ID to expand the path
+    const getAncestorIds = (nodes, targetId, path = []) => {
       for (const node of nodes) {
-        const currentPath = [...path, node.id];
-        if (node.id === targetId) return path; // Return ancestors
+        if (node.id === targetId) return path;
         if (node.children) {
-          const res = findPathIds(node.children, targetId, currentPath);
+          const res = getAncestorIds(node.children, targetId, [...path, node.id]);
           if (res) return res;
         }
       }
@@ -673,13 +674,14 @@ const ChartofAccounts = ({ t, isRtl }) => {
       const nodeData = { ...formData, fullCode, label: labelObj };
 
       let newData;
-      let targetId = nodeData.id; 
+      let targetNodeId;
 
       if (mode === 'edit') {
         newData = updateNodeInTree(data, nodeData);
+        targetNodeId = nodeData.id;
       } else {
         const newNode = { ...nodeData, id: Date.now().toString(), children: [] };
-        targetId = newNode.id;
+        targetNodeId = newNode.id;
         if (formData.level === 'group') {
           newData = [...data, newNode];
         } else {
@@ -687,19 +689,21 @@ const ChartofAccounts = ({ t, isRtl }) => {
         }
       }
       
-      // 1. Save data
+      // 1. Calculate Path to expand BEFORE updating tree data
+      const ancestors = getAncestorIds(newData, targetNodeId) || [];
+      
+      // 2. Set Expanded IDs (Merge with existing)
+      setExpandedIds(prev => [...new Set([...prev, ...ancestors])]);
+
+      // 3. Find the new object reference in the new data structure
+      const newFlatData = flattenTree(newData);
+      const newSelectedNode = newFlatData.find(n => n.id === targetNodeId);
+      
+      // 4. Update Selected Node
+      setSelectedNode(newSelectedNode);
+
+      // 5. Save Data (This triggers prop update)
       onSaveTree(newData);
-      
-      // 2. Auto Select & Expand
-      const newFlatList = flattenTree(newData);
-      const newSelectedNode = newFlatList.find(n => n.id === targetId);
-      
-      if (newSelectedNode) {
-          // Find path to this node to expand parents
-          const ancestors = findPathIds(newData, targetId) || [];
-          setExpandedIds(prev => [...new Set([...prev, ...ancestors])]);
-          setSelectedNode(newSelectedNode);
-      }
       
       setMode('view');
     };
@@ -819,8 +823,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                   <span className="text-[11px] font-bold text-slate-500 uppercase">{isRtl ? "ساختار درختی" : "Tree Structure"}</span>
                   <div className="flex gap-1">
-                     <Button size="iconSm" variant="ghost" onClick={handleExpandAll} title={isRtl ? "باز کردن همه" : "Expand All"} icon={Maximize2} />
-                     <Button size="iconSm" variant="ghost" onClick={handleCollapseAll} title={isRtl ? "بستن همه" : "Collapse All"} icon={Minimize2} />
+                     <button className="w-6 h-6 flex items-center justify-center hover:bg-slate-200 rounded text-slate-500 transition-colors" onClick={handleExpandAll} title={isRtl ? "باز کردن همه" : "Expand All"}><ChevronsDown size={14}/></button>
+                     <button className="w-6 h-6 flex items-center justify-center hover:bg-slate-200 rounded text-slate-500 transition-colors" onClick={handleCollapseAll} title={isRtl ? "بستن همه" : "Collapse All"}><ChevronsUp size={14}/></button>
                   </div>
                </div>
                <div className="flex-1 overflow-y-auto p-2">
