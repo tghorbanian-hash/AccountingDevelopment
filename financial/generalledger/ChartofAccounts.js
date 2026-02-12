@@ -5,10 +5,10 @@ import {
   Settings, Search, ChevronRight, ChevronDown, Check,
   AlertCircle, Layout, List, CreditCard, DollarSign,
   Package, Hash, Layers, FileDigit, ArrowRight, Edit,
-  TreeDeciduous, MoreVertical
+  TreeDeciduous, MoreVertical, ShieldCheck
 } from 'lucide-react';
 
-// --- SHARED HELPERS & SUB-COMPONENTS (Defined OUTSIDE to fix focus bug) ---
+// --- SHARED HELPERS & SUB-COMPONENTS ---
 
 const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
   <div 
@@ -47,7 +47,7 @@ const Tabs = ({ tabs, activeTab, onChange }) => (
   </div>
 );
 
-// --- FORM COMPONENTS (Defined OUTSIDE to fix focus bug) ---
+// --- FORM COMPONENTS ---
 
 const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, accountTypes, accountNatures }) => {
   const { InputField, SelectField, Button, Callout } = window.UI;
@@ -141,11 +141,12 @@ const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, ac
         )}
       </div>
 
-      {/* SUBSIDIARY SPECIFIC SETTINGS (Reverted to original design) */}
+      {/* SUBSIDIARY SPECIFIC SETTINGS - Full height, no internal scroll */}
       {isSubsidiary && (
-        <div className="flex-1 overflow-y-auto pr-1">
+        <div className="w-full">
            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3 mb-4">
-              <h4 className="font-bold text-[11px] text-slate-500 uppercase tracking-wider mb-2">
+              <h4 className="font-bold text-[11px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                 <ShieldCheck size={14} />
                  {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}
               </h4>
               
@@ -252,7 +253,6 @@ const StandardDesc = ({ formData, setFormData, isRtl }) => {
   const { InputField, Button } = window.UI;
   const [descText, setDescText] = useState('');
   
-  // Use a local copy or direct ref if performance is issue, but simple state is fine here
   const list = formData.descriptions || [];
 
   const addDesc = () => {
@@ -428,7 +428,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
             columns={[
               { field: 'code', header: isRtl ? 'کد' : 'Code', width: 'w-24' },
               { field: 'title', header: isRtl ? 'عنوان' : 'Title', width: 'w-64' },
-              // ADDED STATUS COLUMN
               { 
                 field: 'status', 
                 header: isRtl ? 'وضعیت' : 'Status', 
@@ -641,7 +640,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
       { id: 'desc', label: isRtl ? 'شرح‌های استاندارد' : 'Descriptions', icon: FileDigit },
     ];
  
-    // Show only 'info' for Group/General, all tabs for Subsidiary
     const activeTabs = formData.level === 'subsidiary' ? tabs : [tabs[0]];
 
     return (
@@ -690,8 +688,9 @@ const ChartofAccounts = ({ t, isRtl }) => {
                   </div>
                )}
 
+               {/* VIEW MODE - READ ONLY DETAILS */}
                {selectedNode && mode === 'view' && (
-                  <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                  <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto">
                      <div className="p-6 border-b border-slate-100 flex justify-between items-start">
                         <div>
                            <div className="flex items-center gap-2 mb-1">
@@ -705,15 +704,43 @@ const ChartofAccounts = ({ t, isRtl }) => {
                            <Button variant="secondary" size="sm" icon={Edit} onClick={handleEdit}>{isRtl ? "ویرایش" : "Edit"}</Button>
                         </div>
                      </div>
-                     <div className="p-6 grid grid-cols-2 gap-6">
-                        <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "سطح" : "Level"}</label><span className="text-sm">{selectedNode.level}</span></div>
-                        <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "ماهیت" : "Nature"}</label><Badge variant="info">{selectedNode.nature}</Badge></div>
-                        <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "نوع" : "Type"}</label><span className="text-sm">{selectedNode.type}</span></div>
+                     
+                     <div className="p-6 space-y-6">
+                        <div className="grid grid-cols-2 gap-6">
+                           <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "سطح" : "Level"}</label><span className="text-sm">{selectedNode.level}</span></div>
+                           <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "ماهیت" : "Nature"}</label><Badge variant="info">{selectedNode.nature}</Badge></div>
+                           <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "نوع" : "Type"}</label><span className="text-sm">{selectedNode.type}</span></div>
+                           {selectedNode.level === 'subsidiary' && (
+                              <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "وضعیت" : "Status"}</label>
+                              <Badge variant={selectedNode.isActive ? 'success' : 'danger'}>{selectedNode.isActive ? 'فعال' : 'غیرفعال'}</Badge></div>
+                           )}
+                        </div>
+
+                        {/* NEW: DISPLAY CONTROL FEATURES IN VIEW MODE */}
                         {selectedNode.level === 'subsidiary' && (
-                           <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "وضعیت" : "Status"}</label>
-                           <Badge variant={selectedNode.isActive ? 'success' : 'danger'}>{selectedNode.isActive ? 'فعال' : 'غیرفعال'}</Badge></div>
+                           <div className="border-t border-slate-100 pt-4">
+                              <h4 className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1"><ShieldCheck size={12}/> {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}</h4>
+                              <div className="grid grid-cols-2 gap-3">
+                                 {/* Currency */}
+                                 <div className={`p-2 rounded border text-xs ${selectedNode.currencyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                    <div className="font-bold mb-1">{isRtl ? "ویژگی ارزی" : "Currency"}</div>
+                                    <div className="text-slate-500">{selectedNode.currencyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                 </div>
+                                 {/* Tracking */}
+                                 <div className={`p-2 rounded border text-xs ${selectedNode.trackFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                    <div className="font-bold mb-1">{isRtl ? "ویژگی پیگیری" : "Tracking"}</div>
+                                    <div className="text-slate-500">{selectedNode.trackFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                 </div>
+                                 {/* Quantity */}
+                                 <div className={`p-2 rounded border text-xs ${selectedNode.qtyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                    <div className="font-bold mb-1">{isRtl ? "ویژگی مقداری" : "Quantity"}</div>
+                                    <div className="text-slate-500">{selectedNode.qtyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                 </div>
+                              </div>
+                           </div>
                         )}
                      </div>
+
                      <div className="mt-auto p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
                         {selectedNode.level === 'group' && <Button variant="primary" size="sm" icon={Plus} onClick={() => handleCreate('general')}>{isRtl ? "حساب کل جدید" : "New General"}</Button>}
                         {selectedNode.level === 'general' && <Button variant="primary" size="sm" icon={Plus} onClick={() => handleCreate('subsidiary')}>{isRtl ? "حساب معین جدید" : "New Subsidiary"}</Button>}
@@ -721,6 +748,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
                   </div>
                )}
 
+               {/* EDIT / CREATE MODE */}
                {mode !== 'view' && (
                   <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
                      <div className="px-4 py-3 border-b border-slate-100 font-bold text-slate-700 flex items-center gap-2">
@@ -728,6 +756,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
                         {mode === 'edit' ? (isRtl ? "ویرایش حساب" : "Edit Account") : (isRtl ? "حساب جدید" : "New Account")}
                         <Badge variant="neutral">{formData.level}</Badge>
                      </div>
+                     
+                     {/* SCROLLING IS HANDLED HERE - FOR THE WHOLE FORM */}
                      <div className="p-4 flex-1 overflow-y-auto">
                         <Tabs tabs={activeTabs} activeTab={activeTab} onChange={setActiveTab} />
                         
