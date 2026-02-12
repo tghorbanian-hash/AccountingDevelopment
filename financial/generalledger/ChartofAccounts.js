@@ -15,7 +15,7 @@ const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
     className={`flex items-center gap-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'} ${className}`} 
     onClick={(e) => {
       e.stopPropagation();
-      if (!disabled) onChange(!checked);
+      if (!disabled && onChange) onChange(!checked);
     }}
   >
     <div className={`
@@ -56,7 +56,7 @@ const AccountForm = ({
   formData, setFormData, structure, selectedNode, isRtl, 
   accountTypes, accountNatures, onOpenContraModal, contraAccountName 
 }) => {
-  const { InputField, SelectField, Button, Callout } = window.UI;
+  const { InputField, SelectField, Button } = window.UI;
 
   const isSubsidiary = formData.level === 'subsidiary';
   const isGeneral = formData.level === 'general';
@@ -65,13 +65,13 @@ const AccountForm = ({
   // Calculate Code Prefix
   let prefix = '';
   if (!isGroup && selectedNode) {
-     // If creating NEW, selectNode is parent. If EDITING, we need parent of selectNode (not easily avail here without tree traversal, 
-     // but for UX keeping simple prefix based on context is fine or handled by backend validation)
-     // Correct Logic for Prefix Display:
-     if (formData.id) { // Editing
-        // In a real app, we'd strip the own code from fullCode to show prefix. 
-        // Here we simulate by showing parent fullCode if available or part of own fullCode
-        prefix = formData.fullCode ? formData.fullCode.substring(0, formData.fullCode.length - formData.code.length) : '';
+     // If creating NEW, selectedNode is parent. If EDITING, we try to deduce parent code.
+     if (formData.id && selectedNode.fullCode) { // Editing
+        // Try to strip own code from fullCode to find parent prefix
+        const ownCodeLen = formData.code ? formData.code.length : 0;
+        if (ownCodeLen > 0 && formData.fullCode.length > ownCodeLen) {
+            prefix = formData.fullCode.substring(0, formData.fullCode.length - ownCodeLen);
+        }
      } else { // Creating
         prefix = isGeneral 
           ? (selectedNode.level === 'group' ? selectedNode.code : '') 
@@ -96,7 +96,6 @@ const AccountForm = ({
                 value={formData.code || ''}
                 onChange={e => {
                   const val = e.target.value;
-                  // Allow only numbers (optional, based on structure settings)
                   if (val.length <= maxLen) setFormData({...formData, code: val});
                 }}
                 className={`
@@ -183,7 +182,11 @@ const AccountForm = ({
                           <option value="">-</option><option value="IRR">IRR</option><option value="USD">USD</option><option value="EUR">EUR</option>
                        </SelectField>
                        <div className="mt-6">
-                         <Checkbox label={isRtl ? "الزام ورود ارز" : "Mandatory Currency"} checked={true} disabled />
+                         <Checkbox 
+                            label={isRtl ? "الزام ورود ارز" : "Mandatory Currency"} 
+                            checked={!!formData.currencyMandatory} 
+                            onChange={v => setFormData(prev => ({...prev, currencyMandatory: v}))}
+                         />
                        </div>
                     </div>
                  )}
@@ -198,8 +201,16 @@ const AccountForm = ({
                  />
                  {formData.trackFeature && (
                     <div className="mr-6 flex gap-4 animate-in slide-in-from-top-1">
-                       <Checkbox label={isRtl ? "اجباری" : "Mandatory"} checked={true} onChange={()=>{}} />
-                       <Checkbox label={isRtl ? "یکتا بودن شماره پیگیری" : "Unique Tracking No."} checked={false} onChange={()=>{}} />
+                       <Checkbox 
+                          label={isRtl ? "اجباری" : "Mandatory"} 
+                          checked={!!formData.trackMandatory} 
+                          onChange={v => setFormData(prev => ({...prev, trackMandatory: v}))}
+                       />
+                       <Checkbox 
+                          label={isRtl ? "یکتا بودن شماره پیگیری" : "Unique Tracking No."} 
+                          checked={!!formData.trackUnique} 
+                          onChange={v => setFormData(prev => ({...prev, trackUnique: v}))}
+                       />
                     </div>
                  )}
               </div>
@@ -213,7 +224,11 @@ const AccountForm = ({
                  />
                  {formData.qtyFeature && (
                     <div className="mr-6 flex gap-4 animate-in slide-in-from-top-1">
-                       <Checkbox label={isRtl ? "اجباری" : "Mandatory"} checked={false} onChange={()=>{}} />
+                       <Checkbox 
+                          label={isRtl ? "اجباری" : "Mandatory"} 
+                          checked={!!formData.qtyMandatory} 
+                          onChange={v => setFormData(prev => ({...prev, qtyMandatory: v}))}
+                       />
                     </div>
                  )}
               </div>
@@ -235,7 +250,7 @@ const AccountForm = ({
               <div>
                  <label className="block text-[11px] font-bold text-slate-600 mb-1">{isRtl ? "حساب مقابل (تعدیل ماهیت)" : "Contra Account"}</label>
                  <div className="flex gap-2">
-                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded h-9 flex items-center px-2 text-sm text-slate-700 truncate">
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded h-9 flex items-center px-2 text-sm text-slate-700 truncate" dir="ltr">
                         {contraAccountName || (isRtl ? "انتخاب نشده" : "Not Selected")}
                     </div>
                     <Button variant="outline" icon={Search} onClick={onOpenContraModal} />
@@ -539,7 +554,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
     
     // Contra Account Modal State
     const [showContraModal, setShowContraModal] = useState(false);
-    const [contraSearch, setContraSearch] = useState('');
 
     // --- Helpers ---
     const getParentCode = (node) => {
@@ -547,6 +561,11 @@ const ChartofAccounts = ({ t, isRtl }) => {
       if (node.level === 'group') return node.code;
       if (node.level === 'general') return node.fullCode;
       return '';
+    };
+
+    const flattenTree = (nodes, list = []) => {
+        nodes.forEach(node => { list.push(node); if (node.children) flattenTree(node.children, list); });
+        return list;
     };
 
     const handleCreate = (level) => {
@@ -625,8 +644,11 @@ const ChartofAccounts = ({ t, isRtl }) => {
       const nodeData = { ...formData, fullCode, label: labelObj };
 
       let newData;
+      let newNodeId;
+
       if (mode === 'edit') {
         newData = updateNodeInTree(data, nodeData);
+        newNodeId = nodeData.id;
       } else {
         const newNode = { ...nodeData, id: Date.now().toString(), children: [] };
         if (formData.level === 'group') {
@@ -634,17 +656,20 @@ const ChartofAccounts = ({ t, isRtl }) => {
         } else {
           newData = addNodeToTree(data, selectedNode.id, newNode);
         }
-        // If creating new, update nodeData id to match created one for selection
-        nodeData.id = newNode.id;
+        newNodeId = newNode.id;
       }
       
-      // 1. Update global state
+      // Update global state
       onSaveTree(newData);
       
-      // 2. Select the Node & Reset Mode
-      // We pass the new data directly to be sure, but 'data' prop will update soon. 
-      // Important: We set SelectedNode to the *newly saved object* so the tree stays open on it.
-      setSelectedNode(nodeData); 
+      // Force selection of the new node to keep tree open
+      // We find the node in the NEW data
+      const newFlatData = flattenTree(newData);
+      const targetNode = newFlatData.find(n => n.id === newNodeId);
+      
+      if (targetNode) {
+          setSelectedNode(targetNode);
+      }
       setMode('view');
     };
 
@@ -655,31 +680,37 @@ const ChartofAccounts = ({ t, isRtl }) => {
        setMode('view');
     };
 
-    // --- Helpers for Contra Account Modal ---
-    const flattenSubsidiaries = (nodes, result = []) => {
+    // --- Helpers for Contra Account Modal (Path Building) ---
+    const flattenSubsidiariesWithPaths = (nodes, parentPath = '') => {
+       let result = [];
        nodes.forEach(node => {
+          // Construct current path
+          const currentPath = parentPath ? `${parentPath} > ${node.title}` : node.title;
+          
           if (node.level === 'subsidiary') {
-             result.push(node);
+             // For subsidiary, we want the path to be the title shown in grid
+             result.push({ 
+                 ...node, 
+                 pathTitle: currentPath // e.g. "Assets > Cash > Bank"
+             });
           }
-          if (node.children) flattenSubsidiaries(node.children, result);
+          
+          if (node.children) {
+             result = result.concat(flattenSubsidiariesWithPaths(node.children, currentPath));
+          }
        });
        return result;
     };
     
-    // We memoize the list of subsidiaries for the modal
-    const subsidiaryList = useMemo(() => {
-       return flattenSubsidiaries(data).filter(n => n.id !== formData.id); // Exclude self
+    // Memoize the list for performance
+    const filteredSubsidiaries = useMemo(() => {
+       const list = flattenSubsidiariesWithPaths(data);
+       return list.filter(n => n.id !== formData.id); // Exclude self
     }, [data, formData.id]);
-
-    const filteredSubsidiaries = subsidiaryList.filter(s => 
-       s.fullCode.includes(contraSearch) || 
-       s.title.includes(contraSearch) || 
-       (s.titleEn && s.titleEn.toLowerCase().includes(contraSearch.toLowerCase()))
-    );
 
     const getContraAccountName = (id) => {
        if (!id) return '';
-       const acc = flattenSubsidiaries(data).find(n => n.id === id);
+       const acc = flattenTree(data).find(n => n.id === id);
        return acc ? `${acc.fullCode} - ${acc.title}` : '';
     };
 
@@ -698,10 +729,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
       );
     };
 
-    const flattenTree = (nodes, list = []) => {
-        nodes.forEach(node => { list.push(node); if (node.children) flattenTree(node.children, list); });
-        return list;
-    };
     const handleNodeSelect = (nodeId) => {
         const allNodes = flattenTree(data);
         setSelectedNode(allNodes.find(n => n.id === nodeId));
@@ -791,7 +818,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
                            {selectedNode.contraAccountId && (
                                <div className="col-span-2">
                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "حساب مقابل (تعدیل ماهیت)" : "Contra Account"}</label>
-                                   <div className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100">
+                                   <div className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100" dir="ltr">
                                        {getContraAccountName(selectedNode.contraAccountId)}
                                    </div>
                                </div>
@@ -807,16 +834,24 @@ const ChartofAccounts = ({ t, isRtl }) => {
                                  <div className={`p-2 rounded border text-xs ${selectedNode.currencyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                                     <div className="font-bold mb-1">{isRtl ? "ویژگی ارزی" : "Currency"}</div>
                                     <div className="text-slate-500">{selectedNode.currencyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                    {selectedNode.currencyFeature && selectedNode.currencyMandatory && <div className="mt-1 text-indigo-600 font-bold text-[10px]">{isRtl ? "الزام ورود ارز" : "Mandatory"}</div>}
                                  </div>
                                  {/* Tracking */}
                                  <div className={`p-2 rounded border text-xs ${selectedNode.trackFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                                     <div className="font-bold mb-1">{isRtl ? "ویژگی پیگیری" : "Tracking"}</div>
                                     <div className="text-slate-500">{selectedNode.trackFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                    {selectedNode.trackFeature && (
+                                        <div className="mt-1 flex gap-2 text-[10px]">
+                                            {selectedNode.trackMandatory && <span className="text-indigo-600 font-bold">{isRtl ? "اجباری" : "Mandatory"}</span>}
+                                            {selectedNode.trackUnique && <span className="text-indigo-600 font-bold">{isRtl ? "یکتا" : "Unique"}</span>}
+                                        </div>
+                                    )}
                                  </div>
                                  {/* Quantity */}
                                  <div className={`p-2 rounded border text-xs ${selectedNode.qtyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                                     <div className="font-bold mb-1">{isRtl ? "ویژگی مقداری" : "Quantity"}</div>
                                     <div className="text-slate-500">{selectedNode.qtyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                    {selectedNode.qtyFeature && selectedNode.qtyMandatory && <div className="mt-1 text-indigo-600 font-bold text-[10px]">{isRtl ? "اجباری" : "Mandatory"}</div>}
                                  </div>
                               </div>
                            </div>
@@ -885,24 +920,14 @@ const ChartofAccounts = ({ t, isRtl }) => {
             isOpen={showContraModal}
             onClose={() => setShowContraModal(false)}
             title={isRtl ? "انتخاب حساب معین (تعدیل ماهیت)" : "Select Contra Account"}
-            maxWidth="max-w-3xl"
+            maxWidth="max-w-4xl"
          >
              <div className="h-[500px] flex flex-col">
-                 <div className="mb-4">
-                     <InputField 
-                        icon={Search} 
-                        placeholder={isRtl ? "جستجو بر اساس کد یا عنوان حساب..." : "Search code or title..."}
-                        value={contraSearch}
-                        onChange={e => setContraSearch(e.target.value)}
-                        isRtl={isRtl}
-                        autoFocus
-                     />
-                 </div>
                  <div className="flex-1 overflow-hidden border border-slate-200 rounded-lg">
                      <DataGrid 
                          columns={[
                              { field: 'fullCode', header: isRtl ? 'کد کامل' : 'Full Code', width: 'w-32' },
-                             { field: 'title', header: isRtl ? 'عنوان حساب' : 'Account Title', width: 'w-auto' },
+                             { field: 'pathTitle', header: isRtl ? 'مسیر حساب' : 'Account Path', width: 'w-auto' }, // Changed to pathTitle
                              { field: 'nature', header: isRtl ? 'ماهیت' : 'Nature', width: 'w-24', render: r => <Badge variant={r.nature === 'debit' ? 'info' : r.nature === 'credit' ? 'warning' : 'neutral'}>{r.nature}</Badge> }
                          ]}
                          data={filteredSubsidiaries}
@@ -919,8 +944,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
                  </div>
                  <div className="mt-2 text-xs text-slate-400">
                      {isRtl 
-                         ? `تعداد حساب‌های یافت شده: ${filteredSubsidiaries.length}` 
-                         : `${filteredSubsidiaries.length} accounts found`}
+                         ? `تعداد حساب‌های قابل انتخاب: ${filteredSubsidiaries.length}` 
+                         : `${filteredSubsidiaries.length} eligible accounts`}
                  </div>
              </div>
          </Modal>
