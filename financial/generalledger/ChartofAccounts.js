@@ -15,7 +15,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
 
   // --- 0. CUSTOM COMPONENTS (Local) ---
   
-  // Custom Checkbox (replacement for Toggle as requested)
   const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
     <div 
       className={`flex items-center gap-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'} ${className}`} 
@@ -33,7 +32,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
     </div>
   );
 
-  // Tab Navigation Component
   const Tabs = ({ tabs, activeTab, onChange }) => (
     <div className="flex items-center gap-1 border-b border-slate-200 mb-4 overflow-x-auto no-scrollbar">
       {tabs.map(tab => (
@@ -56,30 +54,32 @@ const ChartofAccounts = ({ t, isRtl }) => {
 
   // --- 1. STATE MANAGEMENT ---
 
-  // Coding Structure Settings
   const [structure, setStructure] = useState({
     groupLen: 1,
     generalLen: 2,
     subsidiaryLen: 2,
     useChar: false,
-    isLocked: false // Becomes true after first account is created
+    isLocked: false 
   });
 
-  // Data Store (Mocked for UI)
+  // Data Store - FIXED: Added 'label' object to match TreeView requirements
   const [accounts, setAccounts] = useState([
     { 
       id: '1', level: 'group', code: '1', 
       title: 'دارایی‌های جاری', titleEn: 'Current Assets',
+      label: { fa: 'دارایی‌های جاری', en: 'Current Assets' }, // Required for TreeView
       type: 'permanent', nature: 'debit', 
       children: [
         {
           id: '101', level: 'general', code: '01', fullCode: '101',
           title: 'موجودی نقد و بانک', titleEn: 'Cash & Banks',
+          label: { fa: 'موجودی نقد و بانک', en: 'Cash & Banks' }, // Required for TreeView
           type: 'permanent', nature: 'debit',
           children: [
             {
               id: '10101', level: 'subsidiary', code: '01', fullCode: '10101',
               title: 'موجودی ریالی نزد بانک‌ها', titleEn: 'Cash in Banks (Rials)',
+              label: { fa: 'موجودی ریالی نزد بانک‌ها', en: 'Cash in Banks (Rials)' }, // Required for TreeView
               type: 'permanent', nature: 'debit',
               isActive: true,
               currencyFeature: false, trackFeature: false, qtyFeature: false,
@@ -91,23 +91,13 @@ const ChartofAccounts = ({ t, isRtl }) => {
     }
   ]);
 
-  // UI State
-  const [selectedNode, setSelectedNode] = useState(null); // The node selected in the tree
-  const [mode, setMode] = useState('view'); // 'view', 'create_group', 'create_general', 'create_sub', 'edit'
+  const [selectedNode, setSelectedNode] = useState(null); 
+  const [mode, setMode] = useState('view'); 
   const [showStructureModal, setShowStructureModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('info'); // 'info', 'tafsil', 'desc'
-  
-  // Form Data
+  const [activeTab, setActiveTab] = useState('info'); 
   const [formData, setFormData] = useState({});
 
   // --- 2. HELPERS & LOGIC ---
-
-  const getFullCodeLength = (level) => {
-    if (level === 'group') return structure.groupLen;
-    if (level === 'general') return structure.groupLen + structure.generalLen;
-    if (level === 'subsidiary') return structure.groupLen + structure.generalLen + structure.subsidiaryLen;
-    return 0;
-  };
 
   const getParentCode = (node) => {
     if (!node) return '';
@@ -135,7 +125,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
   const handleCreate = (level) => {
     if (level !== 'group' && !selectedNode) return;
     
-    // Default values inheritance
     let defaults = {
       level: level,
       isActive: true,
@@ -146,11 +135,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
     };
 
     if (selectedNode) {
-      if (level === 'general') {
-        defaults.parentId = selectedNode.id;
-        defaults.type = selectedNode.type;
-        defaults.nature = selectedNode.nature;
-      } else if (level === 'subsidiary') {
+      if (level === 'general' || level === 'subsidiary') {
         defaults.parentId = selectedNode.id;
         defaults.type = selectedNode.type;
         defaults.nature = selectedNode.nature;
@@ -167,6 +152,30 @@ const ChartofAccounts = ({ t, isRtl }) => {
     setFormData({ ...selectedNode });
     setMode('edit');
     setActiveTab('info');
+  };
+
+  // Helper to add node recursively
+  const addNodeToTree = (nodes, parentId, newNode) => {
+    return nodes.map(node => {
+      if (node.id === parentId) {
+        return { ...node, children: [...(node.children || []), newNode] };
+      } else if (node.children) {
+        return { ...node, children: addNodeToTree(node.children, parentId, newNode) };
+      }
+      return node;
+    });
+  };
+
+  // Helper to update node recursively
+  const updateNodeInTree = (nodes, updatedNode) => {
+    return nodes.map(node => {
+      if (node.id === updatedNode.id) {
+        return { ...node, ...updatedNode };
+      } else if (node.children) {
+        return { ...node, children: updateNodeInTree(node.children, updatedNode) };
+      }
+      return node;
+    });
   };
 
   const handleSave = () => {
@@ -187,28 +196,46 @@ const ChartofAccounts = ({ t, isRtl }) => {
       return;
     }
 
-    // Determine Full Code
+    // Prepare Node Data
     let fullCode = formData.code;
     if (formData.level !== 'group') {
       const parentCode = getParentCode(selectedNode);
       fullCode = parentCode + formData.code;
     }
 
-    // Save Logic (Mock)
-    // In a real app, you would recurse the tree to add/update
-    // Here we just alert success for UI demo
+    // Construct the label object for TreeView
+    const labelObj = { 
+        fa: formData.title, 
+        en: formData.titleEn || formData.title 
+    };
+
+    const nodeData = {
+        ...formData,
+        fullCode,
+        label: labelObj, // Critical for TreeView
+    };
+
     if (!structure.isLocked) setStructure(prev => ({ ...prev, isLocked: true }));
-    
-    alert(isRtl ? "اطلاعات با موفقیت ذخیره شد." : "Data saved successfully.");
-    setMode('view');
-    
-    // Optimistic Update (Simplified for Group level just to show effect)
-    if (formData.level === 'group' && mode === 'create_group') {
-      const newGroup = { ...formData, id: Date.now().toString(), fullCode: formData.code, children: [] };
-      setAccounts(prev => [...prev, newGroup]);
+
+    if (mode === 'edit') {
+        // Update existing
+        setAccounts(prev => updateNodeInTree(prev, nodeData));
+        setSelectedNode(nodeData); // Update selected view
+        alert(isRtl ? "تغییرات ذخیره شد." : "Changes saved.");
     } else {
-       // Refresh tree logic would go here
+        // Create new
+        const newNode = { ...nodeData, id: Date.now().toString(), children: [] };
+        
+        if (formData.level === 'group') {
+            setAccounts(prev => [...prev, newNode]);
+        } else {
+            setAccounts(prev => addNodeToTree(prev, selectedNode.id, newNode));
+            // Auto expand logic could go here
+        }
+        alert(isRtl ? "حساب جدید ایجاد شد." : "New account created.");
     }
+
+    setMode('view');
   };
 
   const handleDelete = () => {
@@ -216,10 +243,12 @@ const ChartofAccounts = ({ t, isRtl }) => {
       alert(isRtl ? "این حساب دارای زیرمجموعه است و قابل حذف نیست." : "Cannot delete account with children.");
       return;
     }
+    // Delete logic implies filtering the tree, simplified here:
     if (confirm(isRtl ? "آیا از حذف این حساب اطمینان دارید؟" : "Are you sure you want to delete this account?")) {
-      alert(isRtl ? "حساب حذف شد." : "Account deleted.");
-      setSelectedNode(null);
-      setMode('view');
+        // Recursive delete helper would be needed here, for now just UI feedback
+        alert(isRtl ? "حساب حذف شد (نمایشی)." : "Account deleted (Demo).");
+        setSelectedNode(null);
+        setMode('view');
     }
   };
 
@@ -335,7 +364,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
          : (selectedNode.level === 'general' ? selectedNode.fullCode : ''); // Parent is General
     }
 
-    // Validations for visual feedback
     const maxLen = isGroup ? structure.groupLen : (isGeneral ? structure.generalLen : structure.subsidiaryLen);
 
     return (
@@ -388,8 +416,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
             value={formData.type}
             onChange={e => setFormData({...formData, type: e.target.value})}
             isRtl={isRtl}
-            // Inherited types cannot be changed easily on lower levels unless logic permits
-            // Here we assume flexibility for General/Sub but Group dictates defaults
           >
             {accountTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
           </SelectField>
@@ -478,7 +504,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
                    <option value="block">{isRtl ? "خطا (جلوگیری)" : "Error (Block)"}</option>
                 </SelectField>
                 <div className="md:mt-5">
-                   {/* Contra Account Selector Placeholder */}
                    <Button variant="outline" className="w-full justify-between" icon={Search}>
                       {isRtl ? "انتخاب حساب مقابل (تعدیل ماهیت)" : "Select Contra Account"}
                    </Button>
@@ -578,7 +603,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
      { id: 'desc', label: isRtl ? 'شرح‌های استاندارد' : 'Descriptions', icon: FileDigit },
   ];
 
-  // If level is not subsidiary, show only info tab
   const activeTabs = formData.level === 'subsidiary' ? tabs : [tabs[0]];
 
   return (
@@ -631,7 +655,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
         {/* Right: Details / Form */}
         <div className="w-2/3 flex flex-col">
            
-           {/* Case 1: Nothing Selected */}
            {!selectedNode && mode === 'view' && (
               <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-slate-400">
                  <div className="bg-slate-50 p-4 rounded-full mb-3"><FolderOpen size={48} className="text-indigo-200"/></div>
@@ -640,7 +663,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
               </div>
            )}
 
-           {/* Case 2: View Mode (Read Only Details) */}
            {selectedNode && mode === 'view' && (
               <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col animate-in fade-in zoom-in-95 duration-200">
                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/30">
@@ -683,7 +705,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
                     </div>
                  </div>
 
-                 {/* Actions for Child Creation */}
                  <div className="mt-auto p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
                     {selectedNode.level === 'group' && (
                        <Button variant="primary" icon={Plus} onClick={() => handleCreate('general')}>
@@ -699,7 +720,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
               </div>
            )}
 
-           {/* Case 3: Create/Edit Mode */}
            {mode !== 'view' && (
               <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col animate-in slide-in-from-right-4 duration-300">
                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -733,7 +753,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
         </div>
       </div>
 
-      {/* Settings Modal */}
       <Modal 
         isOpen={showStructureModal} 
         onClose={() => setShowStructureModal(false)}
@@ -747,7 +766,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
   );
 };
 
-// --- CRITICAL FIX: Assign Component to Global Window Object ---
 window.ChartofAccounts = ChartofAccounts;
 
 export default ChartofAccounts;
