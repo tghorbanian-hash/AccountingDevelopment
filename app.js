@@ -18,8 +18,8 @@ const App = () => {
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [lang, setLang] = useState('fa'); 
-  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); 
-  const [activeId, setActiveId] = useState('ledgers'); 
+  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); // Default to GL base info
+  const [activeId, setActiveId] = useState('workspace_gen'); // Default to Chart of Accounts
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Authentication States
@@ -102,7 +102,8 @@ const App = () => {
       Details,
       FiscalPeriods,
       DocTypes,
-      AutoNumbering
+      AutoNumbering,
+      ChartofAccounts 
     } = window;
 
     // --- Routing Logic ---
@@ -122,6 +123,7 @@ const App = () => {
     // 2.1 Financial Base Info (General Ledger)
     if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
     if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Details Component Not Loaded</div>;
+    if (activeId === 'acc_structure') return ChartofAccounts ? <ChartofAccounts t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: ChartofAccounts Component Not Loaded</div>; // <--- ADDED ROUTE
     if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
     if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
     if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
