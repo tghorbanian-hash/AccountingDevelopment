@@ -5,7 +5,7 @@ import {
   Settings, Search, ChevronRight, ChevronDown, Check,
   AlertCircle, Layout, List, CreditCard, DollarSign,
   Package, Hash, Layers, FileDigit, ArrowRight, Edit,
-  TreeDeciduous, MoreVertical, ShieldCheck
+  TreeDeciduous, MoreVertical, ShieldCheck, X
 } from 'lucide-react';
 
 // --- SHARED HELPERS & SUB-COMPONENTS ---
@@ -13,10 +13,13 @@ import {
 const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
   <div 
     className={`flex items-center gap-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'} ${className}`} 
-    onClick={() => !disabled && onChange(!checked)}
+    onClick={(e) => {
+      e.stopPropagation();
+      if (!disabled) onChange(!checked);
+    }}
   >
     <div className={`
-      w-4 h-4 rounded border flex items-center justify-center transition-all duration-200
+      w-4 h-4 rounded border flex items-center justify-center transition-all duration-200 shrink-0
       ${checked 
         ? 'bg-indigo-600 border-indigo-600 shadow-sm' 
         : 'bg-white border-slate-300 group-hover:border-indigo-400'}
@@ -49,7 +52,10 @@ const Tabs = ({ tabs, activeTab, onChange }) => (
 
 // --- FORM COMPONENTS ---
 
-const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, accountTypes, accountNatures }) => {
+const AccountForm = ({ 
+  formData, setFormData, structure, selectedNode, isRtl, 
+  accountTypes, accountNatures, onOpenContraModal, contraAccountName 
+}) => {
   const { InputField, SelectField, Button, Callout } = window.UI;
 
   const isSubsidiary = formData.level === 'subsidiary';
@@ -59,9 +65,18 @@ const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, ac
   // Calculate Code Prefix
   let prefix = '';
   if (!isGroup && selectedNode) {
-     prefix = isGeneral 
-       ? (selectedNode.level === 'group' ? selectedNode.code : '') 
-       : (selectedNode.level === 'general' ? selectedNode.fullCode : '');
+     // If creating NEW, selectNode is parent. If EDITING, we need parent of selectNode (not easily avail here without tree traversal, 
+     // but for UX keeping simple prefix based on context is fine or handled by backend validation)
+     // Correct Logic for Prefix Display:
+     if (formData.id) { // Editing
+        // In a real app, we'd strip the own code from fullCode to show prefix. 
+        // Here we simulate by showing parent fullCode if available or part of own fullCode
+        prefix = formData.fullCode ? formData.fullCode.substring(0, formData.fullCode.length - formData.code.length) : '';
+     } else { // Creating
+        prefix = isGeneral 
+          ? (selectedNode.level === 'group' ? selectedNode.code : '') 
+          : (selectedNode.level === 'general' ? selectedNode.fullCode : '');
+     }
   }
 
   const maxLen = isGroup ? structure.groupLen : (isGeneral ? structure.generalLen : structure.subsidiaryLen);
@@ -81,6 +96,7 @@ const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, ac
                 value={formData.code || ''}
                 onChange={e => {
                   const val = e.target.value;
+                  // Allow only numbers (optional, based on structure settings)
                   if (val.length <= maxLen) setFormData({...formData, code: val});
                 }}
                 className={`
@@ -133,17 +149,17 @@ const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, ac
            <div className="col-span-1 md:col-span-2">
               <Checkbox 
                  label={isRtl ? "فعال" : "Active"}
-                 checked={formData.isActive}
-                 onChange={v => setFormData({...formData, isActive: v})}
+                 checked={!!formData.isActive}
+                 onChange={v => setFormData(prev => ({...prev, isActive: v}))}
                  className="mb-4"
               />
            </div>
         )}
       </div>
 
-      {/* SUBSIDIARY SPECIFIC SETTINGS - Full height, no internal scroll */}
+      {/* SUBSIDIARY SPECIFIC SETTINGS */}
       {isSubsidiary && (
-        <div className="w-full">
+        <div className="w-full animate-in slide-in-from-bottom-2">
            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3 mb-4">
               <h4 className="font-bold text-[11px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                  <ShieldCheck size={14} />
@@ -154,15 +170,21 @@ const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, ac
               <div className="flex flex-col gap-2 pb-2 border-b border-slate-200">
                  <Checkbox 
                     label={isRtl ? "ویژگی ارزی (چند ارزی)" : "Currency Feature (Multi-currency)"}
-                    checked={formData.currencyFeature}
-                    onChange={v => setFormData({...formData, currencyFeature: v})}
+                    checked={!!formData.currencyFeature}
+                    onChange={v => setFormData(prev => ({...prev, currencyFeature: v}))}
                  />
                  {formData.currencyFeature && (
                     <div className="mr-6 grid grid-cols-2 gap-2 animate-in slide-in-from-top-1">
-                       <SelectField label={isRtl ? "ارز پیش‌فرض" : "Default Currency"} isRtl={isRtl}>
-                          <option>IRR</option><option>USD</option><option>EUR</option>
+                       <SelectField 
+                          label={isRtl ? "ارز پیش‌فرض" : "Default Currency"} isRtl={isRtl}
+                          value={formData.defaultCurrency || ''}
+                          onChange={e => setFormData({...formData, defaultCurrency: e.target.value})}
+                       >
+                          <option value="">-</option><option value="IRR">IRR</option><option value="USD">USD</option><option value="EUR">EUR</option>
                        </SelectField>
-                       <Checkbox label={isRtl ? "الزام ورود ارز" : "Mandatory Currency"} checked={true} disabled />
+                       <div className="mt-6">
+                         <Checkbox label={isRtl ? "الزام ورود ارز" : "Mandatory Currency"} checked={true} disabled />
+                       </div>
                     </div>
                  )}
               </div>
@@ -171,8 +193,8 @@ const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, ac
               <div className="flex flex-col gap-2 pb-2 border-b border-slate-200">
                  <Checkbox 
                     label={isRtl ? "ویژگی پیگیری" : "Tracking Feature"}
-                    checked={formData.trackFeature}
-                    onChange={v => setFormData({...formData, trackFeature: v})}
+                    checked={!!formData.trackFeature}
+                    onChange={v => setFormData(prev => ({...prev, trackFeature: v}))}
                  />
                  {formData.trackFeature && (
                     <div className="mr-6 flex gap-4 animate-in slide-in-from-top-1">
@@ -186,8 +208,8 @@ const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, ac
               <div className="flex flex-col gap-2">
                  <Checkbox 
                     label={isRtl ? "ویژگی مقداری" : "Quantity Feature"}
-                    checked={formData.qtyFeature}
-                    onChange={v => setFormData({...formData, qtyFeature: v})}
+                    checked={!!formData.qtyFeature}
+                    onChange={v => setFormData(prev => ({...prev, qtyFeature: v}))}
                  />
                  {formData.qtyFeature && (
                     <div className="mr-6 flex gap-4 animate-in slide-in-from-top-1">
@@ -198,16 +220,29 @@ const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, ac
            </div>
 
            {/* Nature Adjustment & Modules */}
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <SelectField label={isRtl ? "کنترل ماهیت طی دوره" : "Nature Control During Period"} isRtl={isRtl}>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 items-end">
+              <SelectField 
+                  label={isRtl ? "کنترل ماهیت طی دوره" : "Nature Control During Period"} 
+                  isRtl={isRtl}
+                  value={formData.natureControl || 'none'}
+                  onChange={e => setFormData({...formData, natureControl: e.target.value})}
+              >
                  <option value="none">{isRtl ? "بدون کنترل" : "No Control"}</option>
                  <option value="warn">{isRtl ? "هشدار" : "Warning"}</option>
                  <option value="block">{isRtl ? "خطا (جلوگیری)" : "Error (Block)"}</option>
               </SelectField>
-              <div className="md:mt-5">
-                 <Button variant="outline" className="w-full justify-between" icon={Search}>
-                    {isRtl ? "انتخاب حساب مقابل (تعدیل ماهیت)" : "Select Contra Account"}
-                 </Button>
+              
+              <div>
+                 <label className="block text-[11px] font-bold text-slate-600 mb-1">{isRtl ? "حساب مقابل (تعدیل ماهیت)" : "Contra Account"}</label>
+                 <div className="flex gap-2">
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded h-9 flex items-center px-2 text-sm text-slate-700 truncate">
+                        {contraAccountName || (isRtl ? "انتخاب نشده" : "Not Selected")}
+                    </div>
+                    <Button variant="outline" icon={Search} onClick={onOpenContraModal} />
+                    {formData.contraAccountId && (
+                       <Button variant="outline" className="text-red-500 border-red-200 hover:bg-red-50" icon={X} onClick={() => setFormData({...formData, contraAccountId: null})} />
+                    )}
+                 </div>
               </div>
            </div>
         </div>
@@ -235,7 +270,7 @@ const TafsilSelector = ({ formData, setFormData, isRtl, tafsilTypes }) => {
                     setFormData({...formData, tafsils: newTafsils});
                  }}
                  className={`
-                    cursor-pointer border rounded-lg p-3 text-center transition-all
+                    cursor-pointer border rounded-lg p-3 text-center transition-all select-none
                     ${formData.tafsils?.includes(t.id) 
                        ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold shadow-sm ring-1 ring-indigo-200' 
                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
@@ -501,6 +536,10 @@ const ChartofAccounts = ({ t, isRtl }) => {
     const [mode, setMode] = useState('view'); 
     const [activeTab, setActiveTab] = useState('info'); 
     const [formData, setFormData] = useState({});
+    
+    // Contra Account Modal State
+    const [showContraModal, setShowContraModal] = useState(false);
+    const [contraSearch, setContraSearch] = useState('');
 
     // --- Helpers ---
     const getParentCode = (node) => {
@@ -588,7 +627,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
       let newData;
       if (mode === 'edit') {
         newData = updateNodeInTree(data, nodeData);
-        setSelectedNode(nodeData);
       } else {
         const newNode = { ...nodeData, id: Date.now().toString(), children: [] };
         if (formData.level === 'group') {
@@ -596,9 +634,17 @@ const ChartofAccounts = ({ t, isRtl }) => {
         } else {
           newData = addNodeToTree(data, selectedNode.id, newNode);
         }
+        // If creating new, update nodeData id to match created one for selection
+        nodeData.id = newNode.id;
       }
       
+      // 1. Update global state
       onSaveTree(newData);
+      
+      // 2. Select the Node & Reset Mode
+      // We pass the new data directly to be sure, but 'data' prop will update soon. 
+      // Important: We set SelectedNode to the *newly saved object* so the tree stays open on it.
+      setSelectedNode(nodeData); 
       setMode('view');
     };
 
@@ -607,6 +653,34 @@ const ChartofAccounts = ({ t, isRtl }) => {
        alert(isRtl ? "عملیات حذف (شبیه‌سازی شده)" : "Delete simulated");
        setSelectedNode(null);
        setMode('view');
+    };
+
+    // --- Helpers for Contra Account Modal ---
+    const flattenSubsidiaries = (nodes, result = []) => {
+       nodes.forEach(node => {
+          if (node.level === 'subsidiary') {
+             result.push(node);
+          }
+          if (node.children) flattenSubsidiaries(node.children, result);
+       });
+       return result;
+    };
+    
+    // We memoize the list of subsidiaries for the modal
+    const subsidiaryList = useMemo(() => {
+       return flattenSubsidiaries(data).filter(n => n.id !== formData.id); // Exclude self
+    }, [data, formData.id]);
+
+    const filteredSubsidiaries = subsidiaryList.filter(s => 
+       s.fullCode.includes(contraSearch) || 
+       s.title.includes(contraSearch) || 
+       (s.titleEn && s.titleEn.toLowerCase().includes(contraSearch.toLowerCase()))
+    );
+
+    const getContraAccountName = (id) => {
+       if (!id) return '';
+       const acc = flattenSubsidiaries(data).find(n => n.id === id);
+       return acc ? `${acc.fullCode} - ${acc.title}` : '';
     };
 
     // --- Renderers ---
@@ -714,9 +788,17 @@ const ChartofAccounts = ({ t, isRtl }) => {
                               <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "وضعیت" : "Status"}</label>
                               <Badge variant={selectedNode.isActive ? 'success' : 'danger'}>{selectedNode.isActive ? 'فعال' : 'غیرفعال'}</Badge></div>
                            )}
+                           {selectedNode.contraAccountId && (
+                               <div className="col-span-2">
+                                   <label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "حساب مقابل (تعدیل ماهیت)" : "Contra Account"}</label>
+                                   <div className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100">
+                                       {getContraAccountName(selectedNode.contraAccountId)}
+                                   </div>
+                               </div>
+                           )}
                         </div>
 
-                        {/* NEW: DISPLAY CONTROL FEATURES IN VIEW MODE */}
+                        {/* DISPLAY CONTROL FEATURES IN VIEW MODE */}
                         {selectedNode.level === 'subsidiary' && (
                            <div className="border-t border-slate-100 pt-4">
                               <h4 className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1"><ShieldCheck size={12}/> {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}</h4>
@@ -757,11 +839,9 @@ const ChartofAccounts = ({ t, isRtl }) => {
                         <Badge variant="neutral">{formData.level}</Badge>
                      </div>
                      
-                     {/* SCROLLING IS HANDLED HERE - FOR THE WHOLE FORM */}
                      <div className="p-4 flex-1 overflow-y-auto">
                         <Tabs tabs={activeTabs} activeTab={activeTab} onChange={setActiveTab} />
                         
-                        {/* Rendering Forms (using external components to prevent focus loss) */}
                         {activeTab === 'info' && (
                            <AccountForm 
                              formData={formData} 
@@ -769,8 +849,10 @@ const ChartofAccounts = ({ t, isRtl }) => {
                              structure={structure} 
                              selectedNode={selectedNode} 
                              isRtl={isRtl}
-                             accountTypes={accountTypes}
-                             accountNatures={accountNatures}
+                             accountTypes={window.accountTypes || []} // Assuming globals or passed props
+                             accountNatures={window.accountNatures || []}
+                             onOpenContraModal={() => setShowContraModal(true)}
+                             contraAccountName={getContraAccountName(formData.contraAccountId)}
                            />
                         )}
                         {activeTab === 'tafsil' && (
@@ -778,7 +860,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
                              formData={formData} 
                              setFormData={setFormData} 
                              isRtl={isRtl} 
-                             tafsilTypes={tafsilTypes}
+                             tafsilTypes={window.tafsilTypes || []}
                            />
                         )}
                         {activeTab === 'desc' && (
@@ -797,6 +879,51 @@ const ChartofAccounts = ({ t, isRtl }) => {
                )}
             </div>
          </div>
+
+         {/* CONTRA ACCOUNT SELECTION MODAL */}
+         <Modal
+            isOpen={showContraModal}
+            onClose={() => setShowContraModal(false)}
+            title={isRtl ? "انتخاب حساب معین (تعدیل ماهیت)" : "Select Contra Account"}
+            maxWidth="max-w-3xl"
+         >
+             <div className="h-[500px] flex flex-col">
+                 <div className="mb-4">
+                     <InputField 
+                        icon={Search} 
+                        placeholder={isRtl ? "جستجو بر اساس کد یا عنوان حساب..." : "Search code or title..."}
+                        value={contraSearch}
+                        onChange={e => setContraSearch(e.target.value)}
+                        isRtl={isRtl}
+                        autoFocus
+                     />
+                 </div>
+                 <div className="flex-1 overflow-hidden border border-slate-200 rounded-lg">
+                     <DataGrid 
+                         columns={[
+                             { field: 'fullCode', header: isRtl ? 'کد کامل' : 'Full Code', width: 'w-32' },
+                             { field: 'title', header: isRtl ? 'عنوان حساب' : 'Account Title', width: 'w-auto' },
+                             { field: 'nature', header: isRtl ? 'ماهیت' : 'Nature', width: 'w-24', render: r => <Badge variant={r.nature === 'debit' ? 'info' : r.nature === 'credit' ? 'warning' : 'neutral'}>{r.nature}</Badge> }
+                         ]}
+                         data={filteredSubsidiaries}
+                         isRtl={isRtl}
+                         actions={(row) => (
+                             <Button size="sm" onClick={() => {
+                                 setFormData({...formData, contraAccountId: row.id});
+                                 setShowContraModal(false);
+                             }}>
+                                 {isRtl ? "انتخاب" : "Select"}
+                             </Button>
+                         )}
+                     />
+                 </div>
+                 <div className="mt-2 text-xs text-slate-400">
+                     {isRtl 
+                         ? `تعداد حساب‌های یافت شده: ${filteredSubsidiaries.length}` 
+                         : `${filteredSubsidiaries.length} accounts found`}
+                 </div>
+             </div>
+         </Modal>
       </div>
     );
   };
@@ -806,6 +933,11 @@ const ChartofAccounts = ({ t, isRtl }) => {
   const handleUpdateTree = (newData) => {
      setAllAccounts(prev => ({ ...prev, [activeStructure.id]: newData }));
   };
+  
+  // Pass required global data for dropdowns
+  window.accountTypes = accountTypes;
+  window.accountNatures = accountNatures;
+  window.tafsilTypes = tafsilTypes;
 
   return (
     <div className="h-full flex flex-col p-4 bg-slate-100">
