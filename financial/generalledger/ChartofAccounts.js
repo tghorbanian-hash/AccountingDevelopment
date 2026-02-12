@@ -747,4 +747,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
   );
 };
 
+// --- CRITICAL FIX: Assign Component to Global Window Object ---
+window.ChartofAccounts = ChartofAccounts;
+
 export default ChartofAccounts;
