@@ -8,6 +8,297 @@ import {
   TreeDeciduous, MoreVertical
 } from 'lucide-react';
 
+// --- SHARED HELPERS & SUB-COMPONENTS (Defined OUTSIDE to fix focus bug) ---
+
+const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
+  <div 
+    className={`flex items-center gap-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'} ${className}`} 
+    onClick={() => !disabled && onChange(!checked)}
+  >
+    <div className={`
+      w-4 h-4 rounded border flex items-center justify-center transition-all duration-200
+      ${checked 
+        ? 'bg-indigo-600 border-indigo-600 shadow-sm' 
+        : 'bg-white border-slate-300 group-hover:border-indigo-400'}
+    `}>
+      {checked && <Check size={12} className="text-white" strokeWidth={3} />}
+    </div>
+    {label && <span className="text-[12px] font-medium text-slate-700 select-none">{label}</span>}
+  </div>
+);
+
+const Tabs = ({ tabs, activeTab, onChange }) => (
+  <div className="flex items-center gap-1 border-b border-slate-200 mb-4 overflow-x-auto no-scrollbar">
+    {tabs.map(tab => (
+      <button
+        key={tab.id}
+        onClick={() => onChange(tab.id)}
+        className={`
+          px-4 py-2 text-[12px] font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2
+          ${activeTab === tab.id 
+            ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' 
+            : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
+        `}
+      >
+        {tab.icon && <tab.icon size={14} />}
+        {tab.label}
+      </button>
+    ))}
+  </div>
+);
+
+// --- FORM COMPONENTS (Defined OUTSIDE to fix focus bug) ---
+
+const AccountForm = ({ formData, setFormData, structure, selectedNode, isRtl, accountTypes, accountNatures }) => {
+  const { InputField, SelectField, Button, Callout } = window.UI;
+
+  const isSubsidiary = formData.level === 'subsidiary';
+  const isGeneral = formData.level === 'general';
+  const isGroup = formData.level === 'group';
+
+  // Calculate Code Prefix
+  let prefix = '';
+  if (!isGroup && selectedNode) {
+     prefix = isGeneral 
+       ? (selectedNode.level === 'group' ? selectedNode.code : '') 
+       : (selectedNode.level === 'general' ? selectedNode.fullCode : '');
+  }
+
+  const maxLen = isGroup ? structure.groupLen : (isGeneral ? structure.generalLen : structure.subsidiaryLen);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="col-span-1 md:col-span-2">
+           <label className="block text-[11px] font-bold text-slate-600 mb-1">{isRtl ? "کد حساب" : "Account Code"}</label>
+           <div className="flex items-center" dir="ltr">
+             {prefix && (
+               <span className="bg-slate-100 border border-slate-300 border-r-0 rounded-l h-8 flex items-center px-2 text-slate-500 font-mono text-sm">
+                 {prefix}
+               </span>
+             )}
+             <input 
+                value={formData.code || ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val.length <= maxLen) setFormData({...formData, code: val});
+                }}
+                className={`
+                  flex-1 ${window.UI.THEME.colors.surface} border ${window.UI.THEME.colors.border}
+                  ${prefix ? 'rounded-r border-l-0' : 'rounded'} h-8 px-2 outline-none
+                  focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                  text-sm font-mono
+                `}
+                placeholder={"0".repeat(maxLen)}
+             />
+           </div>
+           <div className="text-[10px] text-slate-400 mt-1 text-right">
+             {isRtl ? `تعداد ارقام مجاز: ${maxLen}` : `Max digits: ${maxLen}`}
+           </div>
+        </div>
+
+        <InputField 
+          label={isRtl ? "عنوان حساب (فارسی)" : "Account Title (Local)"} 
+          value={formData.title || ''} 
+          onChange={e => setFormData({...formData, title: e.target.value})}
+          isRtl={isRtl}
+        />
+        <InputField 
+          label={isRtl ? "عنوان حساب (انگلیسی)" : "Account Title (English)"} 
+          value={formData.titleEn || ''} 
+          onChange={e => setFormData({...formData, titleEn: e.target.value})}
+          isRtl={isRtl}
+          dir="ltr"
+        />
+        
+        <SelectField 
+          label={isRtl ? "نوع حساب" : "Account Type"}
+          value={formData.type}
+          onChange={e => setFormData({...formData, type: e.target.value})}
+          isRtl={isRtl}
+        >
+          {accountTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+        </SelectField>
+
+        <SelectField 
+          label={isRtl ? "ماهیت حساب" : "Account Nature"}
+          value={formData.nature}
+          onChange={e => setFormData({...formData, nature: e.target.value})}
+          isRtl={isRtl}
+        >
+          {accountNatures.map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
+        </SelectField>
+        
+        {isSubsidiary && (
+           <div className="col-span-1 md:col-span-2">
+              <Checkbox 
+                 label={isRtl ? "فعال" : "Active"}
+                 checked={formData.isActive}
+                 onChange={v => setFormData({...formData, isActive: v})}
+                 className="mb-4"
+              />
+           </div>
+        )}
+      </div>
+
+      {/* SUBSIDIARY SPECIFIC SETTINGS (Reverted to original design) */}
+      {isSubsidiary && (
+        <div className="flex-1 overflow-y-auto pr-1">
+           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3 mb-4">
+              <h4 className="font-bold text-[11px] text-slate-500 uppercase tracking-wider mb-2">
+                 {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}
+              </h4>
+              
+              {/* Currency */}
+              <div className="flex flex-col gap-2 pb-2 border-b border-slate-200">
+                 <Checkbox 
+                    label={isRtl ? "ویژگی ارزی (چند ارزی)" : "Currency Feature (Multi-currency)"}
+                    checked={formData.currencyFeature}
+                    onChange={v => setFormData({...formData, currencyFeature: v})}
+                 />
+                 {formData.currencyFeature && (
+                    <div className="mr-6 grid grid-cols-2 gap-2 animate-in slide-in-from-top-1">
+                       <SelectField label={isRtl ? "ارز پیش‌فرض" : "Default Currency"} isRtl={isRtl}>
+                          <option>IRR</option><option>USD</option><option>EUR</option>
+                       </SelectField>
+                       <Checkbox label={isRtl ? "الزام ورود ارز" : "Mandatory Currency"} checked={true} disabled />
+                    </div>
+                 )}
+              </div>
+
+              {/* Tracking */}
+              <div className="flex flex-col gap-2 pb-2 border-b border-slate-200">
+                 <Checkbox 
+                    label={isRtl ? "ویژگی پیگیری" : "Tracking Feature"}
+                    checked={formData.trackFeature}
+                    onChange={v => setFormData({...formData, trackFeature: v})}
+                 />
+                 {formData.trackFeature && (
+                    <div className="mr-6 flex gap-4 animate-in slide-in-from-top-1">
+                       <Checkbox label={isRtl ? "اجباری" : "Mandatory"} checked={true} onChange={()=>{}} />
+                       <Checkbox label={isRtl ? "یکتا بودن شماره پیگیری" : "Unique Tracking No."} checked={false} onChange={()=>{}} />
+                    </div>
+                 )}
+              </div>
+
+              {/* Quantity */}
+              <div className="flex flex-col gap-2">
+                 <Checkbox 
+                    label={isRtl ? "ویژگی مقداری" : "Quantity Feature"}
+                    checked={formData.qtyFeature}
+                    onChange={v => setFormData({...formData, qtyFeature: v})}
+                 />
+                 {formData.qtyFeature && (
+                    <div className="mr-6 flex gap-4 animate-in slide-in-from-top-1">
+                       <Checkbox label={isRtl ? "اجباری" : "Mandatory"} checked={false} onChange={()=>{}} />
+                    </div>
+                 )}
+              </div>
+           </div>
+
+           {/* Nature Adjustment & Modules */}
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <SelectField label={isRtl ? "کنترل ماهیت طی دوره" : "Nature Control During Period"} isRtl={isRtl}>
+                 <option value="none">{isRtl ? "بدون کنترل" : "No Control"}</option>
+                 <option value="warn">{isRtl ? "هشدار" : "Warning"}</option>
+                 <option value="block">{isRtl ? "خطا (جلوگیری)" : "Error (Block)"}</option>
+              </SelectField>
+              <div className="md:mt-5">
+                 <Button variant="outline" className="w-full justify-between" icon={Search}>
+                    {isRtl ? "انتخاب حساب مقابل (تعدیل ماهیت)" : "Select Contra Account"}
+                 </Button>
+              </div>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const TafsilSelector = ({ formData, setFormData, isRtl, tafsilTypes }) => {
+  const { Callout } = window.UI;
+  return (
+     <div className="space-y-4">
+        <Callout variant="info">
+           {isRtl 
+              ? "انواع تفصیل‌های مجاز برای این حساب معین را انتخاب کنید." 
+              : "Select the detailed account types allowed for this subsidiary."}
+        </Callout>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+           {tafsilTypes.map(t => (
+              <div 
+                 key={t.id}
+                 onClick={() => {
+                    const exists = formData.tafsils?.includes(t.id);
+                    const newTafsils = exists ? formData.tafsils.filter(x => x !== t.id) : [...(formData.tafsils || []), t.id];
+                    setFormData({...formData, tafsils: newTafsils});
+                 }}
+                 className={`
+                    cursor-pointer border rounded-lg p-3 text-center transition-all
+                    ${formData.tafsils?.includes(t.id) 
+                       ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold shadow-sm ring-1 ring-indigo-200' 
+                       : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
+                 `}
+              >
+                 <div className="text-[12px]">{t.label}</div>
+              </div>
+           ))}
+        </div>
+     </div>
+  );
+};
+
+const StandardDesc = ({ formData, setFormData, isRtl }) => {
+  const { InputField, Button } = window.UI;
+  const [descText, setDescText] = useState('');
+  
+  // Use a local copy or direct ref if performance is issue, but simple state is fine here
+  const list = formData.descriptions || [];
+
+  const addDesc = () => {
+     if(!descText) return;
+     const newList = [...list, { id: Date.now(), text: descText }];
+     setFormData({...formData, descriptions: newList});
+     setDescText('');
+  };
+
+  return (
+     <div className="h-full flex flex-col">
+        <div className="flex gap-2 mb-3">
+           <InputField 
+              placeholder={isRtl ? "شرح استاندارد جدید..." : "New standard description..."} 
+              value={descText} onChange={e=>setDescText(e.target.value)} 
+              className="flex-1" isRtl={isRtl}
+           />
+           <Button onClick={addDesc} icon={Plus} variant="secondary">{isRtl ? "افزودن" : "Add"}</Button>
+        </div>
+        <div className="flex-1 overflow-y-auto border border-slate-200 rounded-lg bg-slate-50 p-2 space-y-1">
+           {list.map(item => (
+              <div key={item.id} className="bg-white p-2 rounded border border-slate-200 flex justify-between items-center group">
+                 <span className="text-[12px] text-slate-700">{item.text}</span>
+                 <button 
+                    onClick={() => {
+                       const newList = list.filter(l => l.id !== item.id);
+                       setFormData({...formData, descriptions: newList});
+                    }}
+                    className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                 >
+                    <Trash2 size={14}/>
+                 </button>
+              </div>
+           ))}
+           {list.length === 0 && (
+              <div className="text-center text-slate-400 text-xs mt-4 italic">
+                 {isRtl ? "موردی تعریف نشده است" : "No descriptions defined"}
+              </div>
+           )}
+        </div>
+     </div>
+  );
+};
+
+// --- MAIN COMPONENT ---
+
 const ChartofAccounts = ({ t, isRtl }) => {
   const { 
     Button, InputField, SelectField, DataGrid, Modal, 
@@ -15,51 +306,11 @@ const ChartofAccounts = ({ t, isRtl }) => {
     FilterSection 
   } = window.UI;
 
-  // --- 0. SHARED CUSTOM COMPONENTS ---
-  
-  const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
-    <div 
-      className={`flex items-center gap-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'} ${className}`} 
-      onClick={() => !disabled && onChange(!checked)}
-    >
-      <div className={`
-        w-4 h-4 rounded border flex items-center justify-center transition-all duration-200
-        ${checked 
-          ? 'bg-indigo-600 border-indigo-600 shadow-sm' 
-          : 'bg-white border-slate-300 group-hover:border-indigo-400'}
-      `}>
-        {checked && <Check size={12} className="text-white" strokeWidth={3} />}
-      </div>
-      {label && <span className="text-[12px] font-medium text-slate-700 select-none">{label}</span>}
-    </div>
-  );
-
-  const Tabs = ({ tabs, activeTab, onChange }) => (
-    <div className="flex items-center gap-1 border-b border-slate-200 mb-4 overflow-x-auto no-scrollbar">
-      {tabs.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          className={`
-            px-4 py-2 text-[12px] font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2
-            ${activeTab === tab.id 
-              ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' 
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
-          `}
-        >
-          {tab.icon && <tab.icon size={14} />}
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  );
-
-  // --- 1. GLOBAL STATE & MOCK DATA ---
+  // --- GLOBAL STATE & MOCK DATA ---
 
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'tree'
   const [activeStructure, setActiveStructure] = useState(null);
 
-  // Mock: Defined Structures (Master Data)
   const [structures, setStructures] = useState([
     { 
       id: 1, code: '01', title: 'کدینگ حسابداری اصلی', status: true, 
@@ -71,8 +322,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
     }
   ]);
 
-  // Mock: Accounts Data (Mapped by Structure ID)
-  // This simulates separate trees for separate structures
   const [allAccounts, setAllAccounts] = useState({
     1: [
       { 
@@ -94,7 +343,30 @@ const ChartofAccounts = ({ t, isRtl }) => {
     2: []
   });
 
-  // --- 2. SUB-COMPONENT: STRUCTURE LIST VIEW ---
+  const accountTypes = [
+    { id: 'permanent', label: isRtl ? 'دائم (ترازنامه‌ای)' : 'Permanent (Balance Sheet)' },
+    { id: 'temporary', label: isRtl ? 'موقت (سود و زیانی)' : 'Temporary (P&L)' },
+    { id: 'disciplinary', label: isRtl ? 'انتظامی' : 'Disciplinary' },
+  ];
+
+  const accountNatures = [
+    { id: 'debit', label: isRtl ? 'بدهکار' : 'Debit' },
+    { id: 'credit', label: isRtl ? 'بستانکار' : 'Credit' },
+    { id: 'none', label: isRtl ? 'مهم نیست' : 'None' },
+  ];
+
+  const tafsilTypes = [
+    { id: 'party', label: isRtl ? 'طرف تجاری' : 'Business Party' },
+    { id: 'costcenter', label: isRtl ? 'مرکز هزینه' : 'Cost Center' },
+    { id: 'project', label: isRtl ? 'پروژه' : 'Project' },
+    { id: 'personnel', label: isRtl ? 'پرسنل' : 'Personnel' },
+    { id: 'bank', label: isRtl ? 'حساب بانکی' : 'Bank Account' },
+    { id: 'cash', label: isRtl ? 'صندوق' : 'Cash Box' },
+    { id: 'product', label: isRtl ? 'کالا/خدمات' : 'Product/Service' },
+    { id: 'branch', label: isRtl ? 'شعبه' : 'Branch' },
+  ];
+
+  // --- SUB-COMPONENT: STRUCTURE LIST VIEW ---
   
   const StructureList = () => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -128,7 +400,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
       } else {
         const newId = Date.now();
         setStructures(prev => [...prev, { ...formData, id: newId }]);
-        setAllAccounts(prev => ({ ...prev, [newId]: [] })); // Initialize empty tree
+        setAllAccounts(prev => ({ ...prev, [newId]: [] })); 
       }
       setShowModal(false);
     };
@@ -136,7 +408,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
     const handleDelete = (ids) => {
       if (confirm(isRtl ? "آیا از حذف موارد انتخاب شده اطمینان دارید؟" : "Are you sure?")) {
         setStructures(prev => prev.filter(item => !ids.includes(item.id)));
-        // In real app, also clean up accounts
       }
     };
 
@@ -157,7 +428,13 @@ const ChartofAccounts = ({ t, isRtl }) => {
             columns={[
               { field: 'code', header: isRtl ? 'کد' : 'Code', width: 'w-24' },
               { field: 'title', header: isRtl ? 'عنوان' : 'Title', width: 'w-64' },
-              { field: 'status', header: isRtl ? 'وضعیت' : 'Status', width: 'w-24', render: r => <Badge variant={r.status ? 'success' : 'neutral'}>{r.status ? (isRtl ? 'فعال' : 'Active') : (isRtl ? 'غیرفعال' : 'Inactive')}</Badge> },
+              // ADDED STATUS COLUMN
+              { 
+                field: 'status', 
+                header: isRtl ? 'وضعیت' : 'Status', 
+                width: 'w-24', 
+                render: r => <Badge variant={r.status ? 'success' : 'neutral'}>{r.status ? (isRtl ? 'فعال' : 'Active') : (isRtl ? 'غیرفعال' : 'Inactive')}</Badge> 
+              },
               { field: 'groupLen', header: isRtl ? 'طول گروه' : 'Group Len', width: 'w-24' },
               { field: 'generalLen', header: isRtl ? 'طول کل' : 'General Len', width: 'w-24' },
               { field: 'subsidiaryLen', header: isRtl ? 'طول معین' : 'Sub Len', width: 'w-24' },
@@ -183,7 +460,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
           />
         </div>
 
-        {/* Create/Edit Modal */}
         <Modal 
           isOpen={showModal} 
           onClose={() => setShowModal(false)} 
@@ -219,10 +495,9 @@ const ChartofAccounts = ({ t, isRtl }) => {
     );
   };
 
-  // --- 3. SUB-COMPONENT: TREE DESIGNER VIEW ---
+  // --- SUB-COMPONENT: TREE DESIGNER VIEW ---
 
   const AccountTreeView = ({ structure, data, onSaveTree, onBack }) => {
-    // Local state for the tree view logic
     const [selectedNode, setSelectedNode] = useState(null);
     const [mode, setMode] = useState('view'); 
     const [activeTab, setActiveTab] = useState('info'); 
@@ -293,7 +568,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
     const handleSaveForm = () => {
       if (!formData.code || !formData.title) return alert(isRtl ? "کد و عنوان الزامی است" : "Code and Title Required");
       
-      // Length Validation based on Structure Settings
       let requiredLen = 0;
       if (formData.level === 'group') requiredLen = structure.groupLen;
       else if (formData.level === 'general') requiredLen = structure.generalLen;
@@ -331,7 +605,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
 
     const handleDelete = () => {
        if (selectedNode?.children?.length > 0) return alert(isRtl ? "حساب دارای زیرمجموعه است" : "Account has children");
-       // Delete logic would go here (simplified for mock)
        alert(isRtl ? "عملیات حذف (شبیه‌سازی شده)" : "Delete simulated");
        setSelectedNode(null);
        setMode('view');
@@ -362,42 +635,14 @@ const ChartofAccounts = ({ t, isRtl }) => {
         setMode('view');
     };
 
-    // --- Forms ---
-    const AccountForm = () => {
-        const maxLen = formData.level === 'group' ? structure.groupLen : (formData.level === 'general' ? structure.generalLen : structure.subsidiaryLen);
-        let prefix = '';
-        if (formData.level !== 'group' && selectedNode) prefix = selectedNode.level === 'group' ? selectedNode.code : selectedNode.fullCode;
-
-        return (
-            <div className="space-y-4">
-                <div>
-                   <label className="block text-[11px] font-bold text-slate-600 mb-1">{isRtl ? "کد حساب" : "Account Code"}</label>
-                   <div className="flex items-center" dir="ltr">
-                     {prefix && <span className="bg-slate-100 border border-slate-300 border-r-0 rounded-l h-8 flex items-center px-2 text-slate-500 font-mono text-sm">{prefix}</span>}
-                     <input 
-                        value={formData.code || ''}
-                        onChange={e => { if (e.target.value.length <= maxLen) setFormData({...formData, code: e.target.value}); }}
-                        className={`flex-1 ${window.UI.THEME.colors.surface} border ${window.UI.THEME.colors.border} ${prefix ? 'rounded-r border-l-0' : 'rounded'} h-8 px-2 outline-none focus:border-indigo-500 text-sm font-mono`}
-                        placeholder={"0".repeat(maxLen)}
-                     />
-                   </div>
-                </div>
-                <InputField label={isRtl ? "عنوان فارسی" : "Title (Local)"} value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} isRtl={isRtl} />
-                <InputField label={isRtl ? "عنوان انگلیسی" : "Title (En)"} value={formData.titleEn} onChange={e => setFormData({...formData, titleEn: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <SelectField label={isRtl ? "نوع حساب" : "Type"} value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} isRtl={isRtl}>
-                    <option value="permanent">{isRtl ? 'دائم' : 'Permanent'}</option>
-                    <option value="temporary">{isRtl ? 'موقت' : 'Temporary'}</option>
-                    <option value="disciplinary">{isRtl ? 'انتظامی' : 'Disciplinary'}</option>
-                </SelectField>
-                <SelectField label={isRtl ? "ماهیت حساب" : "Nature"} value={formData.nature} onChange={e => setFormData({...formData, nature: e.target.value})} isRtl={isRtl}>
-                    <option value="debit">{isRtl ? 'بدهکار' : 'Debit'}</option>
-                    <option value="credit">{isRtl ? 'بستانکار' : 'Credit'}</option>
-                    <option value="none">{isRtl ? 'مهم نیست' : 'None'}</option>
-                </SelectField>
-                {formData.level === 'subsidiary' && <Checkbox label={isRtl ? "فعال" : "Active"} checked={formData.isActive} onChange={v => setFormData({...formData, isActive: v})} />}
-            </div>
-        );
-    };
+    const tabs = [
+      { id: 'info', label: isRtl ? 'اطلاعات اصلی' : 'General Info', icon: FileText },
+      { id: 'tafsil', label: isRtl ? 'تفصیل‌ها' : 'Detailed Accts', icon: List },
+      { id: 'desc', label: isRtl ? 'شرح‌های استاندارد' : 'Descriptions', icon: FileDigit },
+    ];
+ 
+    // Show only 'info' for Group/General, all tabs for Subsidiary
+    const activeTabs = formData.level === 'subsidiary' ? tabs : [tabs[0]];
 
     return (
       <div className="h-full flex flex-col animate-in slide-in-from-right-8 duration-300">
@@ -464,6 +709,10 @@ const ChartofAccounts = ({ t, isRtl }) => {
                         <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "سطح" : "Level"}</label><span className="text-sm">{selectedNode.level}</span></div>
                         <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "ماهیت" : "Nature"}</label><Badge variant="info">{selectedNode.nature}</Badge></div>
                         <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "نوع" : "Type"}</label><span className="text-sm">{selectedNode.type}</span></div>
+                        {selectedNode.level === 'subsidiary' && (
+                           <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "وضعیت" : "Status"}</label>
+                           <Badge variant={selectedNode.isActive ? 'success' : 'danger'}>{selectedNode.isActive ? 'فعال' : 'غیرفعال'}</Badge></div>
+                        )}
                      </div>
                      <div className="mt-auto p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
                         {selectedNode.level === 'group' && <Button variant="primary" size="sm" icon={Plus} onClick={() => handleCreate('general')}>{isRtl ? "حساب کل جدید" : "New General"}</Button>}
@@ -480,8 +729,35 @@ const ChartofAccounts = ({ t, isRtl }) => {
                         <Badge variant="neutral">{formData.level}</Badge>
                      </div>
                      <div className="p-4 flex-1 overflow-y-auto">
-                        <Tabs tabs={[{id: 'info', label: isRtl ? 'اطلاعات' : 'Info', icon: FileText}]} activeTab={activeTab} onChange={setActiveTab} />
-                        {activeTab === 'info' && <AccountForm />}
+                        <Tabs tabs={activeTabs} activeTab={activeTab} onChange={setActiveTab} />
+                        
+                        {/* Rendering Forms (using external components to prevent focus loss) */}
+                        {activeTab === 'info' && (
+                           <AccountForm 
+                             formData={formData} 
+                             setFormData={setFormData} 
+                             structure={structure} 
+                             selectedNode={selectedNode} 
+                             isRtl={isRtl}
+                             accountTypes={accountTypes}
+                             accountNatures={accountNatures}
+                           />
+                        )}
+                        {activeTab === 'tafsil' && (
+                           <TafsilSelector 
+                             formData={formData} 
+                             setFormData={setFormData} 
+                             isRtl={isRtl} 
+                             tafsilTypes={tafsilTypes}
+                           />
+                        )}
+                        {activeTab === 'desc' && (
+                           <StandardDesc 
+                             formData={formData} 
+                             setFormData={setFormData} 
+                             isRtl={isRtl} 
+                           />
+                        )}
                      </div>
                      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-xl">
                         <Button variant="outline" onClick={() => setMode('view')}>{isRtl ? "انصراف" : "Cancel"}</Button>
@@ -498,7 +774,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
   // --- 4. MAIN RENDER ---
 
   const handleUpdateTree = (newData) => {
-     // Save the updated tree back to the global store for this structure ID
      setAllAccounts(prev => ({ ...prev, [activeStructure.id]: newData }));
   };
 
