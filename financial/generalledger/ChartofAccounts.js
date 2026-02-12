@@ -5,8 +5,35 @@ import {
   Settings, Search, ChevronRight, ChevronDown, Check,
   AlertCircle, Layout, List, CreditCard, DollarSign,
   Package, Hash, Layers, FileDigit, ArrowRight, Edit,
-  TreeDeciduous, MoreVertical, ShieldCheck, X
+  TreeDeciduous, MoreVertical, ShieldCheck, X, User,
+  ChevronsDown, ChevronsUp // Added for Tree Controls
 } from 'lucide-react';
+
+// --- DATA CONSTANTS (Expanded as requested) ---
+
+const ALL_TAFSIL_TYPES = [
+  // --- System Types ---
+  { id: 'party', label: 'طرف تجاری', en: 'Business Party', isSystem: true },
+  { id: 'costcenter', label: 'مرکز هزینه', en: 'Cost Center', isSystem: true },
+  { id: 'project', label: 'پروژه', en: 'Project', isSystem: true },
+  { id: 'personnel', label: 'پرسنل', en: 'Personnel', isSystem: true },
+  { id: 'bank', label: 'حساب بانکی', en: 'Bank Account', isSystem: true },
+  { id: 'cash', label: 'صندوق', en: 'Cash Box', isSystem: true },
+  { id: 'petty_cash', label: 'تنخواه', en: 'Petty Cash', isSystem: true },
+  { id: 'branch', label: 'شعبه', en: 'Branch', isSystem: true },
+  { id: 'customer_group', label: 'گروه مشتری', en: 'Customer Group', isSystem: true },
+  { id: 'product_group', label: 'گروه محصول', en: 'Product Group', isSystem: true },
+  { id: 'sales_office', label: 'دفتر فروش', en: 'Sales Office', isSystem: true },
+  { id: 'price_zone', label: 'حوزه قیمت‌گذاری', en: 'Pricing Zone', isSystem: true },
+  { id: 'product', label: 'کالا/خدمات', en: 'Product/Service', isSystem: true },
+  
+  // --- User Defined Types (Mocked based on Details.js usually having these) ---
+  { id: 'contract', label: 'قراردادها', en: 'Contracts', isSystem: false },
+  { id: 'vehicle', label: 'وسایل نقلیه', en: 'Vehicles', isSystem: false },
+  { id: 'loan', label: 'تسهیلات', en: 'Loans', isSystem: false },
+  { id: 'other1', label: 'سایر ۱', en: 'Other 1', isSystem: false },
+  { id: 'other2', label: 'سایر ۲', en: 'Other 2', isSystem: false },
+];
 
 // --- SHARED HELPERS & SUB-COMPONENTS ---
 
@@ -62,12 +89,9 @@ const AccountForm = ({
   const isGeneral = formData.level === 'general';
   const isGroup = formData.level === 'group';
 
-  // Calculate Code Prefix
   let prefix = '';
   if (!isGroup && selectedNode) {
-     // If creating NEW, selectedNode is parent. If EDITING, we try to deduce parent code.
      if (formData.id && selectedNode.fullCode) { // Editing
-        // Try to strip own code from fullCode to find parent prefix
         const ownCodeLen = formData.code ? formData.code.length : 0;
         if (ownCodeLen > 0 && formData.fullCode.length > ownCodeLen) {
             prefix = formData.fullCode.substring(0, formData.fullCode.length - ownCodeLen);
@@ -156,7 +180,6 @@ const AccountForm = ({
         )}
       </div>
 
-      {/* SUBSIDIARY SPECIFIC SETTINGS */}
       {isSubsidiary && (
         <div className="w-full animate-in slide-in-from-bottom-2">
            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3 mb-4">
@@ -165,7 +188,6 @@ const AccountForm = ({
                  {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}
               </h4>
               
-              {/* Currency */}
               <div className="flex flex-col gap-2 pb-2 border-b border-slate-200">
                  <Checkbox 
                     label={isRtl ? "ویژگی ارزی (چند ارزی)" : "Currency Feature (Multi-currency)"}
@@ -192,7 +214,6 @@ const AccountForm = ({
                  )}
               </div>
 
-              {/* Tracking */}
               <div className="flex flex-col gap-2 pb-2 border-b border-slate-200">
                  <Checkbox 
                     label={isRtl ? "ویژگی پیگیری" : "Tracking Feature"}
@@ -215,7 +236,6 @@ const AccountForm = ({
                  )}
               </div>
 
-              {/* Quantity */}
               <div className="flex flex-col gap-2">
                  <Checkbox 
                     label={isRtl ? "ویژگی مقداری" : "Quantity Feature"}
@@ -234,7 +254,6 @@ const AccountForm = ({
               </div>
            </div>
 
-           {/* Nature Adjustment & Modules */}
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 items-end">
               <SelectField 
                   label={isRtl ? "کنترل ماهیت طی دوره" : "Nature Control During Period"} 
@@ -266,7 +285,7 @@ const AccountForm = ({
   );
 };
 
-const TafsilSelector = ({ formData, setFormData, isRtl, tafsilTypes }) => {
+const TafsilSelector = ({ formData, setFormData, isRtl }) => {
   const { Callout } = window.UI;
   return (
      <div className="space-y-4">
@@ -276,7 +295,7 @@ const TafsilSelector = ({ formData, setFormData, isRtl, tafsilTypes }) => {
               : "Select the detailed account types allowed for this subsidiary."}
         </Callout>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-           {tafsilTypes.map(t => (
+           {ALL_TAFSIL_TYPES.map(t => (
               <div 
                  key={t.id}
                  onClick={() => {
@@ -285,13 +304,20 @@ const TafsilSelector = ({ formData, setFormData, isRtl, tafsilTypes }) => {
                     setFormData({...formData, tafsils: newTafsils});
                  }}
                  className={`
-                    cursor-pointer border rounded-lg p-3 text-center transition-all select-none
+                    relative cursor-pointer border rounded-lg p-3 text-center transition-all select-none
                     ${formData.tafsils?.includes(t.id) 
                        ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold shadow-sm ring-1 ring-indigo-200' 
                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
                  `}
               >
-                 <div className="text-[12px]">{t.label}</div>
+                 {!t.isSystem && (
+                     <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}>
+                        <User size={10} className="text-indigo-500" />
+                     </div>
+                 )}
+                 <div className="text-[12px] flex items-center justify-center gap-1">
+                    {t.label}
+                 </div>
               </div>
            ))}
         </div>
@@ -358,7 +384,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
 
   // --- GLOBAL STATE & MOCK DATA ---
 
-  const [viewMode, setViewMode] = useState('list'); // 'list' | 'tree'
+  const [viewMode, setViewMode] = useState('list'); 
   const [activeStructure, setActiveStructure] = useState(null);
 
   const [structures, setStructures] = useState([
@@ -403,17 +429,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
     { id: 'debit', label: isRtl ? 'بدهکار' : 'Debit' },
     { id: 'credit', label: isRtl ? 'بستانکار' : 'Credit' },
     { id: 'none', label: isRtl ? 'مهم نیست' : 'None' },
-  ];
-
-  const tafsilTypes = [
-    { id: 'party', label: isRtl ? 'طرف تجاری' : 'Business Party' },
-    { id: 'costcenter', label: isRtl ? 'مرکز هزینه' : 'Cost Center' },
-    { id: 'project', label: isRtl ? 'پروژه' : 'Project' },
-    { id: 'personnel', label: isRtl ? 'پرسنل' : 'Personnel' },
-    { id: 'bank', label: isRtl ? 'حساب بانکی' : 'Bank Account' },
-    { id: 'cash', label: isRtl ? 'صندوق' : 'Cash Box' },
-    { id: 'product', label: isRtl ? 'کالا/خدمات' : 'Product/Service' },
-    { id: 'branch', label: isRtl ? 'شعبه' : 'Branch' },
   ];
 
   // --- SUB-COMPONENT: STRUCTURE LIST VIEW ---
@@ -552,6 +567,9 @@ const ChartofAccounts = ({ t, isRtl }) => {
     const [activeTab, setActiveTab] = useState('info'); 
     const [formData, setFormData] = useState({});
     
+    // Tree State Control
+    const [expandedIds, setExpandedIds] = useState([]);
+
     // Contra Account Modal State
     const [showContraModal, setShowContraModal] = useState(false);
 
@@ -622,6 +640,18 @@ const ChartofAccounts = ({ t, isRtl }) => {
       });
     };
 
+    // Helper to find path to node for auto-expanding
+    const findPathToNode = (nodes, targetId, path = []) => {
+      for (const node of nodes) {
+        if (node.id === targetId) return path;
+        if (node.children) {
+          const res = findPathToNode(node.children, targetId, [...path, node.id]);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
     const handleSaveForm = () => {
       if (!formData.code || !formData.title) return alert(isRtl ? "کد و عنوان الزامی است" : "Code and Title Required");
       
@@ -644,11 +674,11 @@ const ChartofAccounts = ({ t, isRtl }) => {
       const nodeData = { ...formData, fullCode, label: labelObj };
 
       let newData;
-      let newNodeId;
+      let targetNodeId;
 
       if (mode === 'edit') {
         newData = updateNodeInTree(data, nodeData);
-        newNodeId = nodeData.id;
+        targetNodeId = nodeData.id;
       } else {
         const newNode = { ...nodeData, id: Date.now().toString(), children: [] };
         if (formData.level === 'group') {
@@ -656,20 +686,20 @@ const ChartofAccounts = ({ t, isRtl }) => {
         } else {
           newData = addNodeToTree(data, selectedNode.id, newNode);
         }
-        newNodeId = newNode.id;
+        targetNodeId = newNode.id;
       }
       
-      // Update global state
       onSaveTree(newData);
       
-      // Force selection of the new node to keep tree open
-      // We find the node in the NEW data
-      const newFlatData = flattenTree(newData);
-      const targetNode = newFlatData.find(n => n.id === newNodeId);
+      // Auto-Expand Logic: Find path to the saved node and add to expandedIds
+      const pathIds = findPathToNode(newData, targetNodeId) || [];
+      setExpandedIds(prev => [...new Set([...prev, ...pathIds])]);
       
-      if (targetNode) {
-          setSelectedNode(targetNode);
-      }
+      // Select the node in the new tree
+      const newFlatData = flattenTree(newData);
+      const newSelectedNode = newFlatData.find(n => n.id === targetNodeId);
+      setSelectedNode(newSelectedNode);
+
       setMode('view');
     };
 
@@ -680,18 +710,26 @@ const ChartofAccounts = ({ t, isRtl }) => {
        setMode('view');
     };
 
+    // --- Tree Controls ---
+    const handleExpandAll = () => {
+        const allIds = flattenTree(data).filter(n => n.children && n.children.length > 0).map(n => n.id);
+        setExpandedIds(allIds);
+    };
+
+    const handleCollapseAll = () => {
+        setExpandedIds([]);
+    };
+
     // --- Helpers for Contra Account Modal (Path Building) ---
     const flattenSubsidiariesWithPaths = (nodes, parentPath = '') => {
        let result = [];
        nodes.forEach(node => {
-          // Construct current path
           const currentPath = parentPath ? `${parentPath} > ${node.title}` : node.title;
           
           if (node.level === 'subsidiary') {
-             // For subsidiary, we want the path to be the title shown in grid
              result.push({ 
                  ...node, 
-                 pathTitle: currentPath // e.g. "Assets > Cash > Bank"
+                 pathTitle: currentPath 
              });
           }
           
@@ -702,15 +740,15 @@ const ChartofAccounts = ({ t, isRtl }) => {
        return result;
     };
     
-    // Memoize the list for performance
     const filteredSubsidiaries = useMemo(() => {
        const list = flattenSubsidiariesWithPaths(data);
-       return list.filter(n => n.id !== formData.id); // Exclude self
+       return list.filter(n => n.id !== formData.id); 
     }, [data, formData.id]);
 
     const getContraAccountName = (id) => {
        if (!id) return '';
-       const acc = flattenTree(data).find(n => n.id === id);
+       const list = flattenSubsidiariesWithPaths(data);
+       const acc = list.find(n => n.id === id);
        return acc ? `${acc.fullCode} - ${acc.title}` : '';
     };
 
@@ -768,6 +806,10 @@ const ChartofAccounts = ({ t, isRtl }) => {
             <div className="w-1/3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                   <span className="text-[11px] font-bold text-slate-500 uppercase">{isRtl ? "ساختار درختی" : "Tree Structure"}</span>
+                  <div className="flex gap-1">
+                     <button className="p-1 hover:bg-slate-200 rounded text-slate-500" onClick={handleExpandAll} title={isRtl ? "باز کردن همه" : "Expand All"}><ChevronsDown size={14}/></button>
+                     <button className="p-1 hover:bg-slate-200 rounded text-slate-500" onClick={handleCollapseAll} title={isRtl ? "بستن همه" : "Collapse All"}><ChevronsUp size={14}/></button>
+                  </div>
                </div>
                <div className="flex-1 overflow-y-auto p-2">
                   <TreeView 
@@ -776,6 +818,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
                      selectedNodeId={selectedNode?.id}
                      renderNodeContent={renderTreeContent}
                      isRtl={isRtl}
+                     expandedIds={expandedIds}
+                     onToggle={(ids) => setExpandedIds(ids)}
                   />
                </div>
             </div>
@@ -825,18 +869,15 @@ const ChartofAccounts = ({ t, isRtl }) => {
                            )}
                         </div>
 
-                        {/* DISPLAY CONTROL FEATURES IN VIEW MODE */}
                         {selectedNode.level === 'subsidiary' && (
                            <div className="border-t border-slate-100 pt-4">
                               <h4 className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1"><ShieldCheck size={12}/> {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}</h4>
                               <div className="grid grid-cols-2 gap-3">
-                                 {/* Currency */}
                                  <div className={`p-2 rounded border text-xs ${selectedNode.currencyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                                     <div className="font-bold mb-1">{isRtl ? "ویژگی ارزی" : "Currency"}</div>
                                     <div className="text-slate-500">{selectedNode.currencyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
                                     {selectedNode.currencyFeature && selectedNode.currencyMandatory && <div className="mt-1 text-indigo-600 font-bold text-[10px]">{isRtl ? "الزام ورود ارز" : "Mandatory"}</div>}
                                  </div>
-                                 {/* Tracking */}
                                  <div className={`p-2 rounded border text-xs ${selectedNode.trackFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                                     <div className="font-bold mb-1">{isRtl ? "ویژگی پیگیری" : "Tracking"}</div>
                                     <div className="text-slate-500">{selectedNode.trackFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
@@ -847,7 +888,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
                                         </div>
                                     )}
                                  </div>
-                                 {/* Quantity */}
                                  <div className={`p-2 rounded border text-xs ${selectedNode.qtyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
                                     <div className="font-bold mb-1">{isRtl ? "ویژگی مقداری" : "Quantity"}</div>
                                     <div className="text-slate-500">{selectedNode.qtyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
@@ -884,7 +924,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
                              structure={structure} 
                              selectedNode={selectedNode} 
                              isRtl={isRtl}
-                             accountTypes={window.accountTypes || []} // Assuming globals or passed props
+                             accountTypes={window.accountTypes || []} 
                              accountNatures={window.accountNatures || []}
                              onOpenContraModal={() => setShowContraModal(true)}
                              contraAccountName={getContraAccountName(formData.contraAccountId)}
@@ -895,7 +935,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
                              formData={formData} 
                              setFormData={setFormData} 
                              isRtl={isRtl} 
-                             tafsilTypes={window.tafsilTypes || []}
                            />
                         )}
                         {activeTab === 'desc' && (
@@ -927,14 +966,14 @@ const ChartofAccounts = ({ t, isRtl }) => {
                      <DataGrid 
                          columns={[
                              { field: 'fullCode', header: isRtl ? 'کد کامل' : 'Full Code', width: 'w-32' },
-                             { field: 'pathTitle', header: isRtl ? 'مسیر حساب' : 'Account Path', width: 'w-auto' }, // Changed to pathTitle
+                             { field: 'pathTitle', header: isRtl ? 'مسیر حساب' : 'Account Path', width: 'w-auto' }, 
                              { field: 'nature', header: isRtl ? 'ماهیت' : 'Nature', width: 'w-24', render: r => <Badge variant={r.nature === 'debit' ? 'info' : r.nature === 'credit' ? 'warning' : 'neutral'}>{r.nature}</Badge> }
                          ]}
                          data={filteredSubsidiaries}
                          isRtl={isRtl}
                          actions={(row) => (
                              <Button size="sm" onClick={() => {
-                                 setFormData({...formData, contraAccountId: row.id});
+                                 setFormData(prev => ({...prev, contraAccountId: row.id}));
                                  setShowContraModal(false);
                              }}>
                                  {isRtl ? "انتخاب" : "Select"}
@@ -959,14 +998,11 @@ const ChartofAccounts = ({ t, isRtl }) => {
      setAllAccounts(prev => ({ ...prev, [activeStructure.id]: newData }));
   };
   
-  // Pass required global data for dropdowns
   window.accountTypes = accountTypes;
   window.accountNatures = accountNatures;
-  window.tafsilTypes = tafsilTypes;
 
   return (
     <div className="h-full flex flex-col p-4 bg-slate-100">
-       {/* Main Header */}
        <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
