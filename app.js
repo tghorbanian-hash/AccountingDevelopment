@@ -103,7 +103,7 @@ const App = () => {
       FiscalPeriods,
       DocTypes,
       AutoNumbering,
-      ChartofAccounts // <--- ADDED THIS
+      ChartofAccounts 
     } = window;
 
     // --- Routing Logic ---
@@ -123,8 +123,6 @@ const App = () => {
     // 2.1 Financial Base Info (General Ledger)
     if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
     if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Details Component Not Loaded</div>;
-    
-    // New Components Added Here:
     if (activeId === 'acc_structure') return ChartofAccounts ? <ChartofAccounts t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: ChartofAccounts Component Not Loaded</div>; // <--- ADDED ROUTE
     if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
     if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
