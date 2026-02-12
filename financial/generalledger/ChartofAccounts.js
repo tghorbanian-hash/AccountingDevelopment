@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Folder, FolderOpen, FileText, Plus, Save, Trash2, 
-  Settings, Search, Check,
+  Settings, Search, Check, Hash, // <--- Hash Added Here
   AlertCircle, Layout, List, Layers, FileDigit, ArrowRight, Edit,
   TreeDeciduous, ShieldCheck, X, User,
   ChevronsDown, ChevronsUp, Minimize2, Maximize2 
@@ -487,7 +487,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
            <InputField label={isRtl ? "عنوان" : "Title"} isRtl={isRtl}/>
         </FilterSection>
 
-        {/* FIXED CONTAINER TO PREVENT PAGINATION ISSUES */}
         <div className="flex-1 overflow-hidden relative h-full">
           <DataGrid 
             columns={[
@@ -617,6 +616,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
       setActiveTab('info');
     };
 
+    // Recursive Updaters
     const addNodeToTree = (nodes, parentId, newNode) => {
       return nodes.map(node => {
         if (node.id === parentId) {
@@ -688,18 +688,22 @@ const ChartofAccounts = ({ t, isRtl }) => {
         }
       }
       
-      // Calculate Path to expand BEFORE updating tree data
+      // 1. Calculate Path to expand BEFORE updating tree data
       const ancestors = getAncestorIds(newData, targetNodeId) || [];
+      
+      // 2. Set Expanded IDs (Merge with existing)
       setExpandedIds(prev => [...new Set([...prev, ...ancestors])]);
 
-      // Save Data
-      onSaveTree(newData);
-      
-      // Update Selection
+      // 3. Find the new object reference in the new data structure
       const newFlatData = flattenTree(newData);
       const newSelectedNode = newFlatData.find(n => n.id === targetNodeId);
-      if (newSelectedNode) setSelectedNode(newSelectedNode);
+      
+      // 4. Update Selected Node
+      setSelectedNode(newSelectedNode);
 
+      // 5. Save Data (This triggers prop update)
+      onSaveTree(newData);
+      
       setMode('view');
     };
 
@@ -736,12 +740,14 @@ const ChartofAccounts = ({ t, isRtl }) => {
        let result = [];
        nodes.forEach(node => {
           const currentPath = parentPath ? `${parentPath} > ${node.title}` : node.title;
+          
           if (node.level === 'subsidiary') {
              result.push({ 
                  ...node, 
                  pathTitle: currentPath 
              });
           }
+          
           if (node.children) {
              result = result.concat(flattenSubsidiariesWithPaths(node.children, currentPath));
           }
@@ -847,7 +853,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
                   </div>
                )}
 
-               {/* VIEW MODE */}
+               {/* VIEW MODE - READ ONLY DETAILS */}
                {selectedNode && mode === 'view' && (
                   <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto">
                      <div className="p-6 border-b border-slate-100 flex justify-between items-start">
