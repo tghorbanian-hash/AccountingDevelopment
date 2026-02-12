@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Folder, FolderOpen, FileText, Plus, Save, Trash2, 
-  Settings, Search, Check, Hash, // <--- Hash Added Here
+  Settings, Search, Check, 
   AlertCircle, Layout, List, Layers, FileDigit, ArrowRight, Edit,
   TreeDeciduous, ShieldCheck, X, User,
   ChevronsDown, ChevronsUp, Minimize2, Maximize2 
@@ -1022,10 +1022,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
     <div className="h-full flex flex-col p-4 bg-slate-100">
        <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Hash className="text-indigo-600"/>
-            {t.coa_title || (isRtl ? "ساختار حساب‌ها (کدینگ)" : "Chart of Accounts")}
-          </h1>
           <p className="text-slate-500 text-xs mt-1">
             {isRtl ? "تعریف ساختار حساب‌ها و طراحی درخت کدینگ" : "Manage account structures and coding trees."}
           </p>
