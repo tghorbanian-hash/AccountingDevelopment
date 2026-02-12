@@ -18,8 +18,8 @@ const App = () => {
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [lang, setLang] = useState('fa'); 
-  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); // Default to GL base info
-  const [activeId, setActiveId] = useState('acc_structure'); // Default to Chart of Accounts
+  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); 
+  const [activeId, setActiveId] = useState('ledgers'); 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Authentication States
