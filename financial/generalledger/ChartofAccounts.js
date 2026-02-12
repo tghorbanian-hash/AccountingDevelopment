@@ -2,10 +2,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Folder, FolderOpen, FileText, Plus, Save, Trash2, 
-  Settings, Search, ChevronRight, ChevronDown, Check,
-  AlertCircle, Layout, List, CreditCard, DollarSign,
-  Package, Hash, Layers, FileDigit, ArrowRight, Edit,
-  TreeDeciduous, MoreVertical, ShieldCheck, X, User,
+  Settings, Search, Check,
+  AlertCircle, Layout, List, Layers, FileDigit, ArrowRight, Edit,
+  TreeDeciduous, ShieldCheck, X, User,
   ChevronsDown, ChevronsUp, Minimize2, Maximize2 
 } from 'lucide-react';
 
@@ -33,6 +32,18 @@ const ALL_TAFSIL_TYPES = [
   { id: 'loan', label: 'تسهیلات', en: 'Loans', isSystem: false },
   { id: 'other1', label: 'سایر ۱', en: 'Other 1', isSystem: false },
   { id: 'other2', label: 'سایر ۲', en: 'Other 2', isSystem: false },
+];
+
+const ACCOUNT_TYPES = [
+  { id: 'permanent', labelFa: 'دائم (ترازنامه‌ای)', labelEn: 'Permanent (Balance Sheet)' },
+  { id: 'temporary', labelFa: 'موقت (سود و زیانی)', labelEn: 'Temporary (P&L)' },
+  { id: 'disciplinary', labelFa: 'انتظامی', labelEn: 'Disciplinary' },
+];
+
+const ACCOUNT_NATURES = [
+  { id: 'debit', labelFa: 'بدهکار', labelEn: 'Debit' },
+  { id: 'credit', labelFa: 'بستانکار', labelEn: 'Credit' },
+  { id: 'none', labelFa: 'مهم نیست', labelEn: 'None' },
 ];
 
 // --- SHARED HELPERS & SUB-COMPONENTS ---
@@ -81,7 +92,7 @@ const Tabs = ({ tabs, activeTab, onChange }) => (
 
 const AccountForm = ({ 
   formData, setFormData, structure, selectedNode, isRtl, 
-  accountTypes, accountNatures, onOpenContraModal, contraAccountName 
+  onOpenContraModal, contraAccountName 
 }) => {
   const { InputField, SelectField, Button } = window.UI;
 
@@ -91,12 +102,12 @@ const AccountForm = ({
 
   let prefix = '';
   if (!isGroup && selectedNode) {
-     if (formData.id && selectedNode.fullCode) { // Editing
+     if (formData.id && selectedNode.fullCode) { 
         const ownCodeLen = formData.code ? formData.code.length : 0;
         if (ownCodeLen > 0 && formData.fullCode.length > ownCodeLen) {
             prefix = formData.fullCode.substring(0, formData.fullCode.length - ownCodeLen);
         }
-     } else { // Creating
+     } else { 
         prefix = isGeneral 
           ? (selectedNode.level === 'group' ? selectedNode.code : '') 
           : (selectedNode.level === 'general' ? selectedNode.fullCode : '');
@@ -120,7 +131,7 @@ const AccountForm = ({
                 value={formData.code || ''}
                 onChange={e => {
                   const val = e.target.value;
-                  if (val.length <= maxLen) setFormData({...formData, code: val});
+                  if (val.length <= maxLen) setFormData(prev => ({...prev, code: val}));
                 }}
                 className={`
                   flex-1 ${window.UI.THEME.colors.surface} border ${window.UI.THEME.colors.border}
@@ -139,13 +150,13 @@ const AccountForm = ({
         <InputField 
           label={isRtl ? "عنوان حساب (فارسی)" : "Account Title (Local)"} 
           value={formData.title || ''} 
-          onChange={e => setFormData({...formData, title: e.target.value})}
+          onChange={e => setFormData(prev => ({...prev, title: e.target.value}))}
           isRtl={isRtl}
         />
         <InputField 
           label={isRtl ? "عنوان حساب (انگلیسی)" : "Account Title (English)"} 
           value={formData.titleEn || ''} 
-          onChange={e => setFormData({...formData, titleEn: e.target.value})}
+          onChange={e => setFormData(prev => ({...prev, titleEn: e.target.value}))}
           isRtl={isRtl}
           dir="ltr"
         />
@@ -153,19 +164,19 @@ const AccountForm = ({
         <SelectField 
           label={isRtl ? "نوع حساب" : "Account Type"}
           value={formData.type}
-          onChange={e => setFormData({...formData, type: e.target.value})}
+          onChange={e => setFormData(prev => ({...prev, type: e.target.value}))}
           isRtl={isRtl}
         >
-          {accountTypes.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          {ACCOUNT_TYPES.map(t => <option key={t.id} value={t.id}>{isRtl ? t.labelFa : t.labelEn}</option>)}
         </SelectField>
 
         <SelectField 
           label={isRtl ? "ماهیت حساب" : "Account Nature"}
           value={formData.nature}
-          onChange={e => setFormData({...formData, nature: e.target.value})}
+          onChange={e => setFormData(prev => ({...prev, nature: e.target.value}))}
           isRtl={isRtl}
         >
-          {accountNatures.map(n => <option key={n.id} value={n.id}>{n.label}</option>)}
+          {ACCOUNT_NATURES.map(n => <option key={n.id} value={n.id}>{isRtl ? n.labelFa : n.labelEn}</option>)}
         </SelectField>
         
         {isSubsidiary && (
@@ -199,7 +210,7 @@ const AccountForm = ({
                        <SelectField 
                           label={isRtl ? "ارز پیش‌فرض" : "Default Currency"} isRtl={isRtl}
                           value={formData.defaultCurrency || ''}
-                          onChange={e => setFormData({...formData, defaultCurrency: e.target.value})}
+                          onChange={e => setFormData(prev => ({...prev, defaultCurrency: e.target.value}))}
                        >
                           <option value="">-</option><option value="IRR">IRR</option><option value="USD">USD</option><option value="EUR">EUR</option>
                        </SelectField>
@@ -259,7 +270,7 @@ const AccountForm = ({
                   label={isRtl ? "کنترل ماهیت طی دوره" : "Nature Control During Period"} 
                   isRtl={isRtl}
                   value={formData.natureControl || 'none'}
-                  onChange={e => setFormData({...formData, natureControl: e.target.value})}
+                  onChange={e => setFormData(prev => ({...prev, natureControl: e.target.value}))}
               >
                  <option value="none">{isRtl ? "بدون کنترل" : "No Control"}</option>
                  <option value="warn">{isRtl ? "هشدار" : "Warning"}</option>
@@ -274,7 +285,7 @@ const AccountForm = ({
                     </div>
                     <Button variant="outline" icon={Search} onClick={onOpenContraModal} />
                     {formData.contraAccountId && (
-                       <Button variant="outline" className="text-red-500 border-red-200 hover:bg-red-50" icon={X} onClick={() => setFormData({...formData, contraAccountId: null})} />
+                       <Button variant="outline" className="text-red-500 border-red-200 hover:bg-red-50" icon={X} onClick={() => setFormData(prev => ({...prev, contraAccountId: null}))} />
                     )}
                  </div>
               </div>
@@ -301,7 +312,7 @@ const TafsilSelector = ({ formData, setFormData, isRtl }) => {
                  onClick={() => {
                     const exists = formData.tafsils?.includes(t.id);
                     const newTafsils = exists ? formData.tafsils.filter(x => x !== t.id) : [...(formData.tafsils || []), t.id];
-                    setFormData({...formData, tafsils: newTafsils});
+                    setFormData(prev => ({...prev, tafsils: newTafsils}));
                  }}
                  className={`
                     relative cursor-pointer border rounded-lg p-3 text-center transition-all select-none
@@ -334,7 +345,7 @@ const StandardDesc = ({ formData, setFormData, isRtl }) => {
   const addDesc = () => {
      if(!descText) return;
      const newList = [...list, { id: Date.now(), text: descText }];
-     setFormData({...formData, descriptions: newList});
+     setFormData(prev => ({...prev, descriptions: newList}));
      setDescText('');
   };
 
@@ -355,7 +366,7 @@ const StandardDesc = ({ formData, setFormData, isRtl }) => {
                  <button 
                     onClick={() => {
                        const newList = list.filter(l => l.id !== item.id);
-                       setFormData({...formData, descriptions: newList});
+                       setFormData(prev => ({...prev, descriptions: newList}));
                     }}
                     className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                  >
@@ -419,18 +430,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
     2: []
   });
 
-  const accountTypes = [
-    { id: 'permanent', label: isRtl ? 'دائم (ترازنامه‌ای)' : 'Permanent (Balance Sheet)' },
-    { id: 'temporary', label: isRtl ? 'موقت (سود و زیانی)' : 'Temporary (P&L)' },
-    { id: 'disciplinary', label: isRtl ? 'انتظامی' : 'Disciplinary' },
-  ];
-
-  const accountNatures = [
-    { id: 'debit', label: isRtl ? 'بدهکار' : 'Debit' },
-    { id: 'credit', label: isRtl ? 'بستانکار' : 'Credit' },
-    { id: 'none', label: isRtl ? 'مهم نیست' : 'None' },
-  ];
-
   // --- SUB-COMPONENT: STRUCTURE LIST VIEW ---
   
   const StructureList = () => {
@@ -488,7 +487,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
            <InputField label={isRtl ? "عنوان" : "Title"} isRtl={isRtl}/>
         </FilterSection>
 
-        <div className="flex-1 overflow-hidden">
+        {/* FIXED CONTAINER TO PREVENT PAGINATION ISSUES */}
+        <div className="flex-1 overflow-hidden relative h-full">
           <DataGrid 
             columns={[
               { field: 'code', header: isRtl ? 'کد' : 'Code', width: 'w-24' },
@@ -617,7 +617,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
       setActiveTab('info');
     };
 
-    // Recursive Updaters
     const addNodeToTree = (nodes, parentId, newNode) => {
       return nodes.map(node => {
         if (node.id === parentId) {
@@ -689,22 +688,18 @@ const ChartofAccounts = ({ t, isRtl }) => {
         }
       }
       
-      // 1. Calculate Path to expand BEFORE updating tree data
+      // Calculate Path to expand BEFORE updating tree data
       const ancestors = getAncestorIds(newData, targetNodeId) || [];
-      
-      // 2. Set Expanded IDs (Merge with existing)
       setExpandedIds(prev => [...new Set([...prev, ...ancestors])]);
 
-      // 3. Find the new object reference in the new data structure
-      const newFlatData = flattenTree(newData);
-      const newSelectedNode = newFlatData.find(n => n.id === targetNodeId);
-      
-      // 4. Update Selected Node
-      setSelectedNode(newSelectedNode);
-
-      // 5. Save Data (This triggers prop update)
+      // Save Data
       onSaveTree(newData);
       
+      // Update Selection
+      const newFlatData = flattenTree(newData);
+      const newSelectedNode = newFlatData.find(n => n.id === targetNodeId);
+      if (newSelectedNode) setSelectedNode(newSelectedNode);
+
       setMode('view');
     };
 
@@ -741,14 +736,12 @@ const ChartofAccounts = ({ t, isRtl }) => {
        let result = [];
        nodes.forEach(node => {
           const currentPath = parentPath ? `${parentPath} > ${node.title}` : node.title;
-          
           if (node.level === 'subsidiary') {
              result.push({ 
                  ...node, 
                  pathTitle: currentPath 
              });
           }
-          
           if (node.children) {
              result = result.concat(flattenSubsidiariesWithPaths(node.children, currentPath));
           }
@@ -789,13 +782,9 @@ const ChartofAccounts = ({ t, isRtl }) => {
         setMode('view');
     };
 
-    const tabs = [
-      { id: 'info', label: isRtl ? 'اطلاعات اصلی' : 'General Info', icon: FileText },
-      { id: 'tafsil', label: isRtl ? 'تفصیل‌ها' : 'Detailed Accts', icon: List },
-      { id: 'desc', label: isRtl ? 'شرح‌های استاندارد' : 'Descriptions', icon: FileDigit },
-    ];
- 
-    const activeTabs = formData.level === 'subsidiary' ? tabs : [tabs[0]];
+    const activeTabs = formData.level === 'subsidiary' 
+        ? [{ id: 'info', label: isRtl ? 'اطلاعات اصلی' : 'General Info', icon: FileText }, { id: 'tafsil', label: isRtl ? 'تفصیل‌ها' : 'Detailed Accts', icon: List }, { id: 'desc', label: isRtl ? 'شرح‌های استاندارد' : 'Descriptions', icon: FileDigit }] 
+        : [{ id: 'info', label: isRtl ? 'اطلاعات اصلی' : 'General Info', icon: FileText }];
 
     return (
       <div className="h-full flex flex-col animate-in slide-in-from-right-8 duration-300">
@@ -858,7 +847,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
                   </div>
                )}
 
-               {/* VIEW MODE - READ ONLY DETAILS */}
+               {/* VIEW MODE */}
                {selectedNode && mode === 'view' && (
                   <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto">
                      <div className="p-6 border-b border-slate-100 flex justify-between items-start">
@@ -949,8 +938,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
                              structure={structure} 
                              selectedNode={selectedNode} 
                              isRtl={isRtl}
-                             accountTypes={window.accountTypes || []} 
-                             accountNatures={window.accountNatures || []}
+                             accountTypes={ACCOUNT_TYPES}
+                             accountNatures={ACCOUNT_NATURES}
                              onOpenContraModal={() => setShowContraModal(true)}
                              contraAccountName={getContraAccountName(formData.contraAccountId)}
                            />
@@ -987,7 +976,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
             maxWidth="max-w-4xl"
          >
              <div className="h-[500px] flex flex-col">
-                 <div className="flex-1 overflow-hidden border border-slate-200 rounded-lg">
+                 <div className="flex-1 overflow-hidden border border-slate-200 rounded-lg relative">
                      <DataGrid 
                          columns={[
                              { field: 'fullCode', header: isRtl ? 'کد کامل' : 'Full Code', width: 'w-32' },
@@ -1022,9 +1011,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
   const handleUpdateTree = (newData) => {
      setAllAccounts(prev => ({ ...prev, [activeStructure.id]: newData }));
   };
-  
-  window.accountTypes = accountTypes;
-  window.accountNatures = accountNatures;
 
   return (
     <div className="h-full flex flex-col p-4 bg-slate-100">
