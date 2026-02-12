@@ -1,8 +1,8 @@
 /* Filename: financial/generalledger/AutoNumbering.js */
 import React, { useState } from 'react';
 import { 
-  Settings, Tag, File, Layers, Save, Edit, AlertCircle,  // ✅ FIXED: Hash→Tag, FileDigit→File, ShieldCheck→Shield
-  Shield, RotateCcw, X as XIcon, Box, CheckSquare, List
+  Settings, Hash, FileDigit, Layers, Save, Edit, AlertCircle, 
+  ShieldCheck, RotateCcw, X as XIcon, Box, CheckSquare, List
 } from 'lucide-react';
 
 const AutoNumbering = ({ t, isRtl }) => {
@@ -40,273 +40,267 @@ const AutoNumbering = ({ t, isRtl }) => {
   const INITIAL_DOCS = [
     { id: 101, title: isRtl ? 'دفتر کل مرکزی' : 'Main General Ledger', resetYear: true, uniquenessScope: 'ledger' },
     { id: 102, title: isRtl ? 'دفتر کل ارزی' : 'Currency Ledger', resetYear: false, uniquenessScope: 'branch' },
-    { id: 103, title: isRtl ? 'دفتر روزنامه کل' : 'Daily Journal', resetYear: true, uniquenessScope: 'none' },
+    { id: 103, title: isRtl ? 'دفتر کل پروژه ها' : 'Projects Ledger', resetYear: true, uniquenessScope: 'none' },
   ];
 
   // --- States ---
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState('details'); 
   
-  // Details
-  const [details, setDetails] = useState(INITIAL_DETAILS);
-  const [showDetailModal, setShowDetailModal] = useState(false);
+  // Details State
+  const [detailSettings, setDetailSettings] = useState(INITIAL_DETAILS);
   const [editingDetail, setEditingDetail] = useState(null);
   const [detailFormData, setDetailFormData] = useState({});
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Accounts
-  const [accounts, setAccounts] = useState(INITIAL_ACCOUNTS);
+  // Accounts State
+  const [accSettings, setAccSettings] = useState(INITIAL_ACCOUNTS);
 
-  // Documents
-  const [docs, setDocs] = useState(INITIAL_DOCS);
-  const [showDocModal, setShowDocModal] = useState(false);
+  // Docs State
+  const [docSettings, setDocSettings] = useState(INITIAL_DOCS);
   const [editingDoc, setEditingDoc] = useState(null);
   const [docFormData, setDocFormData] = useState({});
+  const [showDocModal, setShowDocModal] = useState(false);
 
-  // --- Handlers ---
-  
-  // Details Tab
-  const openDetailModal = (detail) => {
-    setEditingDetail(detail);
-    setDetailFormData({ ...detail });
+
+  // --- Handlers: Details ---
+  const openDetailModal = (item) => {
+    setEditingDetail(item);
+    setDetailFormData({ ...item });
     setShowDetailModal(true);
   };
 
-  const saveDetail = () => {
-    setDetails(prev => prev.map(d => d.id === editingDetail.id ? detailFormData : d));
-    setShowDetailModal(false);
-  };
-
   const handleLengthChange = (e) => {
-    const len = parseInt(e.target.value) || 1;
-    const newStart = '1'.padStart(len, '0');
-    const newEnd = '9'.repeat(len);
+    const newLen = parseInt(e.target.value);
+    if (isNaN(newLen) || newLen < 1) return;
+
+    // Smart Suggestion
+    const start = "1".padEnd(newLen, "0");
+    const end = "9".padEnd(newLen, "9");
+
     setDetailFormData({ 
       ...detailFormData, 
-      length: len, 
-      startCode: newStart, 
-      endCode: newEnd 
+      length: newLen, 
+      startCode: start, 
+      endCode: end 
     });
   };
 
-  // Accounts Tab
+  const saveDetail = () => {
+    const len = detailFormData.length;
+    if (len < 1 || len > 20) return alert(isRtl ? "طول کد باید بین ۱ تا ۲۰ باشد" : "Length must be between 1 and 20");
+    
+    if (detailFormData.startCode.length !== len) return alert(isRtl ? `کد شروع حتما باید ${len} رقمی باشد` : `Start code must be exactly ${len} digits`);
+    if (detailFormData.endCode.length !== len) return alert(isRtl ? `کد پایان حتما باید ${len} رقمی باشد` : `End code must be exactly ${len} digits`);
+
+    setDetailSettings(prev => prev.map(d => d.id === editingDetail.id ? { ...detailFormData } : d));
+    setShowDetailModal(false);
+  };
+
+  // --- Handlers: Accounts ---
   const updateAccSetting = (level, field, value) => {
-    setAccounts(prev => ({
+    setAccSettings(prev => ({
       ...prev,
       [level]: { ...prev[level], [field]: value }
     }));
   };
 
-  const handleAccLengthChange = (level, newLen) => {
-    const len = parseInt(newLen) || 1;
-    const newStart = level === 'group' ? '1'.padStart(len, '0') : '0'.repeat(len - 1) + '1';
-    const newEnd = '9'.repeat(len);
-    setAccounts(prev => ({
-      ...prev,
-      [level]: { ...prev[level], length: len, startCode: newStart, endCode: newEnd }
-    }));
-  };
-
-  // Docs Tab
-  const openDocModal = (doc) => {
-    setEditingDoc(doc);
-    setDocFormData({ ...doc });
+  // --- Handlers: Docs ---
+  const openDocModal = (item) => {
+    setEditingDoc(item);
+    setDocFormData({ ...item });
     setShowDocModal(true);
   };
 
   const saveDoc = () => {
-    setDocs(prev => prev.map(d => d.id === editingDoc.id ? docFormData : d));
+    setDocSettings(prev => prev.map(d => d.id === editingDoc.id ? { ...docFormData } : d));
     setShowDocModal(false);
   };
 
-  // --- Render Functions ---
-  
+  // --- Render Sections ---
+
   const renderDetailsTab = () => (
-    <div className="space-y-4 h-full flex flex-col">
-      <div className="shrink-0">
-        <h3 className="text-sm font-black text-slate-700 mb-1">{t.an_dt_subtitle}</h3>
-        <p className="text-xs text-slate-500">{t.an_dt_desc}</p>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-2">
-          {details.map(detail => (
-            <div 
-              key={detail.id} 
-              className="bg-slate-50 border border-slate-200 rounded-lg p-3 hover:bg-white hover:shadow-md transition-all cursor-pointer group"
-              onClick={() => openDetailModal(detail)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="font-bold text-slate-700 text-xs mb-1">{detail.title}</div>
-                  <div className="flex items-center gap-4 text-[10px] text-slate-500 font-mono">
-                    <span>{t.an_dt_length}: <strong className="text-indigo-600">{detail.length}</strong></span>
-                    <span>{t.an_dt_range}: <strong>{detail.startCode}</strong> - <strong>{detail.endCode}</strong></span>
-                    <span>{t.an_dt_last}: <strong className="text-emerald-600">{detail.lastCode}</strong></span>
-                  </div>
-                </div>
-                <Button variant="ghost" size="iconSm" icon={Edit} className="opacity-0 group-hover:opacity-100" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* MODAL: Detail Settings */}
-      <Modal
-        isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
-        title={isRtl ? 'تنظیمات شماره‌گذاری تفصیل' : 'Detail Numbering Settings'}
-        footer={<><Button variant="outline" onClick={() => setShowDetailModal(false)}>{t.btn_cancel}</Button><Button variant="primary" onClick={saveDetail}>{t.btn_save}</Button></>}
-      >
-         <div className="space-y-4">
-            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center gap-2">
-               <Tag size={16} className="text-indigo-600"/>
-               <span className="font-bold text-xs">{editingDetail?.title}</span>
-            </div>
-            
-            {/* 3 Fields in One Row, Compact */}
-            <div className="grid grid-cols-3 gap-3">
-               <InputField 
-                 label={t.an_dt_length} 
-                 type="number" 
-                 value={detailFormData.length} 
-                 onChange={handleLengthChange} 
-                 isRtl={isRtl} 
-               />
-               <InputField label={t.an_dt_start} value={detailFormData.startCode} onChange={e => setDetailFormData({...detailFormData, startCode: e.target.value})} isRtl={isRtl} />
-               <InputField label={t.an_dt_end} value={detailFormData.endCode} onChange={e => setDetailFormData({...detailFormData, endCode: e.target.value})} isRtl={isRtl} />
-            </div>
-            
-            <div className="text-[10px] text-orange-600 bg-orange-50 p-2 rounded border border-orange-100 flex items-center gap-2">
-               <AlertCircle size={12}/>
-               {isRtl ? 'تعداد ارقام کد شروع و پایان باید دقیقاً برابر با طول مجاز باشد.' : 'Start/End codes length must exactly match Max Length.'}
-            </div>
-         </div>
-      </Modal>
+    <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500">
+       <div className="flex-1 overflow-hidden">
+         <DataGrid 
+           columns={[
+              { field: 'title', header: t.an_dt_type, width: 'w-64', render: r => <span className="font-bold text-slate-700">{r.title}</span> },
+              { field: 'length', header: t.an_dt_length, width: 'w-32', render: r => <span className="font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 font-bold text-xs">{r.length}</span> },
+              { field: 'startCode', header: t.an_dt_start, width: 'w-32', render: r => <span className="font-mono text-slate-500">{r.startCode}</span> },
+              { field: 'endCode', header: t.an_dt_end, width: 'w-32', render: r => <span className="font-mono text-slate-500">{r.endCode}</span> },
+              { field: 'lastCode', header: t.an_dt_last, width: 'w-48', render: r => <Badge variant="neutral" className="font-mono">{r.lastCode}</Badge> },
+           ]}
+           data={detailSettings}
+           isRtl={isRtl}
+           actions={(row) => (
+              <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => openDetailModal(row)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"/>
+           )}
+         />
+       </div>
+
+       {/* Modal for Details - Compact Layout */}
+       <Modal
+         isOpen={showDetailModal}
+         onClose={() => setShowDetailModal(false)}
+         title={t.an_edit_dt}
+         size="md"
+         footer={<><Button variant="outline" onClick={() => setShowDetailModal(false)}>{t.btn_cancel}</Button><Button variant="primary" onClick={saveDetail}>{t.btn_save}</Button></>}
+       >
+          <div className="flex flex-col gap-4">
+             <div className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200 text-slate-700">
+                <Hash size={16} className="text-indigo-500"/>
+                <span className="font-bold text-xs">{editingDetail?.title}</span>
+             </div>
+             
+             {/* 3 Fields in One Row, Compact */}
+             <div className="grid grid-cols-3 gap-3">
+                <InputField 
+                  label={t.an_dt_length} 
+                  type="number" 
+                  value={detailFormData.length} 
+                  onChange={handleLengthChange} 
+                  isRtl={isRtl} 
+                />
+                <InputField label={t.an_dt_start} value={detailFormData.startCode} onChange={e => setDetailFormData({...detailFormData, startCode: e.target.value})} isRtl={isRtl} />
+                <InputField label={t.an_dt_end} value={detailFormData.endCode} onChange={e => setDetailFormData({...detailFormData, endCode: e.target.value})} isRtl={isRtl} />
+             </div>
+             
+             <div className="text-[10px] text-orange-600 bg-orange-50 p-2 rounded border border-orange-100 flex items-center gap-2">
+                <AlertCircle size={12}/>
+                {isRtl ? 'تعداد ارقام کد شروع و پایان باید دقیقاً برابر با طول مجاز باشد.' : 'Start/End codes length must exactly match Max Length.'}
+             </div>
+          </div>
+       </Modal>
     </div>
   );
 
   const renderAccountsTab = () => {
     const Card = ({ title, data, level, icon: Icon }) => (
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
-         <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-               <Icon size={16} />
-            </div>
-            <div className="font-bold text-sm text-slate-700">{title}</div>
-         </div>
-         <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-               <InputField label={t.an_acc_len} type="number" size="sm" value={data.length} onChange={e => handleAccLengthChange(level, e.target.value)} isRtl={isRtl} />
-               <SelectField label={t.an_mode} size="sm" value={data.mode} onChange={e => updateAccSetting(level, 'mode', e.target.value)} isRtl={isRtl}>
-                  <option value="auto">{t.an_mode_auto}</option>
-                  <option value="manual">{t.an_mode_manual}</option>
-               </SelectField>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-               <InputField label={t.an_dt_start} size="sm" value={data.startCode} readOnly className="bg-slate-50" isRtl={isRtl} />
-               <InputField label={t.an_dt_end} size="sm" value={data.endCode} readOnly className="bg-slate-50" isRtl={isRtl} />
-            </div>
-            <div className="bg-emerald-50 border border-emerald-100 rounded p-2 text-xs text-emerald-700 font-mono flex items-center justify-between">
-               <span>{t.an_dt_last}:</span>
-               <strong>{data.lastCode}</strong>
-            </div>
-         </div>
-      </div>
+       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+             <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Icon size={16} />
+             </div>
+             <div className="font-bold text-sm text-slate-700">{title}</div>
+          </div>
+          <div className="space-y-4">
+             <div className="grid grid-cols-2 gap-2">
+                <InputField label={t.an_acc_len} type="number" size="sm" value={data.length} onChange={e => updateAccSetting(level, 'length', e.target.value)} isRtl={isRtl} />
+                <SelectField label={t.an_mode} size="sm" value={data.mode} onChange={e => updateAccSetting(level, 'mode', e.target.value)} isRtl={isRtl}>
+                   <option value="auto">{t.an_mode_auto}</option>
+                   <option value="manual">{t.an_mode_manual}</option>
+                </SelectField>
+             </div>
+             <div className="grid grid-cols-2 gap-2">
+                <InputField label={t.an_dt_start} size="sm" value={data.startCode} onChange={e => updateAccSetting(level, 'startCode', e.target.value)} isRtl={isRtl} />
+                <InputField label={t.an_dt_end} size="sm" value={data.endCode} onChange={e => updateAccSetting(level, 'endCode', e.target.value)} isRtl={isRtl} />
+             </div>
+             <div className="bg-slate-50 p-2 rounded text-[11px] text-slate-500 flex justify-between items-center border border-slate-100">
+                <span>{t.an_dt_last}:</span>
+                <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded shadow-sm border">{data.lastCode}</span>
+             </div>
+          </div>
+       </div>
     );
 
     return (
-      <div className="space-y-4 h-full flex flex-col">
-        <div className="shrink-0">
-          <h3 className="text-sm font-black text-slate-700 mb-1">{t.an_acc_subtitle}</h3>
-          <p className="text-xs text-slate-500">{t.an_acc_desc}</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card title={t.an_group} data={accounts.group} level="group" icon={Layers} />
-          <Card title={t.an_general} data={accounts.general} level="general" icon={List} />
-          <Card title={t.an_subsidiary} data={accounts.subsidiary} level="subsidiary" icon={File} />
-        </div>
-      </div>
+       <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500">
+           <div className="flex-1 overflow-auto">
+             {/* All 3 cards in one row */}
+             <div className="grid grid-cols-3 gap-4 pb-6">
+                <Card title={t.an_acc_group} data={accSettings.group} level="group" icon={Layers} />
+                <Card title={t.an_acc_general} data={accSettings.general} level="general" icon={Box} />
+                <Card title={t.an_acc_subsidiary} data={accSettings.subsidiary} level="subsidiary" icon={FileDigit} />
+             </div>
+             <div className="flex justify-end pt-4 border-t border-slate-200">
+                 <Button variant="primary" size="lg" icon={Save} onClick={() => alert(t.save_success)}>{t.btn_save}</Button>
+             </div>
+           </div>
+       </div>
     );
   };
 
   const renderDocsTab = () => (
-    <div className="space-y-4 h-full flex flex-col">
-      <div className="shrink-0">
-        <h3 className="text-sm font-black text-slate-700 mb-1">{t.an_doc_subtitle}</h3>
-        <p className="text-xs text-slate-500">{t.an_doc_desc}</p>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-2">
-          {docs.map(doc => (
-            <div 
-              key={doc.id} 
-              className="bg-slate-50 border border-slate-200 rounded-lg p-3 hover:bg-white hover:shadow-md transition-all cursor-pointer group"
-              onClick={() => openDocModal(doc)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="font-bold text-slate-700 text-xs mb-2">{doc.title}</div>
-                  <div className="flex items-center gap-4 text-[10px]">
-                    <Badge variant={doc.resetYear ? 'success' : 'neutral'}>{doc.resetYear ? (isRtl ? 'ریست سالانه' : 'Annual Reset') : (isRtl ? 'ادامه‌دار' : 'Continuous')}</Badge>
-                    <span className="text-slate-500">{isRtl ? 'محدوده یکتایی:' : 'Uniqueness:'} <strong className="text-indigo-600">{t[`an_scope_${doc.uniquenessScope}`] || doc.uniquenessScope}</strong></span>
-                  </div>
+    <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500">
+       <div className="flex-1 overflow-hidden">
+          <DataGrid 
+             columns={[
+                { field: 'title', header: t.lg_title, width: 'w-64', render: r => <span className="font-bold text-slate-700">{r.title}</span> },
+                { 
+                   field: 'resetYear', 
+                   header: t.an_reset_year, 
+                   width: 'w-48', 
+                   render: r => (
+                      <Badge variant={r.resetYear ? 'success' : 'neutral'} icon={r.resetYear ? RotateCcw : XIcon}>
+                         {r.resetYear ? t.active : t.inactive}
+                      </Badge>
+                   )
+                },
+                { 
+                   field: 'uniquenessScope', 
+                   header: t.an_unique_scope, 
+                   width: 'w-48', 
+                   render: r => (
+                      <Badge variant="primary" icon={ShieldCheck}>
+                         {r.uniquenessScope === 'none' ? (isRtl ? '---' : 'None') : t[`an_scope_${r.uniquenessScope}`]}
+                      </Badge>
+                   )
+                },
+             ]}
+             data={docSettings}
+             isRtl={isRtl}
+             actions={(row) => (
+                <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => openDocModal(row)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"/>
+             )}
+          />
+       </div>
+
+       {/* Modal for Documents Settings */}
+       <Modal
+         isOpen={showDocModal}
+         onClose={() => setShowDocModal(false)}
+         title={t.an_tab_docs}
+         footer={<><Button variant="outline" onClick={() => setShowDocModal(false)}>{t.btn_cancel}</Button><Button variant="primary" onClick={saveDoc}>{t.btn_save}</Button></>}
+       >
+          <div className="flex flex-col gap-6">
+             <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-indigo-900">
+                <Settings size={20}/>
+                <span className="font-bold">{editingDoc?.title}</span>
+             </div>
+
+             <Toggle 
+                label={t.an_reset_year} 
+                checked={docFormData.resetYear} 
+                onChange={val => setDocFormData({...docFormData, resetYear: val})}
+             />
+             
+             {/* Toggle Chips for Uniqueness */}
+             <div className="space-y-2">
+                <label className="text-[11px] font-bold text-slate-600">{t.an_unique_scope}</label>
+                <div className="flex flex-wrap gap-2">
+                   {['none', 'branch', 'ledger', 'company'].map(scope => (
+                      <ToggleChip 
+                         key={scope}
+                         label={scope === 'none' ? (isRtl ? 'بدون کنترل' : 'None') : t[`an_scope_${scope}`]}
+                         checked={docFormData.uniquenessScope === scope}
+                         onClick={() => setDocFormData({...docFormData, uniquenessScope: scope})}
+                         colorClass="green"
+                      />
+                   ))}
                 </div>
-                <Button variant="ghost" size="iconSm" icon={Edit} className="opacity-0 group-hover:opacity-100" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* MODAL: Document Settings */}
-      <Modal
-        isOpen={showDocModal}
-        onClose={() => setShowDocModal(false)}
-        title={isRtl ? 'تنظیمات شماره‌گذاری سند' : 'Document Numbering Settings'}
-        footer={<><Button variant="outline" onClick={() => setShowDocModal(false)}>{t.btn_cancel}</Button><Button variant="primary" onClick={saveDoc}>{t.btn_save}</Button></>}
-      >
-         <div className="space-y-4">
-            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center gap-2">
-               <File size={16} className="text-indigo-600"/>
-               <span className="font-bold text-xs">{editingDoc?.title}</span>
-            </div>
+             </div>
 
-            <div className="space-y-3">
-               <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                  <span className="text-xs font-bold text-slate-600">{isRtl ? 'ریست سالانه شماره‌گذاری' : 'Annual Numbering Reset'}</span>
-                  <Toggle checked={docFormData.resetYear} onChange={val => setDocFormData({...docFormData, resetYear: val})} />
-               </div>
-
-               <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-2">{isRtl ? 'محدوده یکتا بودن شماره سند' : 'Document Number Uniqueness Scope'}</label>
-                  <div className="flex gap-2">
-                     {['ledger', 'branch', 'none'].map(scope => (
-                        <ToggleChip 
-                           key={scope}
-                           label={scope === 'none' ? (isRtl ? 'بدون کنترل' : 'None') : t[`an_scope_${scope}`]}
-                           checked={docFormData.uniquenessScope === scope}
-                           onClick={() => setDocFormData({...docFormData, uniquenessScope: scope})}
-                           colorClass="green"
-                        />
-                     ))}
-                  </div>
-               </div>
-
-               <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100 flex gap-2">
-                  <AlertCircle size={16} className="shrink-0 mt-0.5"/>
-                  <span>{isRtl ? 'با فعال‌سازی ریست سالانه، در ابتدای هر سال مالی شماره اسناد این دفتر از ۱ شروع خواهد شد.' : 'Enabling annual reset will restart document numbering from 1 at the beginning of each fiscal year.'}</span>
-               </div>
-            </div>
-         </div>
-      </Modal>
+             <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100 flex gap-2">
+                <AlertCircle size={16} className="shrink-0 mt-0.5"/>
+                <span>{isRtl ? 'با فعال‌سازی ریست سالانه، در ابتدای هر سال مالی شماره اسناد این دفتر از ۱ شروع خواهد شد.' : 'Enabling annual reset will restart document numbering from 1 at the beginning of each fiscal year.'}</span>
+             </div>
+          </div>
+       </Modal>
     </div>
   );
 
   const tabs = [
-    { id: 'details', icon: Tag, label: t.an_tab_details },    // ✅ FIXED: Hash → Tag
-    { id: 'accounts', icon: File, label: t.an_tab_accounts }, // ✅ FIXED: FileDigit → File
+    { id: 'details', icon: Hash, label: t.an_tab_details },
+    { id: 'accounts', icon: FileDigit, label: t.an_tab_accounts },
     { id: 'docs', icon: Settings, label: t.an_tab_docs },
   ];
 

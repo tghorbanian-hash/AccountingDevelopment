@@ -119,26 +119,6 @@ const SelectField = ({ label, children, isRtl, className = '', ...props }) => (
   </div>
 );
 
-const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
-  <div 
-    className={`flex items-center gap-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'} ${className}`} 
-    onClick={(e) => {
-      e.stopPropagation();
-      if (!disabled && onChange) onChange(!checked);
-    }}
-  >
-    <div className={`
-      w-4 h-4 rounded border flex items-center justify-center transition-all duration-200 shrink-0
-      ${checked 
-        ? 'bg-indigo-600 border-indigo-600 shadow-sm' 
-        : 'bg-white border-slate-300 group-hover:border-indigo-400'}
-    `}>
-      {checked && <Check size={12} className="text-white" strokeWidth={3} />}
-    </div>
-    {label && <span className="text-[12px] font-medium text-slate-700 select-none">{label}</span>}
-  </div>
-);
-
 const Toggle = ({ checked, onChange, label, disabled }) => (
   <div 
     className={`flex items-center gap-2 select-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'}`}
@@ -765,26 +745,6 @@ const SideMenu = ({ items, activeId, onChange, title, isRtl, className = '' }) =
   );
 };
 
-const Tabs = ({ tabs, activeTab, onChange }) => (
-  <div className="flex items-center gap-1 border-b border-slate-200 mb-4 overflow-x-auto no-scrollbar">
-    {tabs.map(tab => (
-      <button
-        key={tab.id}
-        onClick={() => onChange(tab.id)}
-        className={`
-          px-4 py-2 text-[12px] font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2
-          ${activeTab === tab.id 
-            ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50' 
-            : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
-        `}
-      >
-        {tab.icon && <tab.icon size={14} />}
-        {tab.label}
-      </button>
-    ))}
-  </div>
-);
-
 const Accordion = ({ title, icon: Icon, isOpen, onToggle, children, actions, isRtl, className = '' }) => {
   return (
     <div className={`bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md ${className}`}>
@@ -848,4 +808,4 @@ const Callout = ({ title, children, icon: Icon, action, variant = 'info', classN
   );
 };
 
-window.UI = { Button, InputField, SelectField, Toggle, Badge, Checkbox, DataGrid, FilterSection, TreeMenu, TreeView, SelectionGrid, ToggleChip, Modal, DatePicker, LOV, SideMenu, Accordion, Callout, Tabs, THEME };
+window.UI = { Button, InputField, SelectField, Toggle, Badge, DataGrid, FilterSection, TreeMenu, TreeView, SelectionGrid, ToggleChip, Modal, DatePicker, LOV, SideMenu, Accordion, Callout, THEME };
