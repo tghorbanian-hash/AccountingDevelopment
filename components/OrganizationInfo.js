@@ -10,6 +10,11 @@ const OrganizationInfo = ({ t, isRtl }) => {
   const { Button, InputField, DataGrid, FilterSection, Modal, Badge } = UI;
   const supabase = window.supabase;
 
+  // --- Permission Checks ---
+  const canCreate = window.hasAccess ? window.hasAccess('org_info', 'create') : true;
+  const canEdit   = window.hasAccess ? window.hasAccess('org_info', 'edit') : true;
+  const canDelete = window.hasAccess ? window.hasAccess('org_info', 'delete') : true;
+
   // --- States ---
   const [data, setData] = useState([]);
   const [filters, setFilters] = useState({ code: '', name: '' });
@@ -55,7 +60,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
 
   const handleSave = async () => {
     if (!formData.code || !formData.name) {
-      alert(isRtl ? 'لطفاً کد و نام سازمان را وارد کنید.' : 'Please enter Organization Code and Name.');
+      alert(t.req_org_fields || (isRtl ? 'لطفاً کد و نام سازمان را وارد کنید.' : 'Please enter Organization Code and Name.'));
       return;
     }
 
@@ -78,7 +83,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
 
       if (error) {
         console.error('Error updating:', error);
-        alert(isRtl ? 'خطا در ویرایش اطلاعات.' : 'Error updating data.');
+        alert(t.err_update || (isRtl ? 'خطا در ویرایش اطلاعات.' : 'Error updating data.'));
         return;
       }
     } else {
@@ -89,7 +94,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
 
       if (error) {
         console.error('Error inserting:', error);
-        alert(isRtl ? 'خطا در ثبت اطلاعات.' : 'Error inserting data.');
+        alert(t.err_insert || (isRtl ? 'خطا در ثبت اطلاعات.' : 'Error inserting data.'));
         return;
       }
     }
@@ -99,7 +104,8 @@ const OrganizationInfo = ({ t, isRtl }) => {
   };
 
   const handleDelete = async (ids) => {
-    if (confirm(t.confirm_delete?.replace('{0}', ids.length) || `Delete ${ids.length} items?`)) {
+    const confirmMsg = t.confirm_delete?.replace('{0}', ids.length) || (isRtl ? `آیا از حذف ${ids.length} مورد اطمینان دارید؟` : `Delete ${ids.length} items?`);
+    if (confirm(confirmMsg)) {
       const { error } = await supabase
         .schema('gen')
         .from('organization_info')
@@ -108,7 +114,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
 
       if (error) {
         console.error('Error deleting:', error);
-        alert(isRtl ? 'خطا در حذف اطلاعات.' : 'Error deleting data.');
+        alert(t.err_delete || (isRtl ? 'خطا در حذف اطلاعات.' : 'Error deleting data.'));
         return;
       }
 
@@ -157,13 +163,13 @@ const OrganizationInfo = ({ t, isRtl }) => {
 
   // --- Columns Definition ---
   const columns = [
-    { field: 'code', header: t.org_code || 'Code', width: 'w-24', sortable: true },
-    { field: 'name', header: t.org_name || 'Name', width: 'w-64', sortable: true },
-    { field: 'regNo', header: t.org_regNo || 'Reg No', width: 'w-32' },
-    { field: 'phone', header: t.org_phone || 'Phone', width: 'w-32' },
+    { field: 'code', header: t.org_code || (isRtl ? 'کد' : 'Code'), width: 'w-24', sortable: true },
+    { field: 'name', header: t.org_name || (isRtl ? 'نام' : 'Name'), width: 'w-64', sortable: true },
+    { field: 'regNo', header: t.org_regNo || (isRtl ? 'شماره ثبت' : 'Reg No'), width: 'w-32' },
+    { field: 'phone', header: t.org_phone || (isRtl ? 'تلفن' : 'Phone'), width: 'w-32' },
     { 
       field: 'addressCount', 
-      header: t.org_addrCount || 'Addr Count', 
+      header: t.org_addrCount || (isRtl ? 'تعداد آدرس' : 'Addr Count'), 
       width: 'w-24', 
       render: (row) => <Badge variant="info">{row.addresses?.length || 0}</Badge> 
     }
@@ -177,15 +183,15 @@ const OrganizationInfo = ({ t, isRtl }) => {
   });
 
   return (
-    <div className="flex flex-col h-full p-4 md:p-6 bg-slate-50/50">
+    <div className={`flex flex-col h-full p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
       <div className="mb-6 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
             <Building2 size={24} />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-800">{t.org_title || 'Organization Info'}</h1>
-            <p className="text-xs text-slate-500 font-medium mt-1">{t.org_subtitle || 'Manage company info'}</p>
+            <h1 className="text-xl font-black text-slate-800">{t.org_title || (isRtl ? 'اطلاعات سازمان' : 'Organization Info')}</h1>
+            <p className="text-xs text-slate-500 font-medium mt-1">{t.org_subtitle || (isRtl ? 'مدیریت اطلاعات پایه شرکت' : 'Manage company info')}</p>
           </div>
         </div>
       </div>
@@ -196,14 +202,14 @@ const OrganizationInfo = ({ t, isRtl }) => {
         onClear={() => setFilters({ code: '', name: '' })}
       >
         <InputField 
-          label={t.org_code || 'Code'} 
+          label={t.org_code || (isRtl ? 'کد' : 'Code')} 
           placeholder="..." 
           isRtl={isRtl} 
           value={filters.code}
           onChange={(e) => setFilters(prev => ({ ...prev, code: e.target.value }))}
         />
         <InputField 
-          label={t.org_name || 'Name'} 
+          label={t.org_name || (isRtl ? 'نام' : 'Name')} 
           placeholder="..." 
           isRtl={isRtl} 
           value={filters.name}
@@ -218,13 +224,13 @@ const OrganizationInfo = ({ t, isRtl }) => {
           selectedIds={selectedIds}
           onSelectRow={(id, checked) => setSelectedIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))}
           onSelectAll={(checked) => setSelectedIds(checked ? filteredData.map(d => d.id) : [])}
-          onCreate={() => handleOpenModal()}
-          onDelete={handleDelete}
+          onCreate={canCreate ? () => handleOpenModal() : undefined}
+          onDelete={canDelete ? handleDelete : undefined}
           isRtl={isRtl}
           actions={(row) => (
             <>
-              <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenModal(row)} />
-              <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:text-red-600" onClick={() => handleDelete([row.id])} />
+              {canEdit && <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenModal(row)} title={t.edit || (isRtl ? 'ویرایش' : 'Edit')} />}
+              {canDelete && <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete([row.id])} title={t.delete || (isRtl ? 'حذف' : 'Delete')} />}
             </>
           )}
         />
@@ -233,12 +239,12 @@ const OrganizationInfo = ({ t, isRtl }) => {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        title={currentRecord ? (t.org_editTitle || 'Edit Info') : (t.org_newTitle || 'New Org')}
+        title={currentRecord ? (t.org_editTitle || (isRtl ? 'ویرایش اطلاعات' : 'Edit Info')) : (t.org_newTitle || (isRtl ? 'سازمان جدید' : 'New Org'))}
         size="lg"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>{t.btn_cancel}</Button>
-            <Button variant="primary" icon={Save} onClick={handleSave}>{t.btn_save}</Button>
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>{t.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button>
+            <Button variant="primary" icon={Save} onClick={handleSave}>{t.btn_save || (isRtl ? 'ذخیره' : 'Save')}</Button>
           </>
         }
       >
@@ -259,7 +265,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
                <div className="text-center">
                  <Upload size={32} className="mx-auto text-slate-400 mb-2"/>
                  <label className="cursor-pointer text-indigo-600 font-bold text-sm hover:underline">
-                   <span>{t.org_selectLogo || 'Select Logo'}</span>
+                   <span>{t.org_selectLogo || (isRtl ? 'انتخاب لوگو' : 'Select Logo')}</span>
                    <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
                  </label>
                  <p className="text-[10px] text-slate-400 mt-1">PNG, JPG up to 2MB</p>
@@ -268,20 +274,20 @@ const OrganizationInfo = ({ t, isRtl }) => {
           </div>
 
           <InputField 
-            label={`${t.org_code} *`} 
+            label={`${t.org_code || (isRtl ? 'کد' : 'Code')} *`} 
             value={formData.code} 
             onChange={e => setFormData({...formData, code: e.target.value})} 
             isRtl={isRtl} 
             className="dir-ltr"
           />
           <InputField 
-            label={`${t.org_name} *`} 
+            label={`${t.org_name || (isRtl ? 'نام' : 'Name')} *`} 
             value={formData.name} 
             onChange={e => setFormData({...formData, name: e.target.value})} 
             isRtl={isRtl} 
           />
           <InputField 
-            label={t.org_regNo} 
+            label={t.org_regNo || (isRtl ? 'شماره ثبت' : 'Reg No')} 
             value={formData.regNo} 
             onChange={e => setFormData({...formData, regNo: e.target.value})} 
             isRtl={isRtl} 
@@ -289,14 +295,14 @@ const OrganizationInfo = ({ t, isRtl }) => {
           />
           <div className="grid grid-cols-2 gap-4">
              <InputField 
-               label={t.org_phone} 
+               label={t.org_phone || (isRtl ? 'تلفن' : 'Phone')} 
                value={formData.phone} 
                onChange={e => setFormData({...formData, phone: e.target.value})} 
                isRtl={isRtl} 
                className="dir-ltr"
              />
              <InputField 
-               label={t.org_fax} 
+               label={t.org_fax || (isRtl ? 'فکس' : 'Fax')} 
                value={formData.fax} 
                onChange={e => setFormData({...formData, fax: e.target.value})} 
                isRtl={isRtl} 
@@ -307,12 +313,12 @@ const OrganizationInfo = ({ t, isRtl }) => {
           {/* Addresses Section */}
           <div className="md:col-span-2 bg-slate-50 rounded-xl p-4 border border-slate-200">
              <label className="block text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-2">
-               <MapPin size={14}/> {t.org_address}
+               <MapPin size={14}/> {t.org_address || (isRtl ? 'آدرس‌ها' : 'Addresses')}
              </label>
              
              <div className="flex gap-2 mb-3">
                <InputField 
-                 placeholder={t.org_newAddr || "Address..."} 
+                 placeholder={t.org_newAddr || (isRtl ? 'آدرس جدید...' : 'New address...')} 
                  value={newAddress} 
                  onChange={e => setNewAddress(e.target.value)} 
                  isRtl={isRtl}
@@ -322,7 +328,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
              </div>
 
              <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
-               {formData.addresses?.map((addr, idx) => (
+               {formData.addresses?.map((addr) => (
                  <div key={addr.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200 text-xs">
                     <span className="truncate flex-1">{addr.text}</span>
                     <button onClick={() => handleRemoveAddress(addr.id)} className="text-slate-400 hover:text-red-500 px-2">
@@ -331,7 +337,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
                  </div>
                ))}
                {(!formData.addresses || formData.addresses.length === 0) && (
-                 <p className="text-center text-[10px] text-slate-400 italic py-2">{t.org_noAddr || 'No addresses.'}</p>
+                 <p className="text-center text-[10px] text-slate-400 italic py-2">{t.org_noAddr || (isRtl ? 'آدرسی ثبت نشده است.' : 'No addresses.')}</p>
                )}
              </div>
           </div>
