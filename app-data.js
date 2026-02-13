@@ -1,500 +1,747 @@
-/* Filename: app.js */
-import React, { useState, useEffect, useMemo } from 'react';
-import { createRoot } from 'react-dom/client';
-import { 
-  BarChart3, Languages, Bell, Search, 
-  ChevronRight, LogOut, LayoutGrid, ChevronRightSquare,
-  Menu, Circle, BookOpen, Wallet, FileText, Settings, Users, Briefcase, Shield, Building2
-} from 'lucide-react';
+/* Filename: app-data.js */
 
-// ICON MAPPING FOR DYNAMIC DATABASE MENU
-const ICON_MAP = {
-  'BarChart3': BarChart3,
-  'BookOpen': BookOpen,
-  'Wallet': Wallet,
-  'FileText': FileText,
-  'Settings': Settings,
-  'Users': Users,
-  'Briefcase': Briefcase,
-  'Shield': Shield,
-  'Building2': Building2,
-  'LayoutGrid': LayoutGrid,
-  'dashboard': BarChart3,
-  'gl': BookOpen,
-  'treasury': Wallet,
-  'budgeting': Briefcase,
-  'reports': FileText,
-  'settings': Settings,
-  'admin': Shield
+import * as LucideIcons from 'lucide-react';
+
+// --- IMPORTING MODULE DATA ---
+import { GL_MENU, GL_TRANS } from './financial/generalledger/gl-data.js';
+import { TR_MENU, TR_TRANS } from './financial/treasury/tr-data.js';
+import { BD_MENU, BD_TRANS } from './financial/budgeting/bd-data.js';
+import { WF_MENU, WF_TRANS } from './tools/workflow/wf-data.js';
+import { WB_MENU, WB_TRANS, WB_MOCK_TRANSACTIONS, WB_MOCK_STATS } from './tools/workbench/wb-data.js';
+import { DASH_MENU, DASH_TRANS } from './tools/dashboard/dash-data.js';
+import { REP_MENU, REP_TRANS } from './tools/reportbuilder/rep-data.js';
+
+const { 
+  Component, Briefcase, BarChart3, Users, Settings, Key, Building2, 
+  Network, Banknote, MapPin, Layers, ListTodo
+} = LucideIcons;
+
+window.flattenMenu = (items, parentModuleId = null) => {
+  return items.reduce((acc, item) => {
+    const currentModuleId = parentModuleId || item.id;
+    acc.push({ ...item, moduleId: currentModuleId });
+    if (item.children) {
+      acc.push(...window.flattenMenu(item.children, currentModuleId));
+    }
+    return acc;
+  }, []);
 };
 
-// NOTE: Components are loaded via script tags in index.html and accessed via window object
-// Do NOT import custom components here using 'import ... from ...' statements.
-
-const App = () => {
-  const translations = window.translations || { en: {}, fa: {} };
-  const UI = window.UI || {};
-  const { TreeMenu } = UI;
-  
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [menuData, setMenuData] = useState([]);
-  
-  const [lang, setLang] = useState('fa'); 
-  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); // Default
-  const [activeId, setActiveId] = useState('workspace_gen'); // Default
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  
-  // Authentication States
-  const [authView, setAuthView] = useState('login'); 
-  const [loginMethod, setLoginMethod] = useState('standard');
-  const [loginData, setLoginData] = useState({ identifier: '', password: '' });
-  const [recoveryData, setRecoveryData] = useState({ otp: '', newPass: '', confirmPass: '' });
-  const [error, setError] = useState('');
-
-  const t = translations[lang] || {};
-  const isRtl = lang === 'fa';
-
-  useEffect(() => {
-    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
-    document.documentElement.lang = lang;
-  }, [lang, isRtl]);
-
-  // --- Auth Handlers ---
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    
-    if (!loginData.identifier || !loginData.password) {
-      setError(isRtl ? 'لطفا نام کاربری و رمز عبور را وارد کنید' : 'Please enter username and password');
-      return;
-    }
-
-    const supabase = window.supabase;
-    if (!supabase) {
-      setError(isRtl ? 'خطای ارتباط با دیتابیس' : 'Database connection error');
-      return;
-    }
-
-    try {
-      const { data: userData, error: userErr } = await supabase
-        .schema('gen')
-        .from('users')
-        .select('*')
-        .eq('username', loginData.identifier)
-        .single();
-
-      if (userErr || !userData) {
-        setError(t.invalidCreds || (isRtl ? 'نام کاربری در سیستم یافت نشد' : 'Username not found'));
-        return;
-      }
-
-      if (!userData.is_active) {
-        setError(isRtl ? 'حساب کاربری شما غیرفعال شده است' : 'Your account is disabled');
-        return;
-      }
-
-      const storedPassword = userData.password_hash || userData.password || userData.password_hash_value;
-      
-      if (!storedPassword) {
-        setError(isRtl ? 'کلمه عبور در پروفایل این کاربر تنظیم نشده است' : 'Password not set for this user');
-        return;
-      }
-
-      let isPasswordValid = false;
-
-      if (storedPassword === loginData.password) {
-        isPasswordValid = true;
-      } else {
-        try {
-          if (atob(storedPassword) === loginData.password || btoa(loginData.password) === storedPassword) {
-            isPasswordValid = true;
+window.MENU_DATA = [
+  {
+    id: 'showcase',
+    label: { en: 'UI Kit (Showcase)', fa: 'نمونه دیزاین (UI Kit)' },
+    icon: Component,
+    children: [
+      { id: 'ui_showcase', label: { en: 'All Components', fa: 'نمونه تمام کامپوننت‌ها' } }
+    ]
+  },
+  DASH_MENU,
+  WB_MENU,
+  { 
+    id: 'accounting', 
+    label: { en: 'Accounting', fa: 'حسابداری و مالی' }, 
+    icon: BarChart3,
+    children: [
+      GL_MENU,
+      TR_MENU,
+      BD_MENU
+    ]
+  },
+  {
+    id: 'hr',
+    label: { en: 'Human Capital', fa: 'سرمایه انسانی' },
+    icon: Users,
+    children: [
+      { id: 'employees', label: { en: 'Employee Management', fa: 'مدیریت کارکنان' } },
+      { id: 'compensation', label: { en: 'Compensation', fa: 'جبران خدمات' } },
+    ]
+  },
+  WF_MENU,
+  REP_MENU,
+  {
+    id: 'system_settings',
+    label: { en: 'Settings', fa: 'تنظیمات سیستم' },
+    icon: Settings,
+    children: [
+      { 
+        id: 'general_settings', 
+        label: { en: 'General Settings', fa: 'تنظیمات عمومی' },
+        children: [
+          {
+            id: 'base_info_root',
+            label: { en: 'Base Information', fa: 'اطلاعات پایه' },
+            children: [
+              { id: 'org_info', label: { en: 'Organization Info', fa: 'اطلاعات سازمان' }, icon: Building2 },
+              { id: 'org_chart', label: { en: 'Organization Chart', fa: 'چارت سازمانی' }, icon: Network },
+              { id: 'currency_settings', label: { en: 'Currency Settings', fa: 'تنظیمات ارزها' }, icon: Banknote },
+              { id: 'branches', label: { en: 'Branches', fa: 'شعبه ها' }, icon: MapPin },
+              { id: 'cost_centers', label: { en: 'Cost Centers', fa: 'مراکز هزینه' }, icon: Layers },
+              { id: 'projects', label: { en: 'Projects', fa: 'پروژه ها' }, icon: ListTodo },
+              { id: 'parties', label: { en: 'Parties & Companies', fa: 'اشخاص و شرکت‌ها' }, icon: Users }
+            ]
           }
-        } catch (err) {}
-      }
-
-      if (!isPasswordValid) {
-        try {
-          const msgBuffer = new TextEncoder().encode(loginData.password);
-          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-          const hashArray = Array.from(new Uint8Array(hashBuffer));
-          const sha256Hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-          
-          if (storedPassword === sha256Hash) {
-            isPasswordValid = true;
-          }
-        } catch (err) {}
-      }
-
-      if (!isPasswordValid) {
-        const { data: rpcValid, error: rpcErr } = await supabase.schema('gen').rpc('verify_user_password', {
-          p_username: loginData.identifier,
-          p_password: loginData.password
-        });
-        
-        if (!rpcErr && rpcValid === true) {
-          isPasswordValid = true;
-        }
-      }
-
-      if (isPasswordValid) {
-        setIsLoggedIn(true);
-        setError('');
-        setCurrentUser(userData);
-      } else {
-        setError(t.invalidCreds || (isRtl ? 'نام کاربری یا رمز عبور اشتباه است' : 'Invalid credentials'));
-      }
-
-    } catch (err) {
-      console.error(err);
-      setError(t.serverError || (isRtl ? 'خطای ارتباط با سرور' : 'Server error'));
-    }
-  };
-
-  const handleVerifyOtp = (e) => {
-    e.preventDefault();
-    if (recoveryData.otp === '123456') {
-      setError('');
-      setAuthView('reset'); 
-    } else {
-      setError(t.invalidOtp || 'Invalid OTP code');
-    }
-  };
-
-  const handleUpdatePassword = (e) => {
-    e.preventDefault();
-    if (!recoveryData.newPass || recoveryData.newPass !== recoveryData.confirmPass) {
-       setError(isRtl ? 'رمز عبور و تکرار آن مطابقت ندارند' : 'Passwords do not match');
-       return;
-    }
-    alert(t.resetSuccess || 'Password updated successfully');
-    setAuthView('login');
-    setError('');
-    setRecoveryData({ otp: '', newPass: '', confirmPass: '' });
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentUser(null);
-    setMenuData([]);
-  };
-
-  // --- Dynamic Menu & Permissions Logic ---
-
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const buildMenu = async () => {
-      try {
-        const supabase = window.supabase;
-        const userType = currentUser.user_type || '';
-        const isSysAdmin = userType === 'System Admin' || userType === 'مدیر سیستم' || userType.toLowerCase().includes('admin');
-
-        // Fetch Resources Structure
-        const { data: resData, error: resErr } = await supabase.schema('gen').from('resources').select('*').order('sort_order', { ascending: true });
-        
-        let allowedCodes = new Set();
-        
-        // Fetch User Permissions if NOT Admin
-        if (!isSysAdmin) {
-          const { data: userRoles } = await supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', currentUser.id);
-          const roleIds = userRoles ? userRoles.map(ur => ur.role_id) : [];
-
-          if (roleIds.length > 0) {
-            const { data: rPerms } = await supabase.schema('gen').from('permissions').select('resource_code').in('role_id', roleIds);
-            if (rPerms) rPerms.forEach(p => allowedCodes.add(p.resource_code));
-          }
-
-          const { data: uPerms } = await supabase.schema('gen').from('permissions').select('resource_code').eq('user_id', currentUser.id);
-          if (uPerms) uPerms.forEach(p => allowedCodes.add(p.resource_code));
-        }
-
-        // Helper to filter static window.MENU_DATA if DB fetch fails
-        const applyPermissionsToStatic = (nodes) => {
-           return nodes.map(node => {
-              if (node.type === 'form' || !node.children) return (isSysAdmin || allowedCodes.has(node.id)) ? node : null;
-              const filteredChildren = applyPermissionsToStatic(node.children);
-              if (filteredChildren.length > 0 || isSysAdmin || allowedCodes.has(node.id)) return { ...node, children: filteredChildren };
-              return null;
-           }).filter(Boolean);
-        };
-
-        if (resErr || !resData || resData.length === 0) {
-            if (window.MENU_DATA && window.MENU_DATA.length > 0) {
-               const finalFallback = applyPermissionsToStatic(window.MENU_DATA);
-               setMenuData(finalFallback);
-               if (finalFallback.length > 0 && !finalFallback.find(m => m.id === activeModuleId)) {
-                   setActiveModuleId(finalFallback[0].id);
-               }
-            }
-            return;
-        }
-
-        // Build Tree from DB
-        const map = new Map();
-        const roots = [];
-
-        resData.forEach(r => {
-          map.set(r.id, {
-            id: r.code,
-            label: { fa: r.title_fa, en: r.title_en },
-            type: r.type,
-            parent_id: r.parent_id,
-            icon: ICON_MAP[r.icon] || ICON_MAP[r.code] || Circle,
-            children: []
-          });
-        });
-
-        resData.forEach(r => {
-          const node = map.get(r.id);
-          if (r.parent_id && map.has(r.parent_id)) {
-            map.get(r.parent_id).children.push(node);
-          } else {
-            roots.push(node);
-          }
-        });
-
-        // Prune Tree Based on Permissions
-        const pruneTree = (nodes) => {
-          return nodes.map(node => {
-            if (node.type === 'form' || !node.children) {
-              return (isSysAdmin || allowedCodes.has(node.id)) ? node : null;
-            }
-            const filteredChildren = pruneTree(node.children);
-            if (filteredChildren.length > 0 || isSysAdmin || allowedCodes.has(node.id)) {
-              return { ...node, children: filteredChildren };
-            }
-            return null;
-          }).filter(Boolean);
-        };
-
-        let finalMenu = pruneTree(roots);
-        
-        // Final Fallback if DB structure fails but static data exists
-        if (finalMenu.length === 0 && window.MENU_DATA && window.MENU_DATA.length > 0) {
-            finalMenu = applyPermissionsToStatic(window.MENU_DATA);
-        }
-
-        setMenuData(finalMenu);
-        
-        if (finalMenu.length > 0 && !finalMenu.find(m => m.id === activeModuleId)) {
-           setActiveModuleId(finalMenu[0].id);
-        }
-
-      } catch (err) {
-        console.error("Menu build error:", err);
-        if (window.MENU_DATA) setMenuData(window.MENU_DATA);
-      }
-    };
-
-    buildMenu();
-  }, [currentUser, activeModuleId]);
-
-
-  // --- App Logic & Rendering ---
-
-  const currentModule = useMemo(() => {
-    return menuData.find(m => m.id === activeModuleId) || menuData[0] || {};
-  }, [activeModuleId, menuData]);
-  
-  const renderContent = () => {
-    const { 
-      KpiDashboard, UserManagement, GeneralWorkspace, ComponentShowcase, LoginPage, 
-      Roles, Parties, UserProfile, OrganizationInfo, CurrencySettings, CostCenters, 
-      Projects, Branches, OrgChart, Ledgers, Details, FiscalPeriods, DocTypes, 
-      AutoNumbering, ChartofAccounts 
-    } = window;
-
-    if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error: UserProfile Component Not Loaded</div>;
-    if (activeId === 'org_info') return OrganizationInfo ? <OrganizationInfo t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrganizationInfo Component Not Loaded</div>;
-    if (activeId === 'currency_settings') return CurrencySettings ? <CurrencySettings t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: CurrencySettings Component Not Loaded</div>;
-    if (activeId === 'parties') return Parties ? <Parties t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Parties Component Not Loaded</div>;
-    if (activeId === 'cost_centers') return CostCenters ? <CostCenters t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: CostCenters Component Not Loaded</div>;
-    if (activeId === 'projects') return Projects ? <Projects t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Projects Component Not Loaded</div>;
-    if (activeId === 'branches') return Branches ? <Branches t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Branches Component Not Loaded</div>;
-    if (activeId === 'org_chart') return OrgChart ? <OrgChart t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrgChart Component Not Loaded</div>;
-    if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
-    if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Details Component Not Loaded</div>;
-    if (activeId === 'acc_structure') return ChartofAccounts ? <ChartofAccounts t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: ChartofAccounts Component Not Loaded</div>; 
-    if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
-    if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
-    if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
-    if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
-    if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Roles Component Not Loaded</div>;
-    if (activeId === 'workspace_gen') return GeneralWorkspace ? <GeneralWorkspace t={t} isRtl={isRtl} /> : <div>Loading...</div>;
-    if (activeId === 'dashboards_gen') return KpiDashboard ? <KpiDashboard t={t} isRtl={isRtl} /> : <div>Loading...</div>;
-    if (activeId === 'ui_showcase') return ComponentShowcase ? <ComponentShowcase t={t} isRtl={isRtl} /> : <div>Loading...</div>;
-
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center space-y-6 opacity-60">
-          <div className="p-8 bg-white rounded-[2rem] shadow-sm border border-slate-200">
-            <LayoutGrid size={64} className="text-slate-300" strokeWidth={1} />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">{activeId}</h2>
-            <p className="text-slate-500 mt-2 text-sm font-medium">{t.emptyPage || 'This page is empty.'}</p>
-          </div>
-      </div>
-    );
-  };
-
-  const { LoginPage } = window;
-  if (!isLoggedIn) {
-    if (!LoginPage) return <div className="p-10 text-center">Loading...</div>;
-    return (
-      <LoginPage 
-        t={t} 
-        isRtl={isRtl} 
-        authView={authView} 
-        setAuthView={setAuthView} 
-        loginMethod={loginMethod} 
-        setLoginMethod={setLoginMethod} 
-        loginData={loginData} 
-        setLoginData={setLoginData} 
-        recoveryData={recoveryData} 
-        setRecoveryData={setRecoveryData} 
-        error={error} 
-        handleLogin={handleLogin} 
-        toggleLanguage={() => setLang(l => l === 'en' ? 'fa' : 'en')} 
-        handleVerifyOtp={handleVerifyOtp} 
-        handleUpdatePassword={handleUpdatePassword} 
-      />
-    );
+        ]
+      },
+      { id: 'integrations', label: { en: 'Integrations', fa: 'ارتباط با سایر سیستم‌ها' } },
+    ]
+  },
+  {
+    id: 'permissions',
+    label: { en: 'Access', fa: 'حقوق دسترسی' },
+    icon: Key,
+    children: [
+      { id: 'users_list', label: { en: 'Users', fa: 'کاربران' } },
+      { id: 'roles', label: { en: 'Roles', fa: 'نقش‌ها' } },
+      { id: 'access_mgmt', label: { en: 'Access Management', fa: 'مدیریت دسترسی‌ها' } },
+    ]
   }
+];
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-40 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative overflow-x-hidden`}>
-        <div className="bg-indigo-700 w-10 h-10 rounded-xl text-white mb-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
-          <BarChart3 size={20} strokeWidth={2.5} />
-        </div>
-        
-        <div className="flex-1 flex flex-col gap-3 items-center w-full px-2 overflow-y-auto no-scrollbar">
-          {menuData.map(mod => {
-             const isActive = activeModuleId === mod.id;
-             const IconComponent = mod.icon || Circle;
-             return (
-              <button 
-                key={mod.id} onClick={() => setActiveModuleId(mod.id)}
-                className={`
-                  relative w-10 h-10 rounded-xl transition-all flex items-center justify-center shrink-0 group
-                  ${isActive 
-                    ? 'bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200' 
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}
-                `}
-              >
-                <IconComponent size={20} strokeWidth={isActive ? 2 : 1.5} />
-                
-                {isActive && (
-                  <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>
-                )}
+// --- MOCK DATA ASSIGNMENT ---
+window.MOCK_TRANSACTIONS = WB_MOCK_TRANSACTIONS;
+window.MOCK_STATS = WB_MOCK_STATS;
 
-                <div className={`
-                  absolute ${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 
-                  bg-slate-900 text-white text-[11px] py-1.5 px-3 rounded-md opacity-0 invisible 
-                  group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-xl font-medium
-                `}>
-                  {mod.label ? mod.label[lang] : mod.id}
-                  <div className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-[-4px]' : 'left-[-4px]'} w-2 h-2 bg-slate-900 rotate-45`}></div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        
-        <div className="mt-auto flex flex-col gap-3 items-center pb-2 shrink-0">
-            <button onClick={() => setLang(l => l === 'en' ? 'fa' : 'en')} className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors">
-                 <Languages size={20} />
-            </button>
-            <div className="w-8 h-px bg-slate-200"></div>
-            <button onClick={handleLogout} className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-              <LogOut size={20} />
-            </button>
-        </div>
-      </aside>
+// --- DEFAULT VALUES (KEPT IN APP-DATA AS CORE SETTINGS) ---
+window.DEFAULT_VALUES_SCHEMA = [
+  {
+    moduleId: 'accounting',
+    label: { en: 'Accounting & Finance', fa: 'حسابداری و مالی' },
+    icon: BarChart3,
+    groups: [
+      {
+        groupId: 'gl',
+        label: { en: 'General Ledger', fa: 'دفتر کل' },
+        fields: [
+          { key: 'defaultDocType', label: { en: 'Default Document Type', fa: 'نوع سند پیش‌فرض' }, type: 'select', options: [{ value: 'general', label: { en: 'General', fa: 'عمومی' } }, { value: 'opening', label: { en: 'Opening', fa: 'افتتاحیه' } }, { value: 'closing', label: { en: 'Closing', fa: 'اختتامیه' } }] },
+          { key: 'autoPost', label: { en: 'Auto Post Documents', fa: 'قطعی شدن خودکار اسناد' }, type: 'toggle' }
+        ]
+      },
+      {
+        groupId: 'treasury',
+        label: { en: 'Treasury', fa: 'خزانه‌داری' },
+        fields: [
+          { key: 'paymentType', label: { en: 'Default Payment Type', fa: 'نوع پرداخت پیش‌فرض' }, type: 'select', options: [{ value: 'expense', label: { en: 'Expense', fa: 'هزینه' } }, { value: 'prepayment', label: { en: 'Prepayment', fa: 'پیش‌پرداخت' } }, { value: 'transfer', label: { en: 'Transfer', fa: 'انتقال' } }] },
+          { key: 'defaultBank', label: { en: 'Default Bank Account', fa: 'حساب بانکی پیش‌فرض' }, type: 'select', options: [{ value: 'mellat', label: { en: 'Mellat Bank - Main', fa: 'بانک ملت - اصلی' } }, { value: 'pasargad', label: { en: 'Pasargad Bank', fa: 'بانک پاسارگاد' } }] }
+        ]
+      }
+    ]
+  },
+  {
+    moduleId: 'hr',
+    label: { en: 'Human Resources', fa: 'منابع انسانی' },
+    icon: Users,
+    groups: [
+      {
+        groupId: 'recruitment',
+        label: { en: 'Recruitment', fa: 'استخدام' },
+        fields: [
+          { key: 'probationPeriod', label: { en: 'Default Probation (Months)', fa: 'مدت آزمایشی پیش‌فرض (ماه)' }, type: 'select', options: [{ value: '1', label: { en: '1 Month', fa: '۱ ماه' } }, { value: '3', label: { en: '3 Months', fa: '۳ ماه' } }] }
+        ]
+      }
+    ]
+  }
+];
 
-      <aside className={`
-        bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 
-        flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)]
-        ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}
-      `}>
-        <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 bg-slate-50/30">
-           <h2 className="text-sm font-black text-slate-800 truncate leading-tight">
-             {currentModule.label ? currentModule.label[lang] : 'Menu'}
-           </h2>
-        </div>
-        
-        <div className="flex-1 overflow-hidden">
-          {TreeMenu ? (
-            <TreeMenu 
-              items={currentModule.children || []} 
-              activeId={activeId} 
-              onSelect={setActiveId} 
-              isRtl={isRtl}
-            />
-          ) : (
-             <div className="p-4 text-center text-slate-400 text-xs">Loading Menu Component...</div>
-          )}
-        </div>
-        
-        <div className="p-3 border-t border-slate-100 bg-slate-50/50 shrink-0">
-          <div 
-             onClick={() => setActiveId('user_profile')}
-             className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-100"
-          >
-             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-100 to-blue-50 border border-white shadow-sm flex items-center justify-center text-indigo-700 font-black text-xs uppercase">
-               {currentUser?.username ? currentUser.username.substring(0,2) : 'US'}
-             </div>
-             <div className="min-w-0">
-                <div className="text-[12px] font-bold text-slate-700 truncate">{currentUser?.full_name || currentUser?.username || 'User'}</div>
-                <div className="text-[10px] text-slate-400 truncate">{currentUser?.user_type || 'System User'}</div>
-             </div>
-          </div>
-        </div>
-      </aside>
+// --- CORE TRANSLATIONS (System Settings, Auth, Common UI) ---
+const CORE_TRANS = {
+  en: {
+    // --- BRANCHES ---
+    br_title: "Branches",
+    br_subtitle: "Manage company branches and locations",
+    br_code: "Branch Code",
+    br_title_field: "Branch Title",
+    br_addr: "Address",
+    br_default: "Default",
+    br_new: "New Branch",
+    br_edit: "Edit Branch",
+    br_set_default: "Set as Default",
+    br_default_msg: "Default branch changed.",
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50 relative">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-20">
-           <div className="flex items-center gap-4">
-             <button 
-               onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
-               className="p-2 -ml-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-             >
-                {sidebarCollapsed ? <Menu size={20} /> : <ChevronRightSquare size={20} className={isRtl ? '' : 'rotate-180'} />}
-             </button>
-             
-             <div className="flex items-center gap-2 text-sm">
-                <span className="text-slate-400 font-medium hidden sm:inline">{currentModule.label ? currentModule.label[lang] : ''}</span>
-                <ChevronRight size={14} className={`text-slate-300 hidden sm:inline ${isRtl ? 'rotate-180' : ''}`} />
-                <span className="text-slate-800 font-bold">{activeId === 'user_profile' ? (t.profileTitle || 'User Profile') : activeId}</span>
-             </div>
-           </div>
+    // --- ORG CHART ---
+    oc_title: "Organization Chart",
+    oc_subtitle: "Design and manage organizational structures",
+    oc_list_title: "Charts List",
+    oc_code: "Chart Code",
+    oc_title_field: "Chart Title",
+    oc_type: "Type",
+    oc_start_date: "Effective Start",
+    oc_end_date: "Effective End",
+    oc_new: "New Chart",
+    oc_edit: "Edit Chart Info",
+    oc_design: "Design Structure",
+    oc_type_std: "Standard",
+    oc_type_sales: "Sales",
+    oc_type_finance: "Finance",
+    oc_type_hr: "Human Resources",
+    oc_type_custom: "Custom",
+    oc_expand_all: "Expand All",
+    oc_collapse_all: "Collapse All",
+    oc_delete_confirm_cascade: "Deleting this node will remove all its children as well. Are you sure?",
+    
+    // Org Chart Designer
+    oc_designer_title: "Designing",
+    oc_tree_title: "Structure Tree",
+    oc_node_info: "Chart Info",
+    oc_node_code: "Node Code",
+    oc_node_title: "Node Title",
+    oc_parent: "Parent Node",
+    oc_root: "Root",
+    oc_add_root: "Add Root Node",
+    oc_add_child: "Add Child Node",
+    oc_delete_node: "Delete Node",
+    oc_assign_person: "Assign Personnel",
+    oc_personnel: "Personnel",
+    oc_person: "Person",
+    oc_no_person: "No personnel assigned.",
+    oc_select_person: "Select Person",
+    oc_from_date: "From Date",
+    oc_to_date: "To Date",
+    oc_assign: "Assign",
+    oc_remove_person: "Remove",
+    oc_valid: "Valid",
+    oc_back_list: "Back to List",
+    oc_design_btn: "Design Structure",
 
-           <div className="flex items-center gap-3">
-              <div className="relative hidden md:block">
-                 <Search size={16} className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} text-slate-400`} />
-                 <input 
-                    placeholder={t.searchMenu || 'Search...'}
-                    className={`
-                       h-9 bg-slate-100 border-none rounded-full text-xs w-56 focus:w-72 transition-all
-                       ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} focus:ring-2 focus:ring-indigo-100 outline-none
-                    `}
-                 />
-              </div>
-              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors relative">
-                 <Bell size={18} />
-                 <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-              </button>
-           </div>
-        </header>
+    loginTitle: 'Secure Sign In',
+    loginSubtitle: 'Enter your credentials to access the financial portal',
+    usernameLabel: 'Username',
+    passwordLabel: 'Password',
+    emailLabel: 'Corporate Email',
+    loginBtn: 'Sign In',
+    logoutBtn: 'Logout',
+    standardMethod: 'Standard',
+    adMethod: 'Active Directory',
+    invalidCreds: 'Invalid username or password',
+    forgotPass: 'Forgot Password?',
+    backToLogin: 'Back to Login',
+    resetMethodTitle: 'Reset Password',
+    resetMethodSubtitle: 'Choose how you want to recover your account',
+    viaSms: 'Via SMS OTP',
+    viaEmail: 'Via Email Link',
+    mobileLabel: 'Mobile Number',
+    sendOtp: 'Send Code',
+    enterOtp: 'Enter 6-digit Code',
+    verifyOtp: 'Verify & Continue',
+    invalidOtp: 'Invalid OTP code',
+    newPasswordLabel: 'New Password',
+    confirmPasswordLabel: 'Confirm New Password',
+    updatePassword: 'Update Password',
+    resetSuccess: 'Password Updated Successfully',
+    emailSent: 'Reset Link Sent',
+    emailSentDesc: 'Please check your corporate inbox for the recovery link.',
+    searchMenu: 'Search all menus...',
+    welcome: 'Welcome Back, Admin',
+    financialOverview: 'Financial Overview',
+    language: 'English',
+    recentTransactions: 'Recent Transactions',
+    budgetAlloc: 'Budget Allocation',
+    fiscalYear: 'Fiscal Year',
+    ledger: 'Ledger',
+    company: 'Company',
+    filters: 'Global Filters',
+    all: 'All',
+    emptyPage: 'This module is currently empty or under development.',
+    uiKitTitle: 'Design System Showcase',
+    profileTitle: 'User Profile',
+    profileSubtitle: 'Manage your account settings and preferences',
+    personalInfo: 'Personal Information',
+    security: 'Security',
+    preferences: 'System Preferences',
+    defaultValues: 'Default Values',
+    defaultValuesDesc: 'Set default values for faster data entry across the system.',
+    changePass: 'Change Password',
+    changePassDesc: 'Update your password securely.',
+    currentPass: 'Current Password',
+    theme: 'Theme',
+    themeLight: 'Light Mode',
+    themeDark: 'Dark Mode',
+    langSettings: 'Language',
+    saveDefaults: 'Save Default Values',
+    defaultsSaved: 'Default values saved successfully.',
+    org_title: "Organization Info",
+    org_subtitle: "Manage company base information and branches",
+    org_code: "Org Code",
+    org_name: "Org Name",
+    org_regNo: "Registration No",
+    org_phone: "Phone",
+    org_fax: "Fax",
+    org_logo: "Upload Logo",
+    org_address: "Addresses",
+    org_newAddr: "Enter new address...",
+    org_addrCount: "Addr. Count",
+    org_editTitle: "Edit Organization Info",
+    org_newTitle: "New Organization",
+    org_noAddr: "No addresses registered.",
+    org_selectLogo: "Select Logo Image",
+    curr_title: "Currency Settings",
+    curr_subtitle: "Manage system currencies and exchange rates",
+    curr_global: "Global System Settings",
+    curr_base: "Base Currency",
+    curr_op: "Operational Currency",
+    curr_rep1: "Reporting Currency 1",
+    curr_rep2: "Reporting Currency 2",
+    curr_history: "Rates History",
+    curr_update: "Update Rates",
+    curr_code: "Code",
+    curr_desc: "Description",
+    curr_symbol: "Symbol",
+    curr_method: "Rate Method",
+    curr_method_auto: "Automatic",
+    curr_method_manual: "Manual",
+    curr_decimals: "Decimals",
+    curr_active: "Active",
+    curr_reciprocal: "Reciprocal",
+    curr_reciprocal_desc: "Auto-calculate inverse rate",
+    curr_status: "Status",
+    curr_manage_rates: "Manage Rates",
+    curr_defined_rates: "Defined Rates",
+    curr_target: "Target Currency",
+    curr_rate: "Exchange Rate (1 Unit)",
+    curr_no_rates: "No exchange rates defined.",
+    curr_history_title: "Exchange Rates Update History",
+    curr_source: "Source",
+    curr_target_curr: "Target",
+    curr_date: "Date",
+    curr_time: "Time",
+    curr_rate_val: "Rate",
+    curr_edit: "Edit Currency",
+    curr_new: "New Currency",
+    curr_save_global_success: "Global settings saved successfully.",
+    curr_update_success: "Exchange rates updated successfully.",
+    cc_title: "Cost Centers",
+    cc_subtitle: "Manage cost centers and their detail codes",
+    cc_code: "Center Code",
+    cc_title_field: "Title",
+    cc_type: "Type",
+    cc_address: "Address",
+    cc_type_prod: "Production",
+    cc_type_serv: "Service",
+    cc_type_admin: "Administrative",
+    cc_new: "New Cost Center",
+    cc_edit: "Edit Cost Center",
+    proj_title: "Projects",
+    proj_subtitle: "Manage projects, budgets and timelines",
+    proj_code: "Project Code",
+    proj_name: "Project Name",
+    proj_start: "Start Date",
+    proj_end: "End Date",
+    proj_manager: "Project Manager",
+    proj_budget: "Initial Budget",
+    proj_new: "New Project",
+    proj_edit: "Edit Project",
+    parties_title: "Parties & Companies",
+    parties_subtitle: "Manage people and legal entities and their roles",
+    role_employee: "Employee",
+    role_customer: "Customer",
+    role_supplier: "Supplier",
+    role_contractor: "Contractor",
+    role_shareholder: "Shareholder",
+    role_logistics: "Logistics",
+    role_cashier: "Cashier",
+    role_petty: "Petty Cashier",
+    role_bank: "Bank",
+    role_trustee: "Trustee",
+    role_other: "Other",
+    pt_type: "Type",
+    pt_fullname: "Full Name",
+    pt_nat_id: "National ID / Code",
+    pt_roles: "Roles",
+    pt_person: "Real Person",
+    pt_company: "Legal Entity",
+    pt_fname: "First Name",
+    pt_lname: "Last Name",
+    pt_alias: "Alias",
+    pt_gender: "Gender",
+    pt_father: "Father Name",
+    pt_birthdate: "Birth Date",
+    pt_birth_no: "Birth Cert. No",
+    pt_birth_place: "Birth Place",
+    pt_province: "Province",
+    pt_comp_name: "Company Name",
+    pt_website: "Website",
+    pt_nationality: "Nationality",
+    pt_phone: "Phone",
+    pt_mobile: "Mobile",
+    pt_email: "Email",
+    pt_addr: "Addresses",
+    pt_status: "Status",
+    pt_reg_no: "Reg No",
+    opt_male: "Male",
+    opt_female: "Female",
+    opt_iranian: "Iranian",
+    opt_foreign: "Foreign",
+    opt_active: "Active",
+    opt_inactive: "Inactive",
+    opt_all_status: "All Statuses",
+    opt_all_types: "All Types",
+    ph_role_filter: "Filter roles...",
+    ph_addr: "Address",
+    alert_req_fields: "Please fill in all required fields.",
+    pt_new: "New Party/Company",
+    pt_edit: "Edit Info",
+    btn_save: "Save",
+    btn_cancel: "Cancel",
+    btn_search: "Apply Filter",
+    btn_clear: "Clear",
+    btn_add: "Add",
+    btn_close: "Close",
+    confirm_delete: "Are you sure you want to delete {0} records?",
+    confirm_delete_single: "Are you sure you want to delete this record?",
+    filter: "Advanced Filter",
+    detail_code: "Detail Code",
+    detail_assigned: "Assigned",
+    detail_not_assigned: "Not Assigned",
+    detail_assign_btn: "Assign",
+    detail_assign_msg: "Detail code assigned.",
+    active_status: "Active Status",
+    usersListTitle: 'User Management',
+    usersListSubtitle: 'Manage system access and user profiles',
+    createNewUser: 'New User',
+    searchUserPlaceholder: 'Search by username...',
+    colId: 'ID',
+    colUsername: 'Username',
+    colLinkedPerson: 'Linked Person',
+    colUserType: 'User Type',
+    colStatus: 'Status',
+    colActions: 'Actions',
+    active: 'Active',
+    inactive: 'Inactive',
+    roleAdmin: 'System Admin',
+    roleUser: 'System User',
+    editUserTitle: 'Edit User Profile',
+    newUserTitle: 'Define New User',
+    newUserSubtitle: 'Fill in the form to create a new user account',
+    editingId: 'Editing ID',
+    fieldId: 'User ID',
+    fieldUsername: 'Username',
+    fieldStatus: 'Account Status',
+    fieldUserType: 'User Type',
+    fieldLinkedPerson: 'Linked Person (Entity)',
+    selectPersonPlaceholder: '- Select a Person -',
+    linkedPersonHelp: 'Link this user account to a predefined person entity in the system.',
+    fieldPassword: 'Password Management',
+    enterPassword: 'Enter new password...',
+    resetDefault: 'Reset to Default',
+    passwordResetMsg: 'Password has been reset to "DefaultPassword123!"',
+    cancel: 'Cancel',
+    saveChanges: 'Save & Close',
+    confirmDelete: 'Are you sure you want to delete this user?',
+    recordsFound: 'records found',
+    edit: 'Edit',
+    delete: 'Delete',
+    viewPermissions: 'View Permissions',
+    permModalTitle: 'User Access & Permissions',
+    permColSource: 'Access Source',
+    permColForms: 'Accessible Forms',
+    permColOps: 'Allowed Operations',
+    permTypeRole: 'Role',
+    permTypeUser: 'User',
+    permSelectSource: 'Select a Source',
+    permSelectForm: 'Select a Form',
+    perm_click_hint: 'Click on roles to view details',
+    perm_details_for: 'Access details for:',
+  },
+  fa: {
+    // --- BRANCHES ---
+    br_title: "شعبه‌ها",
+    br_subtitle: "مدیریت شعب و مکان‌های فعالیت شرکت",
+    br_code: "کد شعبه",
+    br_title_field: "عنوان شعبه",
+    br_addr: "آدرس",
+    br_default: "پیش‌فرض",
+    br_new: "شعبه جدید",
+    br_edit: "ویرایش شعبه",
+    br_set_default: "انتخاب به عنوان پیش‌فرض",
+    br_default_msg: "شعبه پیش‌فرض تغییر کرد.",
 
-        <div className="flex-1 overflow-hidden relative p-0">
-           {renderContent()}
-        </div>
-      </main>
-    </div>
-  );
+    // --- ORG CHART ---
+    oc_title: "چارت سازمانی",
+    oc_subtitle: "طراحی و مدیریت ساختارهای سازمانی",
+    oc_list_title: "فهرست چارت‌ها",
+    oc_code: "کد چارت",
+    oc_title_field: "عنوان چارت",
+    oc_type: "نوع چارت",
+    oc_start_date: "تاریخ شروع موثر",
+    oc_end_date: "تاریخ پایان موثر",
+    oc_new: "چارت جدید",
+    oc_edit: "ویرایش اطلاعات چارت",
+    oc_design: "طراحی ساختار",
+    oc_type_std: "استاندارد",
+    oc_type_sales: "فروش",
+    oc_type_finance: "مالی",
+    oc_type_hr: "سرمایه انسانی",
+    oc_type_custom: "اختصاصی",
+    oc_expand_all: "باز کردن همه",
+    oc_collapse_all: "بستن همه",
+    oc_delete_confirm_cascade: "با حذف این گره، تمام زیرمجموعه‌های آن نیز حذف خواهند شد. آیا اطمینان دارید؟",
+    
+    // Org Chart Designer
+    oc_designer_title: "در حال طراحی",
+    oc_tree_title: "درختواره ساختار",
+    oc_node_info: "اطلاعات چارت",
+    oc_node_code: "کد گره",
+    oc_node_title: "عنوان گره",
+    oc_parent: "گره مادر",
+    oc_root: "ریشه",
+    oc_add_root: "افزودن ریشه",
+    oc_add_child: "افزودن زیرمجموعه",
+    oc_delete_node: "حذف گره",
+    oc_assign_person: "تخصیص افراد",
+    oc_personnel: "پرسنل",
+    oc_person: "نام شخص",
+    oc_no_person: "شخصی تخصیص داده نشده است.",
+    oc_select_person: "انتخاب شخص",
+    oc_from_date: "از تاریخ",
+    oc_to_date: "تا تاریخ",
+    oc_assign: "افزودن",
+    oc_remove_person: "حذف",
+    oc_valid: "معتبر",
+    oc_back_list: "بازگشت به فهرست",
+    oc_design_btn: "طراحی ساختار",
+
+    loginTitle: 'ورود ایمن به سیستم',
+    loginSubtitle: 'برای دسترسی به پرتال مالی، اطلاعات خود را وارد کنید',
+    usernameLabel: 'نام کاربری',
+    passwordLabel: 'رمز عبور',
+    emailLabel: 'ایمیل سازمانی',
+    loginBtn: 'ورود به سیستم',
+    logoutBtn: 'خروج',
+    standardMethod: 'استاندارد',
+    adMethod: 'اکتیو دایرکتوری',
+    invalidCreds: 'نام کاربری یا رمز عبور اشتباه است',
+    forgotPass: 'رمز عبور را فراموش کرده‌اید؟',
+    backToLogin: 'بازگشت به ورود',
+    resetMethodTitle: 'بازیابی رمز عبور',
+    resetMethodSubtitle: 'روش بازیابی حساب کاربری خود را انتخاب کنید',
+    viaSms: 'پیامک (کد یکبار مصرف)',
+    viaEmail: 'ایمیل (لینک بازیابی)',
+    mobileLabel: 'شماره موبایل',
+    sendOtp: 'ارسال کد',
+    enterOtp: 'کد ۶ رقمی را وارد کنید',
+    verifyOtp: 'تایید و ادامه',
+    invalidOtp: 'کد تایید وارد شده صحیح نیست',
+    newPasswordLabel: 'رمز عبور جدید',
+    confirmPasswordLabel: 'تکرار رمز عبور جدید',
+    updatePassword: 'بروزرسانی رمز عبور',
+    resetSuccess: 'رمز عبور با موفقیت تغییر یافت',
+    emailSent: 'لینک بازیابی ارسال شد',
+    emailSentDesc: 'لطفاً صندوق ورودی ایمیل سازمانی خود را بررسی کنید.',
+    searchMenu: 'جستجو در تمام منوها...',
+    welcome: 'خوش آمدید، مدیر سیستم',
+    financialOverview: 'مرور وضعیت مالی',
+    language: 'فارسی',
+    recentTransactions: 'تراکنش‌های اخیر',
+    budgetAlloc: 'توزیع بودجه',
+    fiscalYear: 'سال مالی',
+    ledger: 'دفتر',
+    company: 'شرکت',
+    filters: 'فیلترهای عمومی',
+    all: 'همه',
+    emptyPage: 'این بخش در حال حاضر خالی است یا در دست توسعه می‌باشد.',
+    uiKitTitle: 'نمایش دیزاین سیستم',
+    profileTitle: 'پروفایل کاربری',
+    profileSubtitle: 'مدیریت تنظیمات حساب و اولویت‌های شخصی',
+    personalInfo: 'اطلاعات فردی',
+    security: 'امنیت',
+    preferences: 'تنظیمات سیستم',
+    defaultValues: 'مقادیر پیش‌فرض',
+    defaultValuesDesc: 'تعیین مقادیر پیش‌فرض برای افزایش سرعت ورود اطلاعات در سیستم.',
+    changePass: 'تغییر رمز عبور',
+    changePassDesc: 'به‌روزرسانی امن کلمه عبور',
+    currentPass: 'رمز عبور فعلی',
+    theme: 'تم سیستم',
+    themeLight: 'حالت روشن',
+    themeDark: 'حالت تاریک',
+    langSettings: 'زبان',
+    saveDefaults: 'ذخیره مقادیر پیش‌فرض',
+    defaultsSaved: 'مقادیر پیش‌فرض با موفقیت ذخیره شد.',
+    org_title: "معرفی سازمان",
+    org_subtitle: "مدیریت اطلاعات پایه شرکت و شعبه‌ها",
+    org_code: "کد شرکت",
+    org_name: "نام شرکت",
+    org_regNo: "شماره ثبت",
+    org_phone: "تلفن",
+    org_fax: "فکس",
+    org_logo: "انتخاب تصویر لوگو",
+    org_address: "آدرس‌ها",
+    org_newAddr: "آدرس جدید را وارد کنید...",
+    org_addrCount: "تعداد آدرس",
+    org_editTitle: "ویرایش اطلاعات سازمان",
+    org_newTitle: "تعریف سازمان جدید",
+    org_noAddr: "آدرسی ثبت نشده است",
+    org_selectLogo: "انتخاب لوگو",
+    curr_title: "تنظیمات ارزها",
+    curr_subtitle: "مدیریت ارزهای سیستم و نرخ‌های تبدیل",
+    curr_global: "تنظیمات کلان سیستم",
+    curr_base: "ارز اصلی سیستم (Base)",
+    curr_op: "ارز عملیاتی (Operational)",
+    curr_rep1: "ارز گزارشگری ۱",
+    curr_rep2: "ارز گزارشگری ۲",
+    curr_history: "تاریخچه نرخ‌ها",
+    curr_update: "بروزرسانی نرخ‌ها",
+    curr_code: "کد ارز",
+    curr_desc: "عنوان ارز",
+    curr_symbol: "علامت",
+    curr_method: "نحوه دریافت نرخ",
+    curr_method_auto: "اتوماتیک",
+    curr_method_manual: "دستی",
+    curr_decimals: "تعداد اعشار",
+    curr_active: "فعال",
+    curr_reciprocal: "تبدیل دو طرفه",
+    curr_reciprocal_desc: "محاسبه نرخ معکوس",
+    curr_status: "وضعیت",
+    curr_manage_rates: "مدیریت تبدیل‌ها",
+    curr_defined_rates: "نرخ‌های تعریف شده",
+    curr_target: "ارز مقصد",
+    curr_rate: "نرخ تبدیل (۱ واحد)",
+    curr_no_rates: "هیچ نرخ تبدیلی تعریف نشده است.",
+    curr_history_title: "تاریخچه بروزرسانی نرخ‌ها",
+    curr_source: "ارز مبدا",
+    curr_target_curr: "ارز مقصد",
+    curr_date: "تاریخ",
+    curr_time: "ساعت",
+    curr_rate_val: "نرخ تبدیل",
+    curr_edit: "ویرایش ارز",
+    curr_new: "تعریف ارز جدید",
+    curr_save_global_success: "تنظیمات کلان سیستم با موفقیت ذخیره شد.",
+    curr_update_success: "نرخ‌های جدید بروزرسانی شد.",
+    cc_title: "مراکز هزینه",
+    cc_subtitle: "مدیریت مراکز هزینه و کدهای تفصیلی مرتبط",
+    cc_code: "کد مرکز",
+    cc_title_field: "عنوان مرکز",
+    cc_type: "نوع مرکز",
+    cc_address: "آدرس",
+    cc_type_prod: "تولیدی",
+    cc_type_serv: "خدماتی",
+    cc_type_admin: "اداری",
+    cc_new: "مرکز هزینه جدید",
+    cc_edit: "ویرایش مرکز هزینه",
+    proj_title: "پروژه‌ها",
+    proj_subtitle: "مدیریت پروژه‌ها، بودجه و زمان‌بندی",
+    proj_code: "کد پروژه",
+    proj_name: "نام پروژه",
+    proj_start: "تاریخ شروع",
+    proj_end: "تاریخ اتمام",
+    proj_manager: "مسئول پروژه",
+    proj_budget: "بودجه اولیه",
+    proj_new: "پروژه جدید",
+    proj_edit: "ویرایش پروژه",
+    parties_title: "مدیریت اشخاص و شرکت‌ها",
+    parties_subtitle: "مدیریت اشخاص و شرکت‌ها و تعریف نقش آنها",
+    role_employee: "کارمند",
+    role_customer: "مشتری",
+    role_supplier: "تامین کننده",
+    role_contractor: "پیمانکار",
+    role_shareholder: "سهامدار",
+    role_logistics: "شرکت حمل و نقل",
+    role_cashier: "صندوقدار",
+    role_petty: "تنخواه دار",
+    role_bank: "بانک",
+    role_trustee: "طرف حساب امانی",
+    role_other: "سایر",
+    pt_type: "نوع",
+    pt_fullname: "نام کامل",
+    pt_nat_id: "کد ملی / شناسه ملی",
+    pt_roles: "نقش‌ها",
+    pt_person: "شخص حقیقی",
+    pt_company: "شخص حقوقی",
+    pt_fname: "نام",
+    pt_lname: "نام خانوادگی",
+    pt_alias: "نام مستعار",
+    pt_gender: "جنسیت",
+    pt_father: "نام پدر",
+    pt_birthdate: "تاریخ تولد",
+    pt_birth_no: "شماره شناسنامه",
+    pt_birth_place: "محل تولد",
+    pt_province: "استان محل زندگی",
+    pt_comp_name: "نام شرکت",
+    pt_website: "وب‌سایت",
+    pt_nationality: "تابعیت",
+    pt_phone: "تلفن",
+    pt_mobile: "تلفن همراه",
+    pt_email: "پست الکترونیک",
+    pt_addr: "آدرس‌ها",
+    pt_status: "وضعیت",
+    pt_reg_no: "شماره ثبت",
+    opt_male: "مرد",
+    opt_female: "زن",
+    opt_iranian: "ایرانی",
+    opt_foreign: "غیر ایرانی",
+    opt_active: "فعال",
+    opt_inactive: "غیرفعال",
+    opt_all_status: "همه وضعیت‌ها",
+    opt_all_types: "همه انواع",
+    ph_role_filter: "فیلتر نقش‌ها...",
+    ph_addr: "آدرس",
+    alert_req_fields: "پر کردن فیلدهای اجباری الزامی است.",
+    pt_new: "تعریف شخص/شرکت جدید",
+    pt_edit: "ویرایش اطلاعات",
+    btn_save: "ذخیره",
+    btn_cancel: "انصراف",
+    btn_search: "اعمال فیلتر",
+    btn_clear: "پاک کردن",
+    btn_add: "افزودن",
+    btn_close: "بستن",
+    confirm_delete: "آیا از حذف {0} رکورد اطمینان دارید؟",
+    confirm_delete_single: "آیا از حذف این رکورد اطمینان دارید؟",
+    filter: "جستجوی پیشرفته",
+    detail_code: "کد تفصیلی",
+    detail_assigned: "تخصیص یافته",
+    detail_not_assigned: "فاقد کد",
+    detail_assign_btn: "تخصیص کد",
+    detail_assign_msg: "کد تفصیلی با موفقیت تخصیص یافت.",
+    active_status: "وضعیت فعال",
+    usersListTitle: 'مدیریت کاربران',
+    usersListSubtitle: 'مدیریت دسترسی‌ها و پروفایل‌های کاربری سیستم',
+    createNewUser: 'کاربر جدید',
+    searchUserPlaceholder: 'جستجو بر اساس نام کاربری...',
+    colId: 'شناسه',
+    colUsername: 'نام کاربری',
+    colLinkedPerson: 'شخص مرتبط',
+    colUserType: 'نوع کاربر',
+    colStatus: 'وضعیت',
+    colActions: 'عملیات',
+    active: 'فعال',
+    inactive: 'غیرفعال',
+    roleAdmin: 'مدیر سیستم',
+    roleUser: 'کاربر سیستم',
+    editUserTitle: 'ویرایش اطلاعات کاربر',
+    newUserTitle: 'تعریف کاربر جدید',
+    newUserSubtitle: 'برای ایجاد حساب کاربری جدید، فرم زیر را تکمیل کنید',
+    editingId: 'در حال ویرایش شناسه',
+    fieldId: 'شناسه کاربری',
+    fieldUsername: 'نام کاربری',
+    fieldStatus: 'وضعیت حساب',
+    fieldUserType: 'نوع کاربر',
+    fieldLinkedPerson: 'شخص مرتبط (طرف حساب)',
+    selectPersonPlaceholder: '- انتخاب شخص -',
+    linkedPersonHelp: 'این حساب کاربری به یکی از اشخاص تعریف شده در سیستم متصل می‌شود.',
+    fieldPassword: 'مدیریت رمز عبور',
+    enterPassword: 'رمز عبور جدید را وارد کنید...',
+    resetDefault: 'بازنشانی به پیش‌فرض',
+    passwordResetMsg: 'رمز عبور کاربر به "DefaultPassword123!" تغییر یافت.',
+    cancel: 'انصراف',
+    saveChanges: 'ذخیره و بستن',
+    confirmDelete: 'آیا از حذف این کاربر اطمینان دارید؟',
+    recordsFound: 'رکورد یافت شد',
+    edit: 'ویرایش',
+    delete: 'حذف',
+    viewPermissions: 'مشاهده دسترسی‌ها',
+    permModalTitle: 'مدیریت دسترسی‌ها و مجوزها',
+    permColSource: 'منبع دسترسی',
+    permColForms: 'فرم‌های در دسترس',
+    permColOps: 'عملیات مجاز',
+    permTypeRole: 'نقش',
+    permTypeUser: 'کاربر',
+    permSelectSource: 'یک منبع دسترسی انتخاب کنید',
+    permSelectForm: 'یک فرم را انتخاب کنید',
+    perm_click_hint: 'برای مشاهده جزئیات روی نقش‌ها کلیک کنید',
+    perm_details_for: 'جزئیات دسترسی برای:',
+  }
 };
 
-const root = createRoot(document.getElementById('root'));
-root.render(<App />);
+window.translations = {
+  en: { ...CORE_TRANS.en, ...GL_TRANS.en, ...TR_TRANS.en, ...BD_TRANS.en, ...WF_TRANS.en, ...WB_TRANS.en, ...DASH_TRANS.en, ...REP_TRANS.en },
+  fa: { ...CORE_TRANS.fa, ...GL_TRANS.fa, ...TR_TRANS.fa, ...BD_TRANS.fa, ...WF_TRANS.fa, ...WB_TRANS.fa, ...DASH_TRANS.fa, ...REP_TRANS.fa }
+};
