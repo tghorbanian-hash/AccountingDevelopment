@@ -114,7 +114,7 @@ window.DEFAULT_VALUES_SCHEMA = [
         label: { en: 'General Ledger', fa: 'دفتر کل' },
         fields: [
           { key: 'defaultDocType', label: { en: 'Default Document Type', fa: 'نوع سند پیش‌فرض' }, type: 'select', options: [{ value: 'general', label: { en: 'General', fa: 'عمومی' } }, { value: 'opening', label: { en: 'Opening', fa: 'افتتاحیه' } }, { value: 'closing', label: { en: 'Closing', fa: 'اختتامیه' } }] },
-          { key: 'autoPost', label: { en: 'Auto Post Documents', fa: 'قطعی شدن خودکار اسناد' }, type: 'toggle' }
+          { key: 'autoPost', label: { en: 'Auto Post Documents', fa: 'قطعی شدن خودکار اسناد' }, type: 'checkbox' }
         ]
       },
       {
