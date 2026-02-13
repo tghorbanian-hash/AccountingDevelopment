@@ -4,26 +4,49 @@ import { createRoot } from 'react-dom/client';
 import { 
   BarChart3, Languages, Bell, Search, 
   ChevronRight, LogOut, LayoutGrid, ChevronRightSquare,
-  Menu, Circle
+  Menu, Circle, BookOpen, Wallet, FileText, Settings, Users, Briefcase, Shield, Building2
 } from 'lucide-react';
+
+// ICON MAPPING FOR DYNAMIC DATABASE MENU
+const ICON_MAP = {
+  'BarChart3': BarChart3,
+  'BookOpen': BookOpen,
+  'Wallet': Wallet,
+  'FileText': FileText,
+  'Settings': Settings,
+  'Users': Users,
+  'Briefcase': Briefcase,
+  'Shield': Shield,
+  'Building2': Building2,
+  'LayoutGrid': LayoutGrid,
+  'dashboard': BarChart3,
+  'gl': BookOpen,
+  'treasury': Wallet,
+  'budgeting': Briefcase,
+  'reports': FileText,
+  'settings': Settings,
+  'admin': Shield
+};
 
 // NOTE: Components are loaded via script tags in index.html and accessed via window object
 // Do NOT import custom components here using 'import ... from ...' statements.
 
 const App = () => {
-  const MENU_DATA = window.MENU_DATA || [];
   const translations = window.translations || { en: {}, fa: {} };
   const UI = window.UI || {};
   const { TreeMenu } = UI;
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [menuData, setMenuData] = useState([]);
+  
   const [lang, setLang] = useState('fa'); 
-  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); // Default to GL base info
-  const [activeId, setActiveId] = useState('workspace_gen'); // Default to Chart of Accounts
+  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); // Default
+  const [activeId, setActiveId] = useState('workspace_gen'); // Default
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Authentication States
-  const [authView, setAuthView] = useState('login'); // login, forgot, otp, reset
+  const [authView, setAuthView] = useState('login'); 
   const [loginMethod, setLoginMethod] = useState('standard');
   const [loginData, setLoginData] = useState({ identifier: '', password: '' });
   const [recoveryData, setRecoveryData] = useState({ otp: '', newPass: '', confirmPass: '' });
@@ -54,7 +77,6 @@ const App = () => {
     }
 
     try {
-      // خواندن رکورد کاربر مستقیماً از جدول users طبق دستور
       const { data: userData, error: userErr } = await supabase
         .schema('gen')
         .from('users')
@@ -72,7 +94,6 @@ const App = () => {
         return;
       }
 
-      // دریافت پسوورد از دیتابیس (پشتیبانی از نام‌های مختلف ستون)
       const storedPassword = userData.password_hash || userData.password || userData.password_hash_value;
       
       if (!storedPassword) {
@@ -82,22 +103,16 @@ const App = () => {
 
       let isPasswordValid = false;
 
-      // بررسی ۱: همسانی عینی (در صورتی که پسوورد به صورت Plain Text ذخیره شده باشد)
       if (storedPassword === loginData.password) {
         isPasswordValid = true;
-      } 
-      // بررسی ۲: دی‌کد Base64 (بررسی Dehash)
-      else {
+      } else {
         try {
           if (atob(storedPassword) === loginData.password || btoa(loginData.password) === storedPassword) {
             isPasswordValid = true;
           }
-        } catch (err) {
-          // خطا در دی‌کد شدن نادیده گرفته می‌شود تا مراحل بعدی بررسی شوند
-        }
+        } catch (err) {}
       }
 
-      // بررسی ۳: هشینگ SHA-256
       if (!isPasswordValid) {
         try {
           const msgBuffer = new TextEncoder().encode(loginData.password);
@@ -108,12 +123,9 @@ const App = () => {
           if (storedPassword === sha256Hash) {
             isPasswordValid = true;
           }
-        } catch (err) {
-          console.error("Hash comparison failed", err);
-        }
+        } catch (err) {}
       }
 
-      // بررسی ۴: پشتیبان (Fallback) برای هش‌های ایمن (مثل bcrypt) که قابلیت dehash ندارند و باید در دیتابیس بررسی شوند
       if (!isPasswordValid) {
         const { data: rpcValid, error: rpcErr } = await supabase.schema('gen').rpc('verify_user_password', {
           p_username: loginData.identifier,
@@ -125,10 +137,10 @@ const App = () => {
         }
       }
 
-      // ورود نهایی
       if (isPasswordValid) {
         setIsLoggedIn(true);
         setError('');
+        setCurrentUser(userData);
       } else {
         setError(t.invalidCreds || (isRtl ? 'نام کاربری یا رمز عبور اشتباه است' : 'Invalid credentials'));
       }
@@ -161,11 +173,129 @@ const App = () => {
     setRecoveryData({ otp: '', newPass: '', confirmPass: '' });
   };
 
-  // --- App Logic ---
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setMenuData([]);
+  };
+
+  // --- Dynamic Menu & Permissions Logic ---
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const buildMenu = async () => {
+      try {
+        const supabase = window.supabase;
+        const userType = currentUser.user_type || '';
+        const isSysAdmin = userType === 'System Admin' || userType === 'مدیر سیستم' || userType.toLowerCase().includes('admin');
+
+        // Fetch Resources Structure
+        const { data: resData, error: resErr } = await supabase.schema('gen').from('resources').select('*').order('sort_order', { ascending: true });
+        
+        let allowedCodes = new Set();
+        
+        // Fetch User Permissions if NOT Admin
+        if (!isSysAdmin) {
+          const { data: userRoles } = await supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', currentUser.id);
+          const roleIds = userRoles ? userRoles.map(ur => ur.role_id) : [];
+
+          if (roleIds.length > 0) {
+            const { data: rPerms } = await supabase.schema('gen').from('permissions').select('resource_code').in('role_id', roleIds);
+            if (rPerms) rPerms.forEach(p => allowedCodes.add(p.resource_code));
+          }
+
+          const { data: uPerms } = await supabase.schema('gen').from('permissions').select('resource_code').eq('user_id', currentUser.id);
+          if (uPerms) uPerms.forEach(p => allowedCodes.add(p.resource_code));
+        }
+
+        // Helper to filter static window.MENU_DATA if DB fetch fails
+        const applyPermissionsToStatic = (nodes) => {
+           return nodes.map(node => {
+              if (node.type === 'form' || !node.children) return (isSysAdmin || allowedCodes.has(node.id)) ? node : null;
+              const filteredChildren = applyPermissionsToStatic(node.children);
+              if (filteredChildren.length > 0 || isSysAdmin || allowedCodes.has(node.id)) return { ...node, children: filteredChildren };
+              return null;
+           }).filter(Boolean);
+        };
+
+        if (resErr || !resData || resData.length === 0) {
+            if (window.MENU_DATA && window.MENU_DATA.length > 0) {
+               const finalFallback = applyPermissionsToStatic(window.MENU_DATA);
+               setMenuData(finalFallback);
+               if (finalFallback.length > 0 && !finalFallback.find(m => m.id === activeModuleId)) {
+                   setActiveModuleId(finalFallback[0].id);
+               }
+            }
+            return;
+        }
+
+        // Build Tree from DB
+        const map = new Map();
+        const roots = [];
+
+        resData.forEach(r => {
+          map.set(r.id, {
+            id: r.code,
+            label: { fa: r.title_fa, en: r.title_en },
+            type: r.type,
+            parent_id: r.parent_id,
+            icon: ICON_MAP[r.icon] || ICON_MAP[r.code] || Circle,
+            children: []
+          });
+        });
+
+        resData.forEach(r => {
+          const node = map.get(r.id);
+          if (r.parent_id && map.has(r.parent_id)) {
+            map.get(r.parent_id).children.push(node);
+          } else {
+            roots.push(node);
+          }
+        });
+
+        // Prune Tree Based on Permissions
+        const pruneTree = (nodes) => {
+          return nodes.map(node => {
+            if (node.type === 'form' || !node.children) {
+              return (isSysAdmin || allowedCodes.has(node.id)) ? node : null;
+            }
+            const filteredChildren = pruneTree(node.children);
+            if (filteredChildren.length > 0 || isSysAdmin || allowedCodes.has(node.id)) {
+              return { ...node, children: filteredChildren };
+            }
+            return null;
+          }).filter(Boolean);
+        };
+
+        let finalMenu = pruneTree(roots);
+        
+        // Final Fallback if DB structure fails but static data exists
+        if (finalMenu.length === 0 && window.MENU_DATA && window.MENU_DATA.length > 0) {
+            finalMenu = applyPermissionsToStatic(window.MENU_DATA);
+        }
+
+        setMenuData(finalMenu);
+        
+        if (finalMenu.length > 0 && !finalMenu.find(m => m.id === activeModuleId)) {
+           setActiveModuleId(finalMenu[0].id);
+        }
+
+      } catch (err) {
+        console.error("Menu build error:", err);
+        if (window.MENU_DATA) setMenuData(window.MENU_DATA);
+      }
+    };
+
+    buildMenu();
+  }, [currentUser, activeModuleId]);
+
+
+  // --- App Logic & Rendering ---
 
   const currentModule = useMemo(() => {
-    return MENU_DATA.find(m => m.id === activeModuleId) || MENU_DATA[0] || {};
-  }, [activeModuleId, MENU_DATA]);
+    return menuData.find(m => m.id === activeModuleId) || menuData[0] || {};
+  }, [activeModuleId, menuData]);
   
   const renderContent = () => {
     const { 
@@ -240,8 +370,9 @@ const App = () => {
         </div>
         
         <div className="flex-1 flex flex-col gap-3 items-center w-full px-2 overflow-y-auto no-scrollbar">
-          {MENU_DATA.map(mod => {
+          {menuData.map(mod => {
              const isActive = activeModuleId === mod.id;
+             const IconComponent = mod.icon || Circle;
              return (
               <button 
                 key={mod.id} onClick={() => setActiveModuleId(mod.id)}
@@ -252,7 +383,7 @@ const App = () => {
                     : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}
                 `}
               >
-                {mod.icon ? <mod.icon size={20} strokeWidth={isActive ? 2 : 1.5} /> : <Circle size={10}/>}
+                <IconComponent size={20} strokeWidth={isActive ? 2 : 1.5} />
                 
                 {isActive && (
                   <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>
@@ -276,7 +407,7 @@ const App = () => {
                  <Languages size={20} />
             </button>
             <div className="w-8 h-px bg-slate-200"></div>
-            <button onClick={() => setIsLoggedIn(false)} className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">
+            <button onClick={handleLogout} className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors">
               <LogOut size={20} />
             </button>
         </div>
@@ -311,12 +442,12 @@ const App = () => {
              onClick={() => setActiveId('user_profile')}
              className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-100"
           >
-             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-100 to-blue-50 border border-white shadow-sm flex items-center justify-center text-indigo-700 font-black text-xs">
-               AD
+             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-100 to-blue-50 border border-white shadow-sm flex items-center justify-center text-indigo-700 font-black text-xs uppercase">
+               {currentUser?.username ? currentUser.username.substring(0,2) : 'US'}
              </div>
              <div className="min-w-0">
-                <div className="text-[12px] font-bold text-slate-700 truncate">{loginData.identifier || 'User'}</div>
-                <div className="text-[10px] text-slate-400 truncate">System User</div>
+                <div className="text-[12px] font-bold text-slate-700 truncate">{currentUser?.full_name || currentUser?.username || 'User'}</div>
+                <div className="text-[10px] text-slate-400 truncate">{currentUser?.user_type || 'System User'}</div>
              </div>
           </div>
         </div>
