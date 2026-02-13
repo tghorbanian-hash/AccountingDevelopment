@@ -1,208 +1,391 @@
 /* Filename: components/Roles.js */
-import React, { useState, useEffect } from 'react';
-import { Shield, Edit, Trash2, Check, Settings } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { 
+  Shield, Edit, Save, Check, Lock, Layers, CheckSquare, Eye, Filter, AlertCircle,
+  FolderOpen, Trash2, Zap, Users, Search, UserPlus, X, UserMinus, Plus, ChevronDown
+} from 'lucide-react';
 
 const Roles = ({ t, isRtl }) => {
   const UI = window.UI || {};
-  const { Button, InputField, DataGrid, Modal, Toggle } = UI;
+  const { 
+    Button, InputField, Toggle, Badge, DataGrid, 
+    FilterSection, Modal, DatePicker, SelectField,
+    TreeView, SelectionGrid, ToggleChip 
+  } = UI;
+  const MENU_DATA = window.MENU_DATA || [];
   const supabase = window.supabase;
 
+  if (!Button) return <div className="p-4 text-center">Loading UI...</div>;
+
+  const MultiSelect = ({ options, value = [], onChange, placeholder }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+      const handleClickOutside = (event) => {
+        if (containerRef.current && !containerRef.current.contains(event.target)) setIsOpen(false);
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filteredOptions = options.filter(opt => opt.label.toLowerCase().includes(searchTerm.toLowerCase()));
+    const toggleOption = (id) => onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+
+    return (
+      <div className="relative" ref={containerRef}>
+        <div className="min-h-[32px] bg-white border border-slate-200 rounded-md flex flex-wrap items-center gap-1 p-1 cursor-pointer focus-within:border-indigo-400 transition-all" onClick={() => setIsOpen(!isOpen)}>
+          {value.length === 0 && <span className="text-slate-400 text-[11px] px-1 select-none">{placeholder}</span>}
+          {value.map(id => (
+            <span key={id} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] flex items-center gap-1">
+              {options.find(o => o.id === id)?.label}
+              <X size={10} className="hover:text-red-500" onClick={(e) => { e.stopPropagation(); onChange(value.filter(v => v !== id)); }}/>
+            </span>
+          ))}
+          <div className={`${isRtl ? 'mr-auto' : 'ml-auto'} px-1 text-slate-400`}><ChevronDown size={14}/></div>
+        </div>
+        {isOpen && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-[100] max-h-48 overflow-y-auto p-2">
+            <input className="w-full text-[11px] border border-slate-200 rounded px-2 py-1 mb-2 outline-none focus:border-indigo-400" placeholder="جستجو..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onClick={e => e.stopPropagation()} autoFocus />
+            {filteredOptions.length > 0 ? filteredOptions.map(opt => (
+              <div key={opt.id} className={`px-3 py-2 text-[11px] cursor-pointer hover:bg-slate-50 flex items-center justify-between ${value.includes(opt.id) ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700'}`} onClick={() => toggleOption(opt.id)}>
+                {opt.label} {value.includes(opt.id) && <Check size={12}/>}
+              </div>
+            )) : <div className="p-2 text-center text-slate-400 text-[10px]">موردی یافت نشد</div>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // --- DB STATES ---
+  const [allUsers, setAllUsers] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [resources, setResources] = useState([]);
-  const [permissions, setPermissions] = useState([]);
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [permissions, setPermissions] = useState({});
+
+  // --- UI STATES ---
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
-  const [formData, setFormData] = useState({ code: '', title: '', description: '', isActive: true });
+  const [formData, setFormData] = useState({ title: '', code: '', isActive: true, startDate: '', endDate: '' });
 
-  const [isPermModalOpen, setIsPermModalOpen] = useState(false);
-  const [activeRoleForPerms, setActiveRoleForPerms] = useState(null);
-  const [rolePerms, setRolePerms] = useState([]);
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [tempPermissions, setTempPermissions] = useState({});
 
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [showUserResults, setShowUserResults] = useState(false);
+
+  const [filterValues, setFilterValues] = useState({ formIds: [], userIds: [], isActive: 'all' });
+  const [appliedFilters, setAppliedFilters] = useState({ formIds: [], userIds: [], isActive: 'all' });
+
+  // --- CONFIG ---
+  const AVAILABLE_ACTIONS = [
+    { id: 'create', label: 'ایجاد' }, { id: 'view', label: 'مشاهده' }, { id: 'edit', label: 'ویرایش' }, { id: 'delete', label: 'حذف' },
+    { id: 'print', label: 'چاپ' }, { id: 'approve', label: 'تایید' }, { id: 'export', label: 'خروجی' }, { id: 'share', label: 'اشتراک' },
+  ];
+
+  const DATA_SCOPES = {
+    'doc_list': [
+      { id: 'docType', label: 'نوع سند', options: [{ value: 'opening', label: 'سند افتتاحیه' }, { value: 'general', label: 'سند عمومی' }] },
+      { id: 'docStatus', label: 'وضعیت سند', options: [{ value: 'draft', label: 'پیش‌نویس' }, { value: 'final', label: 'نهایی' }] }
+    ]
+  };
+
+  // --- FETCH DATA ---
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
+    const { data: uData } = await supabase.schema('gen').from('users').select('*');
+    const { data: urData } = await supabase.schema('gen').from('user_roles').select('*');
+    if (uData && urData) {
+      setAllUsers(uData.map(u => ({ id: u.id, username: u.username, fullName: u.full_name, isActive: u.is_active, roleIds: urData.filter(ur => ur.user_id === u.id).map(ur => ur.role_id) })));
+    }
+
     const { data: rData } = await supabase.schema('gen').from('roles').select('*').order('created_at', { ascending: false });
-    const { data: resData } = await supabase.schema('gen').from('resources').select('*');
+    if (rData) setRoles(rData.map(r => ({ id: r.id, title: r.title, code: r.code, isActive: r.is_active, startDate: '', endDate: '' })));
+
     const { data: pData } = await supabase.schema('gen').from('permissions').select('*').not('role_id', 'is', null);
-    
-    if (rData) setRoles(rData);
-    if (resData) setResources(resData);
-    if (pData) setPermissions(pData);
+    if (pData) {
+      const permsMap = {};
+      pData.forEach(p => {
+        if (!permsMap[p.role_id]) permsMap[p.role_id] = {};
+        permsMap[p.role_id][p.resource_code] = { actions: p.actions || [], dataScopes: p.data_scopes || {} };
+      });
+      setPermissions(permsMap);
+    }
   };
 
-  const handleSaveRole = async () => {
-    if (!formData.code || !formData.title) {
-      return alert(isRtl ? 'لطفاً فیلدهای اجباری را پر کنید.' : 'Please fill required fields.');
+  const allForms = useMemo(() => {
+    const forms = [];
+    const traverse = (nodes) => nodes.forEach(n => { if (!n.children || n.children.length === 0) forms.push({ id: n.id, label: n.label[isRtl ? 'fa' : 'en'] }); else traverse(n.children); });
+    traverse(MENU_DATA);
+    return forms;
+  }, [MENU_DATA, isRtl]);
+
+  const filteredRoles = useMemo(() => {
+    return roles.filter(role => {
+      const matchStatus = appliedFilters.isActive === 'all' || (appliedFilters.isActive === 'active' ? role.isActive : !role.isActive);
+      const matchUser = appliedFilters.userIds.length === 0 || allUsers.some(u => appliedFilters.userIds.includes(u.id) && u.roleIds.includes(role.id));
+      const matchForm = appliedFilters.formIds.length === 0 || (permissions[role.id] && appliedFilters.formIds.some(fid => permissions[role.id][fid]?.actions?.length > 0));
+      return matchStatus && matchUser && matchForm;
+    });
+  }, [roles, appliedFilters, allUsers, permissions]);
+
+  // --- HANDLERS ---
+  const handleCreate = () => {
+    setEditingRole(null);
+    setFormData({ title: '', code: '', isActive: true, startDate: '', endDate: '' });
+    setIsRoleModalOpen(true);
+  };
+
+  const handleEdit = (role) => {
+    setEditingRole(role);
+    setFormData(role);
+    setIsRoleModalOpen(true);
+  };
+
+  const handleDelete = async (ids) => {
+    if (confirm(`آیا از حذف ${ids.length} نقش اطمینان دارید؟`)) {
+      await supabase.schema('gen').from('roles').delete().in('id', ids);
+      fetchData();
+      setSelectedRows([]);
     }
+  };
 
-    const payload = { 
-      code: formData.code, 
-      title: formData.title, 
-      description: formData.description, 
-      is_active: formData.isActive 
-    };
-
+  const saveRole = async () => {
     if (editingRole) {
-      const { error } = await supabase.schema('gen').from('roles').update(payload).eq('id', editingRole.id);
-      if (error) return alert(isRtl ? 'خطا در ویرایش نقش' : 'Error updating role');
+      await supabase.schema('gen').from('roles').update({ title: formData.title, code: formData.code, is_active: formData.isActive }).eq('id', editingRole.id);
     } else {
-      const { error } = await supabase.schema('gen').from('roles').insert([payload]);
-      if (error) return alert(isRtl ? 'خطا در ثبت نقش' : 'Error creating role');
+      await supabase.schema('gen').from('roles').insert([{ title: formData.title, code: formData.code, is_active: formData.isActive }]);
     }
-    
-    setIsModalOpen(false);
+    setIsRoleModalOpen(false);
     fetchData();
   };
 
-  const handleDeleteRole = async (ids) => {
-    if (confirm(t.confirm_delete?.replace('{0}', ids.length) || `Delete ${ids.length} items?`)) {
-      await supabase.schema('gen').from('roles').delete().in('id', ids);
+  const openAccessModal = (role) => {
+    setEditingRole(role);
+    setTempPermissions(JSON.parse(JSON.stringify(permissions[role.id] || {})));
+    setSelectedModule(null);
+    setIsAccessModalOpen(true);
+  };
+
+  const saveAccess = async () => {
+    await supabase.schema('gen').from('permissions').delete().eq('role_id', editingRole.id);
+    
+    const permInserts = [];
+    Object.keys(tempPermissions).forEach(formId => {
+      const perm = tempPermissions[formId];
+      if (perm.actions.length > 0 || Object.keys(perm.dataScopes).length > 0) {
+        permInserts.push({ role_id: editingRole.id, resource_code: formId, actions: perm.actions, data_scopes: perm.dataScopes });
+      }
+    });
+
+    if (permInserts.length > 0) {
+      await supabase.schema('gen').from('permissions').insert(permInserts);
+    }
+
+    setIsAccessModalOpen(false);
+    fetchData();
+  };
+
+  const updateAction = (moduleId, actionId) => {
+    setTempPermissions(prev => {
+      const modulePerms = prev[moduleId] || { actions: [], dataScopes: {} };
+      const newActions = modulePerms.actions.includes(actionId) ? modulePerms.actions.filter(a => a !== actionId) : [...modulePerms.actions, actionId];
+      return { ...prev, [moduleId]: { ...modulePerms, actions: newActions } };
+    });
+  };
+
+  const updateScope = (moduleId, scopeId, value) => {
+    setTempPermissions(prev => {
+      const modulePerms = prev[moduleId] || { actions: [], dataScopes: {} };
+      const current = modulePerms.dataScopes[scopeId] || [];
+      const newValues = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
+      return { ...prev, [moduleId]: { ...modulePerms, dataScopes: { ...modulePerms.dataScopes, [scopeId]: newValues } } };
+    });
+  };
+
+  const getAllDescendantIds = (node) => {
+    let ids = [node.id];
+    if (node.children && node.children.length > 0) node.children.forEach(child => { ids = [...ids, ...getAllDescendantIds(child)]; });
+    return ids;
+  };
+
+  const handleBulkPermission = (mode) => {
+    if (!selectedModule) return;
+    const targetIds = getAllDescendantIds(selectedModule);
+    if (targetIds.length > 1 && !confirm(`این عملیات روی ${targetIds.length} آیتم اعمال می‌شود. ادامه می‌دهید؟`)) return;
+    setTempPermissions(prev => {
+      const next = { ...prev };
+      targetIds.forEach(id => {
+        if (mode === 'revoke') delete next[id];
+        else {
+          let allScopes = {};
+          if (DATA_SCOPES[id]) DATA_SCOPES[id].forEach(scope => { allScopes[scope.id] = scope.options.map(o => o.value); });
+          next[id] = { actions: AVAILABLE_ACTIONS.map(a => a.id), dataScopes: allScopes };
+        }
+      });
+      return next;
+    });
+  };
+
+  const renderPermissionNode = (item) => {
+    const hasAccess = tempPermissions[item.id]?.actions?.length > 0;
+    return <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all shrink-0 ${hasAccess ? 'bg-green-500 border-green-500 text-white shadow-sm' : 'border-slate-300 bg-white'}`}>{hasAccess && <Check size={12} strokeWidth={3} />}</div>;
+  };
+
+  const openUserAssignment = (role) => {
+    setEditingRole(role);
+    setUserSearchTerm('');
+    setShowUserResults(false);
+    setIsUserModalOpen(true);
+  };
+
+  const assignedUsers = useMemo(() => {
+    if (!editingRole) return [];
+    return allUsers.filter(u => u.roleIds.includes(editingRole.id));
+  }, [allUsers, editingRole]);
+
+  const searchResults = useMemo(() => {
+    if (!editingRole || !userSearchTerm) return [];
+    const term = userSearchTerm.toLowerCase();
+    return allUsers.filter(u => !u.roleIds.includes(editingRole.id) && (u.username.toLowerCase().includes(term) || u.fullName.toLowerCase().includes(term)));
+  }, [userSearchTerm, allUsers, editingRole]);
+
+  const handleAssignUser = async (userId) => {
+    await supabase.schema('gen').from('user_roles').insert([{ user_id: userId, role_id: editingRole.id }]);
+    setUserSearchTerm('');
+    setShowUserResults(false);
+    fetchData();
+  };
+
+  const handleUnassignUser = async (userId) => {
+    if (confirm('آیا از سلب مسئولیت این نقش از کاربر اطمینان دارید؟')) {
+      await supabase.schema('gen').from('user_roles').delete().match({ user_id: userId, role_id: editingRole.id });
       fetchData();
     }
   };
 
-  const handleToggleActive = async (id, newVal) => {
-    await supabase.schema('gen').from('roles').update({ is_active: newVal }).eq('id', id);
-    fetchData();
-  };
+  // --- COLUMNS ---
+  const roleColumns = [
+    { header: 'شناسه', field: 'id', width: 'w-16', render: (r) => <span className="text-[10px] text-slate-400 font-mono truncate w-12 inline-block">{r.id.split('-')[0]}</span> },
+    { header: 'عنوان نقش', field: 'title', width: 'w-48', sortable: true },
+    { header: 'کد سیستمی', field: 'code', width: 'w-32', sortable: true },
+    { header: 'تاریخ شروع', field: 'startDate', width: 'w-32', render: (r) => <span className="dir-ltr font-mono text-xs">{r.startDate || '-'}</span> },
+    { header: 'وضعیت', field: 'isActive', width: 'w-24 text-center', render: (r) => <Badge variant={r.isActive ? 'success' : 'neutral'}>{r.isActive ? 'فعال' : 'غیرفعال'}</Badge> },
+  ];
 
-  const openPermModal = (role) => {
-    setActiveRoleForPerms(role);
-    const existing = permissions.filter(p => p.role_id === role.id);
-    const currentPerms = resources.map(res => {
-      const ext = existing.find(e => e.resource_code === res.code) || {};
-      return {
-        resource_code: res.code,
-        title: res.title,
-        can_view: ext.can_view || false,
-        can_create: ext.can_create || false,
-        can_edit: ext.can_edit || false,
-        can_delete: ext.can_delete || false,
-        can_approve: ext.can_approve || false,
-        row_level_rule: ext.row_level_rule || ''
-      };
-    });
-    setRolePerms(currentPerms);
-    setIsPermModalOpen(true);
-  };
-
-  const handleSavePermissions = async () => {
-    await supabase.schema('gen').from('permissions').delete().eq('role_id', activeRoleForPerms.id);
-    
-    const inserts = rolePerms.filter(p => p.can_view || p.can_create || p.can_edit || p.can_delete || p.can_approve).map(p => ({
-      role_id: activeRoleForPerms.id,
-      resource_code: p.resource_code,
-      can_view: p.can_view,
-      can_create: p.can_create,
-      can_edit: p.can_edit,
-      can_delete: p.can_delete,
-      can_approve: p.can_approve,
-      row_level_rule: p.row_level_rule
-    }));
-    
-    if (inserts.length > 0) {
-      const { error } = await supabase.schema('gen').from('permissions').insert(inserts);
-      if (error) return alert(isRtl ? 'خطا در تخصیص دسترسی' : 'Error assigning permissions');
-    }
-    
-    setIsPermModalOpen(false);
-    fetchData();
-  };
-
-  const updatePerm = (idx, field, val) => {
-    const newPerms = [...rolePerms];
-    newPerms[idx][field] = val;
-    setRolePerms(newPerms);
-  };
-
-  const columns = [
-    { header: t.code || 'Code', field: 'code', width: 'w-32', render: r => <span className="font-mono text-indigo-700 font-bold bg-indigo-50 px-2 py-1 rounded">{r.code}</span> },
-    { header: t.title || 'Title', field: 'title', width: 'w-48', render: r => <span className="font-bold text-slate-700">{r.title}</span> },
-    { header: t.description || 'Description', field: 'description', width: 'w-64' },
-    { header: t.active_status || 'Status', field: 'is_active', width: 'w-24', type: 'toggle', render: r => <div className="flex justify-center"><Toggle checked={r.is_active} onChange={(v) => handleToggleActive(r.id, v)} /></div> },
-    { header: t.permissions || 'Permissions', field: 'perms', width: 'w-32', render: r => (
-      <Button variant="secondary" size="sm" icon={Settings} onClick={() => openPermModal(r)}>{t.config || 'Config'}</Button>
-    )},
-    { header: t.actions || 'Actions', field: 'actions', width: 'w-24', render: r => (
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => { 
-          setEditingRole(r); 
-          setFormData({ code: r.code, title: r.title, description: r.description, isActive: r.is_active }); 
-          setIsModalOpen(true); 
-        }} />
-        <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteRole([r.id])} />
-      </div>
-    )}
+  const assignedUsersColumns = [
+    { header: 'شناسه', field: 'id', width: 'w-16', render: (r) => <span className="text-[10px] font-mono">{r.id.split('-')[0]}</span> },
+    { header: 'نام کاربری', field: 'username', width: 'w-32' },
+    { header: 'نام و نام خانوادگی', field: 'fullName', width: 'w-48', render: (r) => <span className="font-bold text-slate-700">{r.fullName}</span> },
+    { header: 'وضعیت کاربر', field: 'isActive', width: 'w-24', render: (r) => <div className="flex justify-center"><Toggle checked={r.isActive} disabled /></div> },
   ];
 
   return (
-    <div className={`flex flex-col h-full bg-slate-50/50 p-4 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
-      <div className="mb-4 flex items-center gap-3">
-        <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg"><Shield size={24} /></div>
-        <div>
-          <h1 className="text-xl font-black text-slate-800">{t.roles_management || 'Roles & Permissions'}</h1>
-          <p className="text-xs text-slate-500 font-medium mt-1">{t.roles_subtitle || 'Manage system access levels'}</p>
-        </div>
+    <div className={`flex flex-col h-full bg-slate-50/50 p-4 overflow-hidden ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+      <div className="flex items-center justify-between mb-4 shrink-0">
+          <div><h1 className="text-xl font-black text-slate-800 flex items-center gap-2"><Shield className="text-indigo-600" size={24}/> مدیریت نقش‌ها</h1></div>
       </div>
 
-      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        <DataGrid 
-          columns={columns} 
-          data={roles} 
-          isRtl={isRtl} 
-          onCreate={() => { 
-            setEditingRole(null); 
-            setFormData({ code: '', title: '', description: '', isActive: true }); 
-            setIsModalOpen(true); 
-          }} 
-          onDelete={handleDeleteRole} 
-        />
-      </div>
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingRole ? (t.edit_role || 'Edit Role') : (t.new_role || 'New Role')} footer={<><Button variant="secondary" onClick={() => setIsModalOpen(false)}>{t.btn_cancel || 'Cancel'}</Button><Button variant="primary" icon={Check} onClick={handleSaveRole}>{t.btn_save || 'Save'}</Button></>}>
-        <div className="space-y-4">
-          <InputField label={`${t.code || 'Code'} *`} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} className="dir-ltr" />
-          <InputField label={`${t.title || 'Title'} *`} value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
-          <InputField label={t.description || 'Description'} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100">
-            <Toggle checked={formData.isActive} onChange={v => setFormData({...formData, isActive: v})} /> 
-            <span className="text-sm font-bold text-slate-600">{t.active_status || 'Active'}</span>
+      <FilterSection title="جستجوی پیشرفته" onSearch={() => setAppliedFilters(filterValues)} onClear={() => { setFilterValues({ formIds: [], userIds: [], isActive: 'all' }); setAppliedFilters({ formIds: [], userIds: [], isActive: 'all' }); }} isRtl={isRtl}>
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-slate-600">نام فرم</label>
+            <MultiSelect options={allForms} value={filterValues.formIds} onChange={v => setFilterValues({...filterValues, formIds: v})} placeholder="جستجوی فرم..." />
           </div>
-        </div>
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-slate-600">نام کاربر</label>
+            <MultiSelect options={allUsers.map(u => ({ id: u.id, label: u.fullName }))} value={filterValues.userIds} onChange={v => setFilterValues({...filterValues, userIds: v})} placeholder="جستجوی کاربر..." />
+          </div>
+          <SelectField label="وضعیت" value={filterValues.isActive} onChange={e => setFilterValues({...filterValues, isActive: e.target.value})} isRtl={isRtl}>
+            <option value="all">همه</option><option value="active">فعال</option><option value="inactive">غیرفعال</option>
+          </SelectField>
+      </FilterSection>
+
+      <div className="flex-1 min-h-0">
+          <DataGrid columns={roleColumns} data={filteredRoles} isRtl={isRtl} selectedIds={selectedRows} onSelectAll={(c) => setSelectedRows(c ? roles.map(r => r.id) : [])} onSelectRow={(id, c) => setSelectedRows(p => c ? [...p, id] : p.filter(r => r !== id))} onCreate={handleCreate} onDelete={handleDelete} onDoubleClick={handleEdit}
+            actions={(row) => (<><Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleEdit(row)} title="ویرایش" /><Button variant="ghost" size="iconSm" icon={Users} className="text-indigo-600" onClick={() => openUserAssignment(row)} title="کاربران نقش" /><Button variant="ghost" size="iconSm" icon={Lock} className="text-amber-600" onClick={() => openAccessModal(row)} title="دسترسی‌ها" /></>)}
+          />
+      </div>
+
+      <Modal isOpen={isRoleModalOpen} onClose={() => setIsRoleModalOpen(false)} title={editingRole ? "ویرایش نقش" : "نقش جدید"} size="md" footer={<><Button variant="secondary" onClick={() => setIsRoleModalOpen(false)}>انصراف</Button><Button variant="primary" icon={Save} onClick={saveRole}>ذخیره</Button></>}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+               <InputField label="عنوان نقش" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} isRtl={isRtl} />
+               <InputField label="کد سیستمی" value={formData.code} onChange={(e) => setFormData({...formData, code: e.target.value})} isRtl={isRtl} className="dir-ltr" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+               <DatePicker label="تاریخ شروع" value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
+               <DatePicker label="تاریخ پایان" value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2">
+               <span className="text-[13px] font-bold text-slate-700">وضعیت نقش</span>
+               <Toggle checked={formData.isActive} onChange={(val) => setFormData({...formData, isActive: val})} label={formData.isActive ? "فعال" : "غیرفعال"} />
+            </div>
+          </div>
       </Modal>
 
-      <Modal isOpen={isPermModalOpen} onClose={() => setIsPermModalOpen(false)} title={`${t.permissions || 'Permissions'}: ${activeRoleForPerms?.title}`} size="xl" footer={<><Button variant="secondary" onClick={() => setIsPermModalOpen(false)}>{t.btn_cancel || 'Cancel'}</Button><Button variant="primary" icon={Check} onClick={handleSavePermissions}>{t.btn_save || 'Save Permissions'}</Button></>}>
-        <div className="max-h-[60vh] overflow-y-auto border rounded-lg shadow-inner">
-          <table className="w-full text-xs text-left" dir={isRtl ? 'rtl' : 'ltr'}>
-            <thead className="bg-slate-100 sticky top-0 shadow-sm text-slate-600">
-              <tr>
-                <th className="p-3 border-b">{t.resource || 'Resource'}</th>
-                <th className="p-3 border-b text-center">{t.can_view || 'View'}</th>
-                <th className="p-3 border-b text-center">{t.can_create || 'Create'}</th>
-                <th className="p-3 border-b text-center">{t.can_edit || 'Edit'}</th>
-                <th className="p-3 border-b text-center">{t.can_delete || 'Delete'}</th>
-                <th className="p-3 border-b text-center">{t.can_approve || 'Approve'}</th>
-                <th className="p-3 border-b">{t.row_level || 'Row Level Rule'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rolePerms.map((p, idx) => (
-                <tr key={p.resource_code} className="border-b hover:bg-slate-50 transition-colors">
-                  <td className="p-2 font-medium">{p.title} <div className="text-[9px] text-slate-400 font-mono mt-1">{p.resource_code}</div></td>
-                  <td className="p-2 text-center"><input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" checked={p.can_view} onChange={e => updatePerm(idx, 'can_view', e.target.checked)} /></td>
-                  <td className="p-2 text-center"><input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" checked={p.can_create} onChange={e => updatePerm(idx, 'can_create', e.target.checked)} /></td>
-                  <td className="p-2 text-center"><input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" checked={p.can_edit} onChange={e => updatePerm(idx, 'can_edit', e.target.checked)} /></td>
-                  <td className="p-2 text-center"><input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" checked={p.can_delete} onChange={e => updatePerm(idx, 'can_delete', e.target.checked)} /></td>
-                  <td className="p-2 text-center"><input type="checkbox" className="rounded text-indigo-600 focus:ring-indigo-500" checked={p.can_approve} onChange={e => updatePerm(idx, 'can_approve', e.target.checked)} /></td>
-                  <td className="p-2"><input type="text" className="w-full border border-slate-200 rounded px-2 py-1.5 text-[10px] dir-ltr outline-none focus:border-indigo-500" value={p.row_level_rule} onChange={e => updatePerm(idx, 'row_level_rule', e.target.value)} placeholder='{"branch": 1}' /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Modal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} title={`کاربران دارای نقش: ${editingRole?.title}`} size="lg" footer={<Button variant="primary" onClick={() => setIsUserModalOpen(false)}>بستن</Button>}>
+          <div className="flex flex-col h-[500px]">
+            <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-3 relative z-[60]">
+               <label className="text-xs font-bold text-indigo-800 mb-2 block flex items-center gap-2"><UserPlus size={14}/> افزودن کاربر جدید به این نقش</label>
+               <div className="relative">
+                  <input value={userSearchTerm} onChange={(e) => { setUserSearchTerm(e.target.value); setShowUserResults(true); }} placeholder="جستجوی نام کاربری یا نام شخص..." className="w-full h-9 bg-white border border-indigo-200 rounded text-xs pr-9 pl-2 outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+                  <Search size={16} className="absolute top-2.5 right-2.5 text-indigo-400"/>
+                  {showUserResults && userSearchTerm && (
+                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]">
+                        {searchResults.length > 0 ? searchResults.map(user => (
+                           <div key={user.id} onClick={() => handleAssignUser(user.id)} className="p-2 hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-50 last:border-0 group transition-colors">
+                              <div className="flex flex-col"><span className="text-xs font-bold text-slate-700">{user.fullName}</span><span className="text-[10px] text-slate-400 font-mono">@{user.username}</span></div>
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-600 bg-indigo-100 p-1 rounded"><Plus size={14}/></div>
+                           </div>
+                        )) : <div className="p-3 text-center text-xs text-slate-400">کاربری یافت نشد یا قبلاً اضافه شده است.</div>}
+                     </div>
+                  )}
+                  {showUserResults && userSearchTerm && <div className="fixed inset-0 z-[-1]" onClick={() => setShowUserResults(false)}></div>}
+               </div>
+            </div>
+            <div className="flex-1 overflow-hidden border border-slate-200 rounded-lg bg-white relative z-0">
+               <DataGrid columns={assignedUsersColumns} data={assignedUsers} isRtl={isRtl} actions={(row) => (<Button variant="ghost" size="iconSm" icon={UserMinus} className="text-red-500 hover:bg-red-50" onClick={() => handleUnassignUser(row.id)} title="حذف نقش از کاربر" />)} />
+            </div>
+          </div>
+      </Modal>
+
+      <Modal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} title={`دسترسی‌های: ${editingRole?.title}`} size="xl" footer={<><Button variant="secondary" onClick={() => setIsAccessModalOpen(false)}>انصراف</Button><Button variant="primary" icon={Save} onClick={saveAccess}>اعمال</Button></>}>
+          <div className="flex h-[550px] border border-slate-200 rounded-lg overflow-hidden">
+            <div className="w-1/3 border-l border-slate-200 bg-slate-50 flex flex-col p-2">
+               <TreeView data={MENU_DATA} selectedNodeId={selectedModule?.id} onSelectNode={setSelectedModule} renderNodeContent={renderPermissionNode} isRtl={isRtl} />
+            </div>
+            <div className="w-2/3 bg-white flex flex-col">
+               {selectedModule ? (
+                  <>
+                     <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-sm">{selectedModule.label[isRtl ? 'fa' : 'en']}</h3><div className="flex gap-1"><Button variant="outline" size="sm" icon={Trash2} onClick={() => handleBulkPermission('revoke')}>حذف همه</Button><Button variant="success" size="sm" icon={Zap} onClick={() => handleBulkPermission('grant')}>دسترسی کامل</Button></div></div>
+                     <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                        <div>
+                           <div className="text-[11px] font-bold text-slate-500 uppercase mb-2">عملیات</div>
+                           <SelectionGrid items={AVAILABLE_ACTIONS} selectedIds={tempPermissions[selectedModule.id]?.actions || []} onToggle={(id) => updateAction(selectedModule.id, id)} />
+                        </div>
+                        {DATA_SCOPES[selectedModule.id] && (
+                           <div className="pt-4 border-t border-slate-100">
+                              <div className="text-[11px] font-bold text-slate-500 uppercase mb-2">داده‌ها</div>
+                              {DATA_SCOPES[selectedModule.id].map(scope => (
+                                 <div key={scope.id} className="mb-3">
+                                    <span className="text-xs font-bold block mb-1">{scope.label}:</span>
+                                    <div className="flex flex-wrap gap-2">{scope.options.map(o => <ToggleChip key={o.value} label={o.label} checked={tempPermissions[selectedModule.id]?.dataScopes?.[scope.id]?.includes(o.value)} onClick={() => updateScope(selectedModule.id, scope.id, o.value)} />)}</div>
+                                 </div>
+                              ))}
+                           </div>
+                        )}
+                     </div>
+                  </>
+               ) : <div className="flex items-center justify-center h-full text-slate-400 text-sm">یک آیتم انتخاب کنید</div>}
+            </div>
+          </div>
       </Modal>
     </div>
   );
