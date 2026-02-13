@@ -1,327 +1,371 @@
-/* Filename: components/LoginPage.js */
-import React from 'react';
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  Phone, 
-  Mail, 
-  ShieldCheck, 
-  RefreshCw, 
-  CheckCircle2, 
-  Lock, 
-  User, 
-  Building2, 
-  Languages, 
-  BarChart3,
-  Search,
-  ArrowRight,
-  ArrowLeft
-} from 'lucide-react';
+/* توضیحات آپدیت: 
+   - ورود (Login) از قبل در فایل app.js به صورت کامل به سیستم اعتبارسنجی واقعی Supabase متصل شده است.
+   - در این فایل، فرآیند "تغییر کلمه عبور" (Reset Password) نیز به صورت کامل بازنویسی شد و به پایگاه داده و تابع امنیتی `reset_user_password` در Supabase متصل گردید.
+   - نکته: مرحله دریافت کد OTP به دلیل نبود پنل پیامکی صرفاً برای شبیه‌سازی رابط کاربری است، اما اعمال نهایی رمز عبور در پایگاه داده واقعی و رمزنگاری‌شده (Hash) خواهد بود.
+   
+   Filename: components/LoginPage.js 
+*/
+import React, { useState } from 'react';
+import { User, Lock, Mail, Smartphone, ArrowRight, ArrowLeft, KeyRound, Building2, CheckCircle2, ShieldCheck, Globe, Loader2 } from 'lucide-react';
 
 const LoginPage = ({ 
-  t, isRtl, authView, setAuthView, loginMethod, setLoginMethod, 
-  loginData, setLoginData, recoveryData, setRecoveryData, error, 
-  handleLogin, handleVerifyOtp, handleUpdatePassword, toggleLanguage 
+  t, isRtl, authView, setAuthView, 
+  loginMethod, setLoginMethod, 
+  loginData, setLoginData, 
+  error, handleLogin, toggleLanguage 
 }) => {
+  const [resetData, setResetData] = useState({ identifier: '', otp: '', newPassword: '', confirmPassword: '' });
+  const [isLoading, setIsLoading] = useState(false);
 
-  // --- Logic to Determine Header Title & Subtitle ---
-  let headerTitle = t.resetMethodTitle;
-  let headerSubtitle = t.resetMethodSubtitle;
-
-  if (authView === 'login') {
-    headerTitle = t.loginTitle;
-    headerSubtitle = t.loginSubtitle;
-  } else if (authView === 'forgot-identify') {
-    headerTitle = isRtl ? 'بازیابی حساب کاربری' : 'Account Recovery';
-    headerSubtitle = isRtl ? 'ابتدا نام کاربری یا شماره موبایل خود را وارد کنید' : 'Enter your username or mobile number first';
-  } else if (authView === 'forgot-choice') {
-    headerTitle = isRtl ? 'انتخاب روش بازیابی' : 'Select Recovery Method';
-    headerSubtitle = isRtl ? `بازیابی برای حساب: ${recoveryData.identifier || '...'}` : `Recovery for: ${recoveryData.identifier || '...'}`;
-  } else if (authView === 'reset') {
-    headerTitle = t.updatePassword || (isRtl ? 'تغییر رمز عبور' : 'Change Password');
-    headerSubtitle = isRtl ? 'لطفاً رمز عبور جدید خود را وارد کنید' : 'Please enter your new password';
-  }
-  
-  const DirectionIcon = isRtl ? ArrowLeft : ArrowRight;
-  const BackIcon = isRtl ? ChevronRight : ChevronLeft;
-
-  // Handler to move from Identity to Choice
-  const handleIdentitySubmit = (e) => {
+  const handleResetNext = (e, nextView) => {
     e.preventDefault();
-    if (!recoveryData.identifier) return; // Simple validation
-    setAuthView('forgot-choice');
+    setAuthView(nextView);
   };
 
-  const renderAuthView = () => {
-    switch (authView) {
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if(resetData.newPassword !== resetData.confirmPassword) {
+       alert(isRtl ? 'کلمات عبور مطابقت ندارند.' : 'Passwords do not match.');
+       return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const supabase = window.supabase;
       
-      // --- 1. NEW STEP: IDENTIFY USER ---
-      case 'forgot-identify':
-        return (
-          <form onSubmit={handleIdentitySubmit} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <button 
-              type="button"
-              onClick={() => setAuthView('login')}
-              className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors text-sm font-bold mb-2"
-            >
-              <BackIcon size={18} />
-              {t.backToLogin}
-            </button>
+      const { data: userData, error: userErr } = await supabase
+        .schema('gen')
+        .from('users')
+        .select('id')
+        .eq('username', resetData.identifier)
+        .single();
+        
+      if (userErr || !userData) {
+         alert(isRtl ? 'نام کاربری در سیستم یافت نشد.' : 'Username not found.');
+         setIsLoading(false);
+         return;
+      }
+      
+      const { error: resetErr } = await supabase.rpc('reset_user_password', {
+         p_user_id: userData.id,
+         p_new_password: resetData.newPassword
+      }, { schema: 'gen' });
+      
+      if (resetErr) {
+         alert(isRtl ? 'خطا در تغییر رمز عبور. با مدیر سیستم تماس بگیرید.' : 'Error resetting password.');
+      } else {
+         alert(isRtl ? 'کلمه عبور با موفقیت تغییر کرد. اکنون می‌توانید وارد شوید.' : 'Password changed successfully. Please login.');
+         setAuthView('login');
+         setResetData({ identifier: '', otp: '', newPassword: '', confirmPassword: '' });
+      }
+    } catch(err) {
+       console.error(err);
+       alert(isRtl ? 'خطای ارتباط با سرور' : 'Server error');
+    } finally {
+       setIsLoading(false);
+    }
+  };
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
-                {isRtl ? 'نام کاربری / موبایل / ایمیل' : 'Username / Mobile / Email'}
-              </label>
-              <div className="relative group">
-                <div className={`absolute inset-y-0 ${isRtl ? 'right-4' : 'left-4'} flex items-center text-slate-400 group-focus-within:text-blue-600 transition-colors`}>
-                  <Search size={20} />
-                </div>
-                <input 
-                  type="text" 
-                  autoFocus
-                  required
-                  value={recoveryData.identifier || ''}
-                  onChange={(e) => setRecoveryData({...recoveryData, identifier: e.target.value})}
-                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-3 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'} outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-sm`}
-                  placeholder={isRtl ? "مثال: admin" : "e.g. admin"}
-                />
-              </div>
-            </div>
-
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-              {isRtl ? 'ادامه' : 'Continue'}
-              <DirectionIcon size={18} />
-            </button>
-          </form>
-        );
-
-      // --- 2. CHOOSE METHOD (Updated) ---
-      case 'forgot-choice':
-        return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-            <button 
-              onClick={() => setAuthView('forgot-identify')}
-              className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors text-sm font-bold mb-4"
-            >
-              <BackIcon size={18} />
-              {isRtl ? 'بازگشت' : 'Back'}
-            </button>
-            
-            <div className="grid grid-cols-1 gap-4">
-              <button 
-                onClick={() => setAuthView('otp')}
-                className="flex flex-col items-center gap-4 p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all group"
-              >
-                <div className="p-4 bg-white rounded-xl shadow-sm text-blue-600 group-hover:scale-110 transition-transform">
-                  <Phone size={24} />
-                </div>
-                <div className="text-center">
-                  <h3 className="font-bold text-slate-900">{t.viaSms}</h3>
-                  <span className="text-[10px] text-slate-400 block mt-1">0912***3456</span>
-                </div>
-              </button>
-              <button 
-                onClick={() => setAuthView('email-sent')}
-                className="flex flex-col items-center gap-4 p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50/50 transition-all group"
-              >
-                <div className="p-4 bg-white rounded-xl shadow-sm text-purple-600 group-hover:scale-110 transition-transform">
-                  <Mail size={24} />
-                </div>
-                <div className="text-center">
-                  <h3 className="font-bold text-slate-900">{t.viaEmail}</h3>
-                  <span className="text-[10px] text-slate-400 block mt-1">use***@company.com</span>
-                </div>
-              </button>
-            </div>
-          </div>
-        );
-
-      case 'otp':
-        return (
-          <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <button type="button" onClick={() => setAuthView('forgot-choice')} className="flex items-center gap-2 text-slate-500 hover:text-blue-600 transition-colors text-sm font-bold">
-              <BackIcon size={18} />
-              {isRtl ? 'تغییر روش' : 'Change Method'}
-            </button>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">{t.enterOtp}</label>
-              <input 
-                type="text" 
-                autoFocus
-                required
-                value={recoveryData.otp}
-                onChange={(e) => setRecoveryData({...recoveryData, otp: e.target.value})}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-4 text-center text-2xl font-bold tracking-[0.5em] focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all outline-none font-mono"
-                placeholder="000000"
-                maxLength={6}
-              />
-            </div>
-            {error && <div className="text-red-600 text-xs font-bold flex items-center gap-2"><ShieldCheck size={16}/>{error}</div>}
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-              {t.verifyOtp}
-            </button>
-            <button type="button" className="w-full text-slate-500 text-xs font-bold flex items-center justify-center gap-2 hover:text-blue-600 transition-colors">
-              <RefreshCw size={14} />
-              {isRtl ? 'ارسال مجدد کد' : 'Resend Code'}
-            </button>
-          </form>
-        );
-
-      case 'email-sent':
-        return (
-          <div className="text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
-            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 size={40} />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">{t.emailSent}</h2>
-              <p className="text-slate-500 text-sm mt-2">{t.emailSentDesc}</p>
-            </div>
-            <button 
-              onClick={() => setAuthView('login')}
-              className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all"
-            >
-              {t.backToLogin}
-            </button>
-          </div>
-        );
-
-      case 'reset':
-        return (
-          <form onSubmit={handleUpdatePassword} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">{t.newPasswordLabel}</label>
-              <div className="relative group">
-                <div className={`absolute inset-y-0 ${isRtl ? 'right-4' : 'left-4'} flex items-center text-slate-400`}><Lock size={20}/></div>
-                <input 
-                  type="password" 
-                  required
-                  value={recoveryData.newPass}
-                  onChange={(e) => setRecoveryData({...recoveryData, newPass: e.target.value})}
-                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-3 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'} outline-none focus:border-blue-500 transition-all text-sm`}
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">{t.confirmPasswordLabel}</label>
-              <div className="relative group">
-                <div className={`absolute inset-y-0 ${isRtl ? 'right-4' : 'left-4'} flex items-center text-slate-400`}><Lock size={20}/></div>
-                <input 
-                  type="password" 
-                  required
-                  value={recoveryData.confirmPass}
-                  onChange={(e) => setRecoveryData({...recoveryData, confirmPass: e.target.value})}
-                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-3 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'} outline-none focus:border-blue-500 transition-all text-sm`}
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs font-bold flex items-center gap-2 border border-red-100 animate-in shake">
-                <ShieldCheck size={16}/> {error}
-              </div>
-            )}
-
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
-              {t.updatePassword}
-            </button>
-          </form>
-        );
-
-      default: // Login View
-        return (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-8">
-              <button 
-                onClick={() => {setLoginMethod('standard');}}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all ${loginMethod === 'standard' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <User size={16} />
-                {t.standardMethod}
-              </button>
-              <button 
-                onClick={() => {setLoginMethod('ad');}}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all ${loginMethod === 'ad' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-              >
-                <Building2 size={16} />
-                {t.adMethod}
-              </button>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
-                  {loginMethod === 'standard' ? t.usernameLabel : t.emailLabel}
-                </label>
-                <div className="relative group">
-                  <div className={`absolute inset-y-0 ${isRtl ? 'right-4' : 'left-4'} flex items-center text-slate-400 group-focus-within:text-blue-600 transition-colors`}>
-                    {loginMethod === 'standard' ? <User size={20} /> : <Mail size={20} />}
-                  </div>
-                  <input 
-                    type={loginMethod === 'standard' ? 'text' : 'email'}
-                    required
-                    value={loginData.identifier}
-                    onChange={(e) => setLoginData({...loginData, identifier: e.target.value})}
-                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-3 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'} outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-sm`}
-                    placeholder={loginMethod === 'standard' ? 'admin' : 'user@company.com'}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">{t.passwordLabel}</label>
-                <div className="relative group">
-                  <div className={`absolute inset-y-0 ${isRtl ? 'right-4' : 'left-4'} flex items-center text-slate-400 group-focus-within:text-blue-600 transition-colors`}>
-                    <Lock size={20} />
-                  </div>
-                  <input 
-                    type="password"
-                    required
-                    value={loginData.password}
-                    onChange={(e) => setLoginData({...loginData, password: e.target.value})}
-                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-3 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'} outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-sm`}
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="flex justify-end mt-2 px-1">
-                  <button type="button" onClick={() => {setAuthView('forgot-identify');}} className="text-xs font-bold text-blue-600 hover:underline">{t.forgotPass}</button>
-                </div>
-              </div>
-
-              {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-xs font-bold flex items-center gap-2 border border-red-100"><ShieldCheck size={16}/>{error}</div>}
-
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2">
-                {t.loginBtn}
-                <DirectionIcon size={18} />
-              </button>
-            </form>
-          </div>
-        );
+  const getHeaderTitle = () => {
+    switch (authView) {
+      case 'login': return t.loginTitle || (isRtl ? 'ورود به سیستم' : 'System Login');
+      case 'forgot-identify': return t.forgotPassword || (isRtl ? 'فراموشی کلمه عبور' : 'Forgot Password');
+      case 'forgot-choice': return t.recoveryMethod || (isRtl ? 'روش بازیابی' : 'Recovery Method');
+      case 'otp': return t.enterOtp || (isRtl ? 'تایید کد' : 'Verify OTP');
+      case 'email-sent': return t.emailSent || (isRtl ? 'ایمیل ارسال شد' : 'Email Sent');
+      case 'reset': return t.resetPassword || (isRtl ? 'تغییر کلمه عبور' : 'Reset Password');
+      default: return t.loginTitle || (isRtl ? 'ورود به سیستم' : 'System Login');
     }
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center bg-slate-50 p-4 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
-      <div className="absolute top-8 right-8 left-8 flex justify-end">
-        <button onClick={toggleLanguage} className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-slate-200 text-sm font-medium hover:bg-slate-50 transition-colors">
-          <Languages size={18} /> {t.language}
+    <div className={`min-h-screen w-full flex items-center justify-center bg-slate-100 relative overflow-hidden ${isRtl ? 'font-vazir' : 'font-sans'}`} dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* Background styling */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-200 rounded-full mix-blend-multiply filter blur-[100px] opacity-70"></div>
+        <div className="absolute top-[20%] right-[-5%] w-[30%] h-[30%] bg-blue-200 rounded-full mix-blend-multiply filter blur-[80px] opacity-60"></div>
+        <div className="absolute bottom-[-10%] left-[20%] w-[50%] h-[50%] bg-purple-200 rounded-full mix-blend-multiply filter blur-[120px] opacity-60"></div>
+      </div>
+
+      {/* Language Toggle */}
+      <div className="absolute top-6 right-6 z-20">
+        <button 
+          onClick={toggleLanguage}
+          className="flex items-center gap-2 bg-white/60 backdrop-blur-md border border-white/50 px-4 py-2 rounded-full shadow-sm text-sm font-bold text-slate-700 hover:bg-white transition-all"
+        >
+          <Globe size={16} />
+          {isRtl ? 'English' : 'فارسی'}
         </button>
       </div>
 
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden">
-        <div className="p-8 text-center bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
-            <BarChart3 size={32} />
+      <div className="w-full max-w-md relative z-10 mx-4">
+        <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 p-8 sm:p-10 overflow-hidden relative">
+          
+          {isLoading && (
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-3xl">
+               <Loader2 className="animate-spin text-indigo-600" size={40} />
+            </div>
+          )}
+
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg shadow-indigo-200 mb-4">
+              <ShieldCheck size={32} className="text-white" strokeWidth={1.5} />
+            </div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">{getHeaderTitle()}</h1>
+            <p className="text-sm text-slate-500 mt-2 font-medium">
+              {t.loginSubtitle || (isRtl ? 'نرم‌افزار جامع حسابداری و مالی' : 'Financial & Accounting Enterprise System')}
+            </p>
           </div>
-          <h1 className="text-2xl font-black">{headerTitle}</h1>
-          <p className="text-blue-100 text-sm mt-2 opacity-90">{headerSubtitle}</p>
+
+          {/* Error Message */}
+          {error && authView === 'login' && (
+            <div className="mb-6 p-3 bg-red-50 border border-red-100 rounded-xl text-center">
+              <span className="text-sm font-bold text-red-600">{error}</span>
+            </div>
+          )}
+
+          {/* VIEW: LOGIN */}
+          {authView === 'login' && (
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div className="flex p-1 bg-slate-200/50 rounded-xl mb-6">
+                <button
+                  type="button"
+                  onClick={() => setLoginMethod('standard')}
+                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                    loginMethod === 'standard' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <User size={16} />
+                  {t.standardLogin || (isRtl ? 'ورود استاندارد' : 'Standard')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginMethod('ad')}
+                  className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+                    loginMethod === 'ad' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Building2 size={16} />
+                  {t.adLogin || (isRtl ? 'اکتیو دایرکتوری' : 'Active Directory')}
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 ml-1">
+                    {loginMethod === 'ad' ? (t.domainUser || (isRtl ? 'نام کاربری دامین' : 'Domain Username')) : (t.username || (isRtl ? 'نام کاربری' : 'Username'))}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={loginData.identifier}
+                      onChange={(e) => setLoginData({ ...loginData, identifier: e.target.value })}
+                      className="w-full h-11 bg-white/80 border border-slate-200 rounded-xl px-10 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all dir-ltr"
+                      placeholder={loginMethod === 'ad' ? "DOMAIN\\username" : "admin"}
+                    />
+                    <User size={18} className="absolute top-3.5 left-3.5 text-slate-400" />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5 px-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      {t.password || (isRtl ? 'کلمه عبور' : 'Password')}
+                    </label>
+                    <button 
+                      type="button" 
+                      onClick={() => setAuthView('forgot-identify')}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                      {t.forgotPasswordLink || (isRtl ? 'رمز عبور را فراموش کرده‌اید؟' : 'Forgot password?')}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      required
+                      value={loginData.password}
+                      onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                      className="w-full h-11 bg-white/80 border border-slate-200 rounded-xl px-10 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all dir-ltr"
+                      placeholder="••••••••"
+                    />
+                    <Lock size={18} className="absolute top-3.5 left-3.5 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full h-12 mt-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+              >
+                {t.loginBtn || (isRtl ? 'ورود به سیستم' : 'Sign In')}
+                {isRtl ? <ArrowLeft size={18} /> : <ArrowRight size={18} />}
+              </button>
+            </form>
+          )}
+
+          {/* VIEW: FORGOT - IDENTIFY */}
+          {authView === 'forgot-identify' && (
+            <form onSubmit={(e) => handleResetNext(e, 'forgot-choice')} className="space-y-5 animate-in fade-in slide-in-from-right-4">
+              <p className="text-sm text-slate-600 text-center mb-6 leading-relaxed">
+                {t.forgotDesc || (isRtl ? 'برای بازیابی کلمه عبور، لطفا نام کاربری یا ایمیل خود را وارد کنید.' : 'Enter your username or email to recover your password.')}
+              </p>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 ml-1">
+                  {t.usernameOrEmail || (isRtl ? 'نام کاربری سیستم' : 'System Username')}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={resetData.identifier}
+                    onChange={(e) => setResetData({ ...resetData, identifier: e.target.value })}
+                    className="w-full h-11 bg-white/80 border border-slate-200 rounded-xl px-10 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all dir-ltr"
+                    placeholder="admin"
+                  />
+                  <User size={18} className="absolute top-3.5 left-3.5 text-slate-400" />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setAuthView('login')} className="flex-1 h-11 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm transition-all">
+                  {t.cancel || (isRtl ? 'انصراف' : 'Cancel')}
+                </button>
+                <button type="submit" className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-all">
+                  {t.next || (isRtl ? 'مرحله بعد' : 'Next')}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* VIEW: FORGOT - CHOICE */}
+          {authView === 'forgot-choice' && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+              <p className="text-sm text-slate-600 text-center mb-6">
+                {t.chooseRecovery || (isRtl ? 'کد تایید به کدام روش برای شما ارسال شود؟' : 'How would you like to receive the code?')}
+              </p>
+              
+              <button onClick={(e) => handleResetNext(e, 'email-sent')} className="w-full p-4 border border-slate-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all flex items-center gap-4 group bg-white/50">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Mail size={20} />
+                </div>
+                <div className="text-right flex-1">
+                  <div className="font-bold text-slate-800 text-sm">{t.sendEmail || (isRtl ? 'ارسال ایمیل' : 'Send Email')}</div>
+                  <div className="text-xs text-slate-500 mt-0.5 dir-ltr text-right">***@domain.com</div>
+                </div>
+              </button>
+
+              <button onClick={(e) => handleResetNext(e, 'otp')} className="w-full p-4 border border-slate-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-all flex items-center gap-4 group bg-white/50">
+                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Smartphone size={20} />
+                </div>
+                <div className="text-right flex-1">
+                  <div className="font-bold text-slate-800 text-sm">{t.sendSms || (isRtl ? 'ارسال پیامک' : 'Send SMS')}</div>
+                  <div className="text-xs text-slate-500 mt-0.5 dir-ltr text-right">0912 *** **89</div>
+                </div>
+              </button>
+
+              <button type="button" onClick={() => setAuthView('forgot-identify')} className="w-full h-11 mt-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm transition-all">
+                {t.back || (isRtl ? 'بازگشت' : 'Back')}
+              </button>
+            </div>
+          )}
+
+          {/* VIEW: EMAIL SENT */}
+          {authView === 'email-sent' && (
+            <div className="space-y-6 text-center animate-in fade-in zoom-in-95">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-500 mb-2">
+                <CheckCircle2 size={40} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 mb-2">
+                  {t.checkEmail || (isRtl ? 'ایمیل خود را بررسی کنید' : 'Check your email')}
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  {t.emailSentDesc || (isRtl ? 'لینک بازیابی کلمه عبور به ایمیل شما ارسال شد. لطفا پوشه Spam را نیز بررسی کنید.' : 'Recovery link sent to your email. Please check your spam folder as well.')}
+                </p>
+              </div>
+              <button onClick={() => setAuthView('login')} className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-all">
+                {t.backToLogin || (isRtl ? 'بازگشت به صفحه ورود' : 'Back to Login')}
+              </button>
+            </div>
+          )}
+
+          {/* VIEW: OTP */}
+          {authView === 'otp' && (
+            <form onSubmit={(e) => handleResetNext(e, 'reset')} className="space-y-5 animate-in fade-in slide-in-from-right-4">
+              <p className="text-sm text-slate-600 text-center mb-6">
+                {t.enterOtpDesc || (isRtl ? 'کد ۵ رقمی پیامک شده را وارد کنید (شبیه‌سازی: هر کدی قابل قبول است)' : 'Enter the 5-digit code sent to you (Simulation: any code works)')}
+              </p>
+              <div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    maxLength={5}
+                    value={resetData.otp}
+                    onChange={(e) => setResetData({ ...resetData, otp: e.target.value.replace(/\D/g, '') })}
+                    className="w-full h-14 bg-white/80 border border-slate-200 rounded-xl text-center text-2xl tracking-[0.5em] font-bold outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all dir-ltr"
+                    placeholder="•••••"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setAuthView('forgot-choice')} className="flex-1 h-11 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm transition-all">
+                  {t.back || (isRtl ? 'بازگشت' : 'Back')}
+                </button>
+                <button type="submit" disabled={resetData.otp.length < 5} className="flex-1 h-11 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-md transition-all">
+                  {t.verify || (isRtl ? 'تایید' : 'Verify')}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* VIEW: RESET PASSWORD */}
+          {authView === 'reset' && (
+            <form onSubmit={handleResetPasswordSubmit} className="space-y-4 animate-in fade-in slide-in-from-right-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 ml-1">
+                  {t.newPassword || (isRtl ? 'کلمه عبور جدید' : 'New Password')}
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    required
+                    value={resetData.newPassword}
+                    onChange={(e) => setResetData({ ...resetData, newPassword: e.target.value })}
+                    className="w-full h-11 bg-white/80 border border-slate-200 rounded-xl px-10 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all dir-ltr"
+                  />
+                  <KeyRound size={18} className="absolute top-3.5 left-3.5 text-slate-400" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 ml-1">
+                  {t.confirmNewPassword || (isRtl ? 'تکرار کلمه عبور جدید' : 'Confirm New Password')}
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    required
+                    value={resetData.confirmPassword}
+                    onChange={(e) => setResetData({ ...resetData, confirmPassword: e.target.value })}
+                    className="w-full h-11 bg-white/80 border border-slate-200 rounded-xl px-10 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all dir-ltr"
+                  />
+                  <Lock size={18} className="absolute top-3.5 left-3.5 text-slate-400" />
+                </div>
+              </div>
+              <button type="submit" className="w-full h-12 mt-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 transition-all flex items-center justify-center">
+                {t.savePassword || (isRtl ? 'ذخیره کلمه عبور' : 'Save Password')}
+              </button>
+            </form>
+          )}
+
         </div>
 
-        <div className="p-8">
-          {renderAuthView()}
-          <p className="mt-8 text-center text-slate-400 text-xs">© 2024 FinCorp OS. Professional Accounting Protocol.</p>
+        {/* Footer text */}
+        <div className="text-center mt-6 text-[11px] text-slate-400 font-medium">
+          {isRtl ? 'تمامی حقوق برای شرکت توسعه نرم‌افزار محفوظ است. © ۲۰۲۶' : 'All rights reserved © 2026'}
         </div>
       </div>
     </div>
