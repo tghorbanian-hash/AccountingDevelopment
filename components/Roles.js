@@ -12,7 +12,6 @@ const Roles = ({ t, isRtl }) => {
     FilterSection, Modal, DatePicker, SelectField,
     TreeView, SelectionGrid, ToggleChip 
   } = UI;
-  const MENU_DATA = window.MENU_DATA || [];
   const supabase = window.supabase;
 
   if (!Button) return <div className="p-4 text-center">Loading UI...</div>;
@@ -63,6 +62,8 @@ const Roles = ({ t, isRtl }) => {
   const [allUsers, setAllUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState({});
+  const [dynamicMenu, setDynamicMenu] = useState([]);
+  const [allForms, setAllForms] = useState([]);
 
   // --- UI STATES ---
   const [selectedRows, setSelectedRows] = useState([]);
@@ -100,6 +101,31 @@ const Roles = ({ t, isRtl }) => {
   }, []);
 
   const fetchData = async () => {
+    // 1. Fetch Resources
+    const { data: resData } = await supabase.schema('gen').from('resources').select('*');
+    if (resData) {
+      const map = new Map();
+      const roots = [];
+      const formsList = [];
+      resData.forEach(r => map.set(r.id, { id: r.code, uuid: r.id, label: { fa: r.title_fa, en: r.title_en }, type: r.type, parent_id: r.parent_id, children: [] }));
+      resData.forEach(r => {
+        const node = map.get(r.id);
+        if (r.parent_id && map.has(r.parent_id)) map.get(r.parent_id).children.push(node);
+        else roots.push(node);
+      });
+      setDynamicMenu(roots);
+
+      const traverse = (nodes, path = '') => {
+        nodes.forEach(n => {
+          const currentPath = path ? `${path} / ${n.label[isRtl ? 'fa' : 'en']}` : n.label[isRtl ? 'fa' : 'en'];
+          if (n.type === 'form') formsList.push({ id: n.id, label: n.label[isRtl ? 'fa' : 'en'], fullPath: currentPath });
+          if (n.children.length > 0) traverse(n.children, currentPath);
+        });
+      };
+      traverse(roots);
+      setAllForms(formsList);
+    }
+
     const { data: uData } = await supabase.schema('gen').from('users').select('*');
     const { data: urData } = await supabase.schema('gen').from('user_roles').select('*');
     if (uData && urData) {
@@ -119,13 +145,6 @@ const Roles = ({ t, isRtl }) => {
       setPermissions(permsMap);
     }
   };
-
-  const allForms = useMemo(() => {
-    const forms = [];
-    const traverse = (nodes) => nodes.forEach(n => { if (!n.children || n.children.length === 0) forms.push({ id: n.id, label: n.label[isRtl ? 'fa' : 'en'] }); else traverse(n.children); });
-    traverse(MENU_DATA);
-    return forms;
-  }, [MENU_DATA, isRtl]);
 
   const filteredRoles = useMemo(() => {
     return roles.filter(role => {
@@ -175,8 +194,9 @@ const Roles = ({ t, isRtl }) => {
   };
 
   const saveAccess = async () => {
-    await supabase.schema('gen').from('permissions').delete().eq('role_id', editingRole.id);
-    
+    const { error: delErr } = await supabase.schema('gen').from('permissions').delete().eq('role_id', editingRole.id);
+    if (delErr) console.error(delErr);
+
     const permInserts = [];
     Object.keys(tempPermissions).forEach(formId => {
       const perm = tempPermissions[formId];
@@ -186,7 +206,12 @@ const Roles = ({ t, isRtl }) => {
     });
 
     if (permInserts.length > 0) {
-      await supabase.schema('gen').from('permissions').insert(permInserts);
+      const { error: insErr } = await supabase.schema('gen').from('permissions').insert(permInserts);
+      if (insErr) {
+         console.error(insErr);
+         alert('خطا در ذخیره دسترسی‌ها');
+         return;
+      }
     }
 
     setIsAccessModalOpen(false);
@@ -359,7 +384,7 @@ const Roles = ({ t, isRtl }) => {
       <Modal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} title={`دسترسی‌های: ${editingRole?.title}`} size="xl" footer={<><Button variant="secondary" onClick={() => setIsAccessModalOpen(false)}>انصراف</Button><Button variant="primary" icon={Save} onClick={saveAccess}>اعمال</Button></>}>
           <div className="flex h-[550px] border border-slate-200 rounded-lg overflow-hidden">
             <div className="w-1/3 border-l border-slate-200 bg-slate-50 flex flex-col p-2">
-               <TreeView data={MENU_DATA} selectedNodeId={selectedModule?.id} onSelectNode={setSelectedModule} renderNodeContent={renderPermissionNode} isRtl={isRtl} />
+               <TreeView data={dynamicMenu} selectedNodeId={selectedModule?.id} onSelectNode={setSelectedModule} renderNodeContent={renderPermissionNode} isRtl={isRtl} />
             </div>
             <div className="w-2/3 bg-white flex flex-col">
                {selectedModule ? (
