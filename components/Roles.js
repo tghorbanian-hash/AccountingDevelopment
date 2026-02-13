@@ -46,12 +46,12 @@ const Roles = ({ t, isRtl }) => {
         </div>
         {isOpen && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-[100] max-h-48 overflow-y-auto p-2">
-            <input className="w-full text-[11px] border border-slate-200 rounded px-2 py-1 mb-2 outline-none focus:border-indigo-400" placeholder={t.search || "Search..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onClick={e => e.stopPropagation()} autoFocus />
+            <input className="w-full text-[11px] border border-slate-200 rounded px-2 py-1 mb-2 outline-none focus:border-indigo-400" placeholder={t.search || (isRtl ? "جستجو..." : "Search...")} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onClick={e => e.stopPropagation()} autoFocus />
             {filteredOptions.length > 0 ? filteredOptions.map(opt => (
               <div key={opt.id} className={`px-3 py-2 text-[11px] cursor-pointer hover:bg-slate-50 flex items-center justify-between ${value.includes(opt.id) ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700'}`} onClick={() => toggleOption(opt.id)}>
                 {opt.label} {value.includes(opt.id) && <Check size={12}/>}
               </div>
-            )) : <div className="p-2 text-center text-slate-400 text-[10px]">{t.noItemsFound || "No items found."}</div>}
+            )) : <div className="p-2 text-center text-slate-400 text-[10px]">{t.noItemsFound || (isRtl ? "موردی یافت نشد." : "No items found.")}</div>}
           </div>
         )}
       </div>
@@ -84,14 +84,14 @@ const Roles = ({ t, isRtl }) => {
 
   // --- CONFIG ---
   const AVAILABLE_ACTIONS = [
-    { id: 'create', label: t.actCreate || 'Create' }, { id: 'view', label: t.actView || 'View' }, { id: 'edit', label: t.actEdit || 'Edit' }, { id: 'delete', label: t.actDelete || 'Delete' },
-    { id: 'print', label: t.actPrint || 'Print' }, { id: 'approve', label: t.actApprove || 'Approve' }, { id: 'export', label: t.actExport || 'Export' }, { id: 'share', label: t.actShare || 'Share' },
+    { id: 'create', label: t.actCreate || (isRtl ? 'ایجاد' : 'Create') }, { id: 'view', label: t.actView || (isRtl ? 'مشاهده' : 'View') }, { id: 'edit', label: t.actEdit || (isRtl ? 'ویرایش' : 'Edit') }, { id: 'delete', label: t.actDelete || (isRtl ? 'حذف' : 'Delete') },
+    { id: 'print', label: t.actPrint || (isRtl ? 'چاپ' : 'Print') }, { id: 'approve', label: t.actApprove || (isRtl ? 'تایید' : 'Approve') }, { id: 'export', label: t.actExport || (isRtl ? 'خروجی' : 'Export') }, { id: 'share', label: t.actShare || (isRtl ? 'اشتراک' : 'Share') },
   ];
 
   const DATA_SCOPES = {
     'doc_list': [
-      { id: 'docType', label: t.dsDocType || 'Doc Type', options: [{ value: 'opening', label: t.dsDocOpening || 'Opening' }, { value: 'general', label: t.dsDocGeneral || 'General' }] },
-      { id: 'docStatus', label: t.dsStatus || 'Status', options: [{ value: 'draft', label: t.dsStatusTemp || 'Temp' }, { value: 'final', label: t.dsStatusFinal || 'Final' }] }
+      { id: 'docType', label: t.dsDocType || (isRtl ? 'نوع سند' : 'Doc Type'), options: [{ value: 'opening', label: t.dsDocOpening || (isRtl ? 'سند افتتاحیه' : 'Opening') }, { value: 'general', label: t.dsDocGeneral || (isRtl ? 'سند عمومی' : 'General') }] },
+      { id: 'docStatus', label: t.dsStatus || (isRtl ? 'وضعیت سند' : 'Status'), options: [{ value: 'draft', label: t.dsStatusTemp || (isRtl ? 'پیش‌نویس' : 'Draft') }, { value: 'final', label: t.dsStatusFinal || (isRtl ? 'نهایی' : 'Final') }] }
     ]
   };
 
@@ -101,7 +101,6 @@ const Roles = ({ t, isRtl }) => {
   }, [isRtl]);
 
   const fetchData = async () => {
-    // 1. Fetch Resources
     const { data: resData } = await supabase.schema('gen').from('resources').select('*');
     if (resData) {
       const map = new Map();
@@ -169,7 +168,7 @@ const Roles = ({ t, isRtl }) => {
   };
 
   const handleDelete = async (ids) => {
-    const msg = (t.confirmDeleteRoles || 'Delete {0} roles?').replace('{0}', ids.length);
+    const msg = isRtl ? `آیا از حذف ${ids.length} نقش اطمینان دارید؟` : `Delete ${ids.length} roles?`;
     if (confirm(msg)) {
       await supabase.schema('gen').from('roles').delete().in('id', ids);
       fetchData();
@@ -210,7 +209,7 @@ const Roles = ({ t, isRtl }) => {
       const { error: insErr } = await supabase.schema('gen').from('permissions').insert(permInserts);
       if (insErr) {
          console.error(insErr);
-         alert(t.errSavePerms || 'Error saving permissions.');
+         alert(t.errSavePerms || (isRtl ? 'خطا در ذخیره دسترسی‌ها' : 'Error saving permissions.'));
          return;
       }
     }
@@ -245,7 +244,7 @@ const Roles = ({ t, isRtl }) => {
   const handleBulkPermission = (mode) => {
     if (!selectedModule) return;
     const targetIds = getAllDescendantIds(selectedModule);
-    const msg = (t.confirmBulkPerms || 'This will affect {0} items. Continue?').replace('{0}', targetIds.length);
+    const msg = isRtl ? `این عملیات روی آیتم‌های زیرمجموعه نیز اعمال می‌شود. ادامه می‌دهید؟` : `This will affect child items. Continue?`;
     if (targetIds.length > 1 && !confirm(msg)) return;
     setTempPermissions(prev => {
       const next = { ...prev };
@@ -292,7 +291,7 @@ const Roles = ({ t, isRtl }) => {
   };
 
   const handleUnassignUser = async (userId) => {
-    if (confirm(t.confirmUnassignRole || 'Are you sure you want to remove this role from the user?')) {
+    if (confirm(t.confirmUnassignRole || (isRtl ? 'آیا از سلب مسئولیت این نقش از کاربر اطمینان دارید؟' : 'Are you sure you want to remove this role from the user?'))) {
       await supabase.schema('gen').from('user_roles').delete().match({ user_id: userId, role_id: editingRole.id });
       fetchData();
     }
@@ -300,69 +299,69 @@ const Roles = ({ t, isRtl }) => {
 
   // --- COLUMNS ---
   const roleColumns = [
-    { header: t.id || 'ID', field: 'id', width: 'w-16', render: (r) => <span className="text-[10px] text-slate-400 font-mono truncate w-12 inline-block">{r.id.split('-')[0]}</span> },
-    { header: t.roleTitle || 'Role Title', field: 'title', width: 'w-48', sortable: true },
-    { header: t.sysCode || 'System Code', field: 'code', width: 'w-32', sortable: true },
-    { header: t.startDate || 'Start Date', field: 'startDate', width: 'w-32', render: (r) => <span className="dir-ltr font-mono text-xs">{r.startDate || '-'}</span> },
-    { header: t.status || 'Status', field: 'isActive', width: 'w-24 text-center', render: (r) => <Badge variant={r.isActive ? 'success' : 'neutral'}>{r.isActive ? (t.active || 'Active') : (t.inactive || 'Inactive')}</Badge> },
+    { header: t.id || (isRtl ? 'شناسه' : 'ID'), field: 'id', width: 'w-16', render: (r) => <span className="text-[10px] text-slate-400 font-mono truncate w-12 inline-block">{r.id.split('-')[0]}</span> },
+    { header: t.roleTitle || (isRtl ? 'عنوان نقش' : 'Role Title'), field: 'title', width: 'w-48', sortable: true },
+    { header: t.sysCode || (isRtl ? 'کد سیستمی' : 'System Code'), field: 'code', width: 'w-32', sortable: true },
+    { header: t.startDate || (isRtl ? 'تاریخ شروع' : 'Start Date'), field: 'startDate', width: 'w-32', render: (r) => <span className="dir-ltr font-mono text-xs">{r.startDate || '-'}</span> },
+    { header: t.status || (isRtl ? 'وضعیت' : 'Status'), field: 'isActive', width: 'w-24 text-center', render: (r) => <Badge variant={r.isActive ? 'success' : 'neutral'}>{r.isActive ? (t.active || (isRtl ? 'فعال' : 'Active')) : (t.inactive || (isRtl ? 'غیرفعال' : 'Inactive'))}</Badge> },
   ];
 
   const assignedUsersColumns = [
-    { header: t.id || 'ID', field: 'id', width: 'w-16', render: (r) => <span className="text-[10px] font-mono">{r.id.split('-')[0]}</span> },
-    { header: t.username || 'Username', field: 'username', width: 'w-32' },
-    { header: t.fullName || 'Full Name', field: 'fullName', width: 'w-48', render: (r) => <span className="font-bold text-slate-700">{r.fullName}</span> },
-    { header: t.status || 'Status', field: 'isActive', width: 'w-24', render: (r) => <div className="flex justify-center"><Toggle checked={r.isActive} disabled /></div> },
+    { header: t.id || (isRtl ? 'شناسه' : 'ID'), field: 'id', width: 'w-16', render: (r) => <span className="text-[10px] font-mono">{r.id.split('-')[0]}</span> },
+    { header: t.username || (isRtl ? 'نام کاربری' : 'Username'), field: 'username', width: 'w-32' },
+    { header: t.fullName || (isRtl ? 'نام و نام خانوادگی' : 'Full Name'), field: 'fullName', width: 'w-48', render: (r) => <span className="font-bold text-slate-700">{r.fullName}</span> },
+    { header: t.status || (isRtl ? 'وضعیت کاربر' : 'Status'), field: 'isActive', width: 'w-24', render: (r) => <div className="flex justify-center"><Toggle checked={r.isActive} disabled /></div> },
   ];
 
   return (
     <div className={`flex flex-col h-full bg-slate-50/50 p-4 overflow-hidden ${isRtl ? 'font-vazir' : 'font-sans'}`}>
       <div className="flex items-center justify-between mb-4 shrink-0">
-          <div><h1 className="text-xl font-black text-slate-800 flex items-center gap-2"><Shield className="text-indigo-600" size={24}/> {t.roles_title || 'Roles Management'}</h1></div>
+          <div><h1 className="text-xl font-black text-slate-800 flex items-center gap-2"><Shield className="text-indigo-600" size={24}/> {t.roles_title || (isRtl ? 'مدیریت نقش‌ها' : 'Roles Management')}</h1></div>
       </div>
 
-      <FilterSection title={t.advancedSearch || "Advanced Search"} onSearch={() => setAppliedFilters(filterValues)} onClear={() => { setFilterValues({ formIds: [], userIds: [], isActive: 'all' }); setAppliedFilters({ formIds: [], userIds: [], isActive: 'all' }); }} isRtl={isRtl}>
+      <FilterSection title={t.advancedSearch || (isRtl ? "جستجوی پیشرفته" : "Advanced Search")} onSearch={() => setAppliedFilters(filterValues)} onClear={() => { setFilterValues({ formIds: [], userIds: [], isActive: 'all' }); setAppliedFilters({ formIds: [], userIds: [], isActive: 'all' }); }} isRtl={isRtl}>
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600">{t.formName || 'Form Name'}</label>
-            <MultiSelect options={allForms} value={filterValues.formIds} onChange={v => setFilterValues({...filterValues, formIds: v})} placeholder={t.searchForm || "Search Form..."} />
+            <label className="block text-[11px] font-bold text-slate-600">{t.formName || (isRtl ? 'نام فرم' : 'Form Name')}</label>
+            <MultiSelect options={allForms} value={filterValues.formIds} onChange={v => setFilterValues({...filterValues, formIds: v})} placeholder={t.searchForm || (isRtl ? "جستجوی فرم..." : "Search Form...")} />
           </div>
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600">{t.userName || 'User Name'}</label>
-            <MultiSelect options={allUsers.map(u => ({ id: u.id, label: u.fullName }))} value={filterValues.userIds} onChange={v => setFilterValues({...filterValues, userIds: v})} placeholder={t.searchUser || "Search User..."} />
+            <label className="block text-[11px] font-bold text-slate-600">{t.userName || (isRtl ? 'نام کاربر' : 'User Name')}</label>
+            <MultiSelect options={allUsers.map(u => ({ id: u.id, label: u.fullName }))} value={filterValues.userIds} onChange={v => setFilterValues({...filterValues, userIds: v})} placeholder={t.searchUser || (isRtl ? "جستجوی کاربر..." : "Search User...")} />
           </div>
-          <SelectField label={t.status || "Status"} value={filterValues.isActive} onChange={e => setFilterValues({...filterValues, isActive: e.target.value})} isRtl={isRtl}>
-            <option value="all">{t.optAll || "All"}</option><option value="active">{t.active || "Active"}</option><option value="inactive">{t.inactive || "Inactive"}</option>
+          <SelectField label={t.status || (isRtl ? "وضعیت" : "Status")} value={filterValues.isActive} onChange={e => setFilterValues({...filterValues, isActive: e.target.value})} isRtl={isRtl}>
+            <option value="all">{t.optAll || (isRtl ? "همه" : "All")}</option><option value="active">{t.active || (isRtl ? "فعال" : "Active")}</option><option value="inactive">{t.inactive || (isRtl ? "غیرفعال" : "Inactive")}</option>
           </SelectField>
       </FilterSection>
 
       <div className="flex-1 min-h-0">
           <DataGrid columns={roleColumns} data={filteredRoles} isRtl={isRtl} selectedIds={selectedRows} onSelectAll={(c) => setSelectedRows(c ? roles.map(r => r.id) : [])} onSelectRow={(id, c) => setSelectedRows(p => c ? [...p, id] : p.filter(r => r !== id))} onCreate={handleCreate} onDelete={handleDelete} onDoubleClick={handleEdit}
-            actions={(row) => (<><Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleEdit(row)} title={t.edit || "Edit"} /><Button variant="ghost" size="iconSm" icon={Users} className="text-indigo-600" onClick={() => openUserAssignment(row)} title={t.roleUsers || "Role Users"} /><Button variant="ghost" size="iconSm" icon={Lock} className="text-amber-600" onClick={() => openAccessModal(row)} title={t.permissions || "Permissions"} /></>)}
+            actions={(row) => (<><Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleEdit(row)} title={t.edit || (isRtl ? "ویرایش" : "Edit")} /><Button variant="ghost" size="iconSm" icon={Users} className="text-indigo-600" onClick={() => openUserAssignment(row)} title={t.roleUsers || (isRtl ? "کاربران نقش" : "Role Users")} /><Button variant="ghost" size="iconSm" icon={Lock} className="text-amber-600" onClick={() => openAccessModal(row)} title={t.permissions || (isRtl ? "دسترسی‌ها" : "Permissions")} /></>)}
           />
       </div>
 
-      <Modal isOpen={isRoleModalOpen} onClose={() => setIsRoleModalOpen(false)} title={editingRole ? (t.editRole || "Edit Role") : (t.newRole || "New Role")} size="md" footer={<><Button variant="secondary" onClick={() => setIsRoleModalOpen(false)}>{t.cancel || "Cancel"}</Button><Button variant="primary" icon={Save} onClick={saveRole}>{t.save || "Save"}</Button></>}>
+      <Modal isOpen={isRoleModalOpen} onClose={() => setIsRoleModalOpen(false)} title={editingRole ? (t.editRole || (isRtl ? "ویرایش نقش" : "Edit Role")) : (t.newRole || (isRtl ? "نقش جدید" : "New Role"))} size="md" footer={<><Button variant="secondary" onClick={() => setIsRoleModalOpen(false)}>{t.cancel || (isRtl ? "انصراف" : "Cancel")}</Button><Button variant="primary" icon={Save} onClick={saveRole}>{t.save || (isRtl ? "ذخیره" : "Save")}</Button></>}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-               <InputField label={t.roleTitle || "Role Title"} value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} isRtl={isRtl} />
-               <InputField label={t.sysCode || "System Code"} value={formData.code} onChange={(e) => setFormData({...formData, code: e.target.value})} isRtl={isRtl} className="dir-ltr" />
+               <InputField label={t.roleTitle || (isRtl ? "عنوان نقش" : "Role Title")} value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} isRtl={isRtl} />
+               <InputField label={t.sysCode || (isRtl ? "کد سیستمی" : "System Code")} value={formData.code} onChange={(e) => setFormData({...formData, code: e.target.value})} isRtl={isRtl} className="dir-ltr" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-               <DatePicker label={t.startDate || "Start Date"} value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
-               <DatePicker label={t.endDate || "End Date"} value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
+               <DatePicker label={t.startDate || (isRtl ? "تاریخ شروع" : "Start Date")} value={formData.startDate} onChange={(e) => setFormData({...formData, startDate: e.target.value})} />
+               <DatePicker label={t.endDate || (isRtl ? "تاریخ پایان" : "End Date")} value={formData.endDate} onChange={(e) => setFormData({...formData, endDate: e.target.value})} />
             </div>
             <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2">
-               <span className="text-[13px] font-bold text-slate-700">{t.roleStatus || "Role Status"}</span>
-               <Toggle checked={formData.isActive} onChange={(val) => setFormData({...formData, isActive: val})} label={formData.isActive ? (t.active || "Active") : (t.inactive || "Inactive")} />
+               <span className="text-[13px] font-bold text-slate-700">{t.roleStatus || (isRtl ? "وضعیت نقش" : "Role Status")}</span>
+               <Toggle checked={formData.isActive} onChange={(val) => setFormData({...formData, isActive: val})} label={formData.isActive ? (t.active || (isRtl ? "فعال" : "Active")) : (t.inactive || (isRtl ? "غیرفعال" : "Inactive"))} />
             </div>
           </div>
       </Modal>
 
-      <Modal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} title={`${t.usersWithRole || 'Users with Role'}: ${editingRole?.title}`} size="lg" footer={<Button variant="primary" onClick={() => setIsUserModalOpen(false)}>{t.close || 'Close'}</Button>}>
+      <Modal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} title={`${t.usersWithRole || (isRtl ? 'کاربران دارای نقش' : 'Users with Role')}: ${editingRole?.title}`} size="lg" footer={<Button variant="primary" onClick={() => setIsUserModalOpen(false)}>{t.close || (isRtl ? 'بستن' : 'Close')}</Button>}>
           <div className="flex flex-col h-[500px]">
             <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-3 relative z-[60]">
-               <label className="text-xs font-bold text-indigo-800 mb-2 block flex items-center gap-2"><UserPlus size={14}/> {t.addUserToRole || 'Add user to this role'}</label>
+               <label className="text-xs font-bold text-indigo-800 mb-2 block flex items-center gap-2"><UserPlus size={14}/> {t.addUserToRole || (isRtl ? 'افزودن کاربر جدید به این نقش' : 'Add user to this role')}</label>
                <div className="relative">
-                  <input value={userSearchTerm} onChange={(e) => { setUserSearchTerm(e.target.value); setShowUserResults(true); }} placeholder={t.searchUserPrompt || "Search username or full name..."} className={`w-full h-9 bg-white border border-indigo-200 rounded text-xs outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${isRtl ? 'pr-9 pl-2' : 'pl-9 pr-2'}`} />
+                  <input value={userSearchTerm} onChange={(e) => { setUserSearchTerm(e.target.value); setShowUserResults(true); }} placeholder={t.searchUserPrompt || (isRtl ? "جستجوی نام کاربری یا نام شخص..." : "Search username or full name...")} className={`w-full h-9 bg-white border border-indigo-200 rounded text-xs outline-none focus:ring-2 focus:ring-indigo-300 transition-all ${isRtl ? 'pr-9 pl-2' : 'pl-9 pr-2'}`} />
                   <Search size={16} className={`absolute top-2.5 text-indigo-400 ${isRtl ? 'right-2.5' : 'left-2.5'}`}/>
                   {showUserResults && userSearchTerm && (
                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-[100]">
@@ -371,19 +370,19 @@ const Roles = ({ t, isRtl }) => {
                               <div className="flex flex-col"><span className="text-xs font-bold text-slate-700">{user.fullName}</span><span className="text-[10px] text-slate-400 font-mono">@{user.username}</span></div>
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-600 bg-indigo-100 p-1 rounded"><Plus size={14}/></div>
                            </div>
-                        )) : <div className="p-3 text-center text-xs text-slate-400">{t.userNotFoundOrAdded || 'User not found or already added.'}</div>}
+                        )) : <div className="p-3 text-center text-xs text-slate-400">{t.userNotFoundOrAdded || (isRtl ? 'کاربری یافت نشد یا قبلاً اضافه شده است.' : 'User not found or already added.')}</div>}
                      </div>
                   )}
                   {showUserResults && userSearchTerm && <div className="fixed inset-0 z-[-1]" onClick={() => setShowUserResults(false)}></div>}
                </div>
             </div>
             <div className="flex-1 overflow-hidden border border-slate-200 rounded-lg bg-white relative z-0">
-               <DataGrid columns={assignedUsersColumns} data={assignedUsers} isRtl={isRtl} actions={(row) => (<Button variant="ghost" size="iconSm" icon={UserMinus} className="text-red-500 hover:bg-red-50" onClick={() => handleUnassignUser(row.id)} title={t.removeRoleFromUser || "Remove role from user"} />)} />
+               <DataGrid columns={assignedUsersColumns} data={assignedUsers} isRtl={isRtl} actions={(row) => (<Button variant="ghost" size="iconSm" icon={UserMinus} className="text-red-500 hover:bg-red-50" onClick={() => handleUnassignUser(row.id)} title={t.removeRoleFromUser || (isRtl ? "حذف نقش از کاربر" : "Remove role from user")} />)} />
             </div>
           </div>
       </Modal>
 
-      <Modal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} title={`${t.managePermsFor || 'Manage Permissions for'}: ${editingRole?.title}`} size="xl" footer={<><Button variant="secondary" onClick={() => setIsAccessModalOpen(false)}>{t.cancel || "Cancel"}</Button><Button variant="primary" icon={Save} onClick={saveAccess}>{t.apply || "Apply"}</Button></>}>
+      <Modal isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} title={`${t.managePermsFor || (isRtl ? 'مدیریت دسترسی‌های:' : 'Manage Permissions for:')} ${editingRole?.title}`} size="xl" footer={<><Button variant="secondary" onClick={() => setIsAccessModalOpen(false)}>{t.cancel || (isRtl ? "انصراف" : "Cancel")}</Button><Button variant="primary" icon={Save} onClick={saveAccess}>{t.apply || (isRtl ? "اعمال" : "Apply")}</Button></>}>
           <div className="flex h-[550px] border border-slate-200 rounded-lg overflow-hidden">
             <div className="w-1/3 border-l border-slate-200 bg-slate-50 flex flex-col p-2">
                <TreeView data={dynamicMenu} selectedNodeId={selectedModule?.id} onSelectNode={setSelectedModule} renderNodeContent={renderPermissionNode} isRtl={isRtl} />
@@ -391,15 +390,15 @@ const Roles = ({ t, isRtl }) => {
             <div className="w-2/3 bg-white flex flex-col">
                {selectedModule ? (
                   <>
-                     <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-sm">{selectedModule.label[isRtl ? 'fa' : 'en']}</h3><div className="flex gap-1"><Button variant="outline" size="sm" icon={Trash2} onClick={() => handleBulkPermission('revoke')}>{t.revokeAll || 'Revoke All'}</Button><Button variant="success" size="sm" icon={Zap} onClick={() => handleBulkPermission('grant')}>{t.fullAccess || 'Full Access'}</Button></div></div>
+                     <div className="p-4 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-sm">{selectedModule.label[isRtl ? 'fa' : 'en']}</h3><div className="flex gap-1"><Button variant="outline" size="sm" icon={Trash2} onClick={() => handleBulkPermission('revoke')}>{t.revokeAll || (isRtl ? 'حذف همه' : 'Revoke All')}</Button><Button variant="success" size="sm" icon={Zap} onClick={() => handleBulkPermission('grant')}>{t.fullAccess || (isRtl ? 'دسترسی کامل' : 'Full Access')}</Button></div></div>
                      <div className="flex-1 overflow-y-auto p-5 space-y-6">
                         <div>
-                           <div className="text-[11px] font-bold text-slate-500 uppercase mb-2">{t.actions || 'Actions'}</div>
+                           <div className="text-[11px] font-bold text-slate-500 uppercase mb-2">{t.actions || (isRtl ? 'عملیات' : 'Actions')}</div>
                            <SelectionGrid items={AVAILABLE_ACTIONS} selectedIds={tempPermissions[selectedModule.id]?.actions || []} onToggle={(id) => updateAction(selectedModule.id, id)} />
                         </div>
                         {DATA_SCOPES[selectedModule.id] && (
                            <div className="pt-4 border-t border-slate-100">
-                              <div className="text-[11px] font-bold text-slate-500 uppercase mb-2">{t.dataAccess || 'Data Access'}</div>
+                              <div className="text-[11px] font-bold text-slate-500 uppercase mb-2">{t.dataAccess || (isRtl ? 'داده‌ها' : 'Data Access')}</div>
                               {DATA_SCOPES[selectedModule.id].map(scope => (
                                  <div key={scope.id} className="mb-3">
                                     <span className="text-xs font-bold block mb-1">{scope.label}:</span>
@@ -410,7 +409,7 @@ const Roles = ({ t, isRtl }) => {
                         )}
                      </div>
                   </>
-               ) : <div className="flex items-center justify-center h-full text-slate-400 text-sm">{t.selectItem || 'Select an item'}</div>}
+               ) : <div className="flex items-center justify-center h-full text-slate-400 text-sm">{t.selectItem || (isRtl ? 'یک آیتم انتخاب کنید' : 'Select an item')}</div>}
             </div>
           </div>
       </Modal>
