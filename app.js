@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { 
   BarChart3, Languages, Bell, Search, 
   ChevronRight, LogOut, LayoutGrid, ChevronRightSquare,
-  Menu, Circle, Loader2
+  Menu, Circle, Loader2, Shield
 } from 'lucide-react';
 
 const App = () => {
@@ -33,23 +33,17 @@ const App = () => {
     document.documentElement.lang = lang;
   }, [lang, isRtl]);
 
-  // ============================================================================
-  // GLOBAL PERMISSION CHECKER FUNCTION
-  // ============================================================================
   window.hasAccess = (formCode, action) => {
     const user = window.currentUser;
     if (!user) return false;
     
-    // 1. Admin Override Rule
     if (user.user_type === 'admin' || user.user_type === 'مدیر سیستم') return true;
     
-    // 2. Standard User Check
     const perms = window.userPermissions || {};
     const resourcePerms = perms[formCode];
     
     if (!resourcePerms) return false;
     
-    // If checking 'view', they can view if they have ANY action permission explicitly given for this form
     if (action === 'view') {
        return resourcePerms.actions.includes('view') || resourcePerms.actions.length > 0;
     }
@@ -57,7 +51,6 @@ const App = () => {
     return resourcePerms.actions.includes(action);
   };
 
-  // --- Auth Handlers ---
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!window.supabase) return setError('دیتابیس مقداردهی نشده است.');
@@ -66,7 +59,6 @@ const App = () => {
     setError('');
 
     try {
-      // 1. Verify User Credentials via RPC with correct schema chain
       const { data: user, error: loginErr } = await window.supabase.schema('gen').rpc('verify_user', {
         p_username: loginData.identifier,
         p_password: loginData.password
@@ -80,13 +72,10 @@ const App = () => {
 
       window.currentUser = user;
 
-      // 2. Fetch Permissions for non-admins
       if (user.user_type !== 'admin' && user.user_type !== 'مدیر سیستم') {
-        // Get user roles
         const { data: rolesData } = await window.supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', user.id);
         const roleIds = rolesData ? rolesData.map(r => r.role_id) : [];
 
-        // Fetch permissions (both direct and role-based)
         let query = window.supabase.schema('gen').from('permissions').select('*');
         if (roleIds.length > 0) {
           query = query.or(`user_id.eq.${user.id},role_id.in.(${roleIds.join(',')})`);
@@ -104,7 +93,6 @@ const App = () => {
             }
             const existing = mergedPerms[p.resource_code];
             existing.actions = [...new Set([...existing.actions, ...(p.actions || [])])];
-            // Merge scopes if needed...
             Object.keys(p.data_scopes || {}).forEach(key => {
                if (!existing.scopes[key]) existing.scopes[key] = [];
                existing.scopes[key] = [...new Set([...existing.scopes[key], ...p.data_scopes[key]])];
@@ -125,7 +113,6 @@ const App = () => {
     }
   };
 
-  // --- Dynamic Menu Filtering ---
   const filterMenuTree = (nodes) => {
     if (window.currentUser?.user_type === 'admin' || window.currentUser?.user_type === 'مدیر سیستم') return nodes;
     
@@ -149,11 +136,9 @@ const App = () => {
     return filterMenuTree(MENU_DATA);
   }, [isLoggedIn, MENU_DATA]);
 
-  // Set default modules after login
   useEffect(() => {
     if (isLoggedIn && dynamicMenuData.length > 0 && !activeModuleId) {
        setActiveModuleId(dynamicMenuData[0].id);
-       // Select first form of first module
        let firstForm = null;
        const findFirstForm = (nodes) => {
          for (let n of nodes) {
@@ -171,7 +156,6 @@ const App = () => {
     return dynamicMenuData.find(m => m.id === activeModuleId) || dynamicMenuData[0] || {};
   }, [activeModuleId, dynamicMenuData]);
 
-  // --- Render Components ---
   const renderContent = () => {
     const { 
       KpiDashboard, UserManagement, GeneralWorkspace, ComponentShowcase, 
@@ -180,7 +164,6 @@ const App = () => {
       FiscalPeriods, DocTypes, AutoNumbering, ChartofAccounts 
     } = window;
 
-    // Security Check: Even if they manually change the activeId state, prevent rendering if no access
     if (activeId !== 'user_profile' && !window.hasAccess(activeId, 'view')) {
       return (
          <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
@@ -252,7 +235,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      {/* SIDEBAR - Module Rail */}
       <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-40 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative overflow-x-hidden`}>
         <div className="bg-indigo-700 w-10 h-10 rounded-xl text-white mb-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
           <BarChart3 size={20} strokeWidth={2.5} />
@@ -290,7 +272,6 @@ const App = () => {
         </div>
       </aside>
 
-      {/* SIDEBAR - Sub Menu */}
       <aside className={`bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)] ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}`}>
         <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 bg-slate-50/30">
            <h2 className="text-sm font-black text-slate-800 truncate leading-tight">
@@ -315,7 +296,6 @@ const App = () => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50 relative">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-20">
            <div className="flex items-center gap-4">
