@@ -218,6 +218,7 @@ const UserManagement = ({ t, isRtl }) => {
     const fullName = getPartyName(userFormData.partyId).split(' (')[0];
 
     if (editingUser) {
+      // فقط فیلدهای عادی آپدیت می‌شوند تا از دسترسی غیرمجاز به فیلد password و ایجاد ارور جلوگیری شود
       const { error } = await supabase.schema('gen').from('users').update({
         username: userFormData.username, party_id: userFormData.partyId, user_type: userFormData.userType,
         is_active: userFormData.isActive, full_name: fullName
@@ -228,7 +229,7 @@ const UserManagement = ({ t, isRtl }) => {
         return alert(t.errUpdateUser || (isRtl ? 'خطا در ویرایش کاربر' : 'Error updating user.'));
       }
     } else {
-      // ایجاد رمز عبور با الگوریتم SHA-256 دقیقاً مشابه سیستم لاگین
+      // محاسبه هش کلمه عبور با استاندارد SHA-256 مانند صفحه لاگین سیستم
       let hashedPassword = userFormData.password;
       if (window.crypto && window.crypto.subtle) {
           const msgBuffer = new TextEncoder().encode(userFormData.password);
@@ -237,17 +238,16 @@ const UserManagement = ({ t, isRtl }) => {
           hashedPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       }
 
-      // درج مستقیم در جدول به جای استفاده از RPC
-      const { error } = await supabase.schema('gen').from('users').insert([{
-          username: userFormData.username, 
-          password: hashedPassword,
-          password_hash: hashedPassword,
-          password_hash_value: hashedPassword,
-          full_name: fullName,
-          user_type: userFormData.userType, 
-          is_active: userFormData.isActive, 
-          party_id: userFormData.partyId
-      }]);
+      // ارسال مستقیم هش محاسبه شده به تابع دیتابیس
+      const { error } = await supabase.schema('gen').rpc('create_user_with_hash', {
+        p_username: userFormData.username, 
+        p_password: hashedPassword, 
+        p_full_name: fullName,
+        p_user_type: userFormData.userType, 
+        p_email: '', 
+        p_is_active: userFormData.isActive, 
+        p_party_id: userFormData.partyId
+      });
       
       if (error) {
          console.error(error);
@@ -266,23 +266,21 @@ const UserManagement = ({ t, isRtl }) => {
         const defaultPassword = '123456';
         let hashedPassword = defaultPassword;
         
-        // محاسبه هش با روش استاندارد SHA-256 سازگار با فرم لاگین
+        // محاسبه هش به همان روش یکسان با سیستم لاگین
         if (window.crypto && window.crypto.subtle) {
           const msgBuffer = new TextEncoder().encode(defaultPassword);
           const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
           const hashArray = Array.from(new Uint8Array(hashBuffer));
           hashedPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         } else {
-           // پشتیبان: رشته هگزادسیمال SHA-256 از 123456
            hashedPassword = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
         }
 
-        // آپدیت مستقیم ردیف کاربر در دیتابیس بدون درگیری با الگوریتم‌های بک‌اند دیتابیس
-        const { error } = await supabase.schema('gen').from('users').update({
-           password: hashedPassword,
-           password_hash: hashedPassword,
-           password_hash_value: hashedPassword
-        }).eq('id', user.id);
+        // فراخوانی تابع RPC و انتقال هش محاسبه شده به آن جهت عبور از محدودیت‌های دیتابیس
+        const { error } = await supabase.schema('gen').rpc('reset_user_password', {
+           p_user_id: user.id,
+           p_new_password: hashedPassword
+        });
 
         if (error) {
            console.error(error);
@@ -469,7 +467,7 @@ const UserManagement = ({ t, isRtl }) => {
             </SelectField>
             <div className="col-span-2 grid grid-cols-2 gap-4">
                 {!editingUser ? <InputField label={t.password || (isRtl ? "رمز عبور" : "Password")} type="password" value={userFormData.password} onChange={(e) => setUserFormData({...userFormData, password: e.target.value})} isRtl={isRtl} className="dir-ltr" placeholder="********" /> : <div className="opacity-50"><InputField label={t.password || (isRtl ? "رمز عبور" : "Password")} disabled value="********" isRtl={isRtl} /></div>}
-                <SelectField label={t.linkToParty || (isRtl ? "اتصال به پرسنل مرتبط" : "Link to Personnel")} value={userFormData.partyId} onChange={(e) => setUserFormData({...userFormData, partyId: e.target.value})} isRtl={isRtl}><option value="">-- {t.select || (isRtl ? "انتخاب کنید" : "Select")} --</option>{partiesList.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}</SelectField>
+                <SelectField label={t.linkToParty || (isRtl ? "اتصال به شخص / طرف حساب" : "Link to Party")} value={userFormData.partyId} onChange={(e) => setUserFormData({...userFormData, partyId: e.target.value})} isRtl={isRtl}><option value="">-- {t.select || (isRtl ? "انتخاب کنید" : "Select")} --</option>{partiesList.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}</SelectField>
             </div>
             <div className="col-span-2 flex items-center pt-2 gap-2">
                <input 
