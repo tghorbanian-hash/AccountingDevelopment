@@ -54,40 +54,85 @@ const App = () => {
     }
 
     try {
-      const { data: isValid, error: authErr } = await supabase.schema('gen').rpc('verify_user_password', {
-        p_username: loginData.identifier,
-        p_password: loginData.password
-      });
+      // خواندن رکورد کاربر مستقیماً از جدول users طبق دستور
+      const { data: userData, error: userErr } = await supabase
+        .schema('gen')
+        .from('users')
+        .select('*')
+        .eq('username', loginData.identifier)
+        .single();
 
-      if (authErr) {
-        console.error('Login error:', authErr);
-        setError(t.invalidCreds || (isRtl ? 'نام کاربری یا رمز عبور اشتباه است' : 'Invalid credentials'));
+      if (userErr || !userData) {
+        setError(t.invalidCreds || (isRtl ? 'نام کاربری در سیستم یافت نشد' : 'Username not found'));
         return;
       }
 
-      if (isValid) {
-        const { data: userData, error: userErr } = await supabase
-          .schema('gen')
-          .from('users')
-          .select('is_active')
-          .eq('username', loginData.identifier)
-          .single();
+      if (!userData.is_active) {
+        setError(isRtl ? 'حساب کاربری شما غیرفعال شده است' : 'Your account is disabled');
+        return;
+      }
 
-        if (userErr || !userData) {
-          setError(t.invalidCreds || (isRtl ? 'کاربر در سیستم یافت نشد' : 'User not found'));
-          return;
+      // دریافت پسوورد از دیتابیس (پشتیبانی از نام‌های مختلف ستون)
+      const storedPassword = userData.password_hash || userData.password || userData.password_hash_value;
+      
+      if (!storedPassword) {
+        setError(isRtl ? 'کلمه عبور در پروفایل این کاربر تنظیم نشده است' : 'Password not set for this user');
+        return;
+      }
+
+      let isPasswordValid = false;
+
+      // بررسی ۱: همسانی عینی (در صورتی که پسوورد به صورت Plain Text ذخیره شده باشد)
+      if (storedPassword === loginData.password) {
+        isPasswordValid = true;
+      } 
+      // بررسی ۲: دی‌کد Base64 (بررسی Dehash)
+      else {
+        try {
+          if (atob(storedPassword) === loginData.password || btoa(loginData.password) === storedPassword) {
+            isPasswordValid = true;
+          }
+        } catch (err) {
+          // خطا در دی‌کد شدن نادیده گرفته می‌شود تا مراحل بعدی بررسی شوند
         }
+      }
 
-        if (!userData.is_active) {
-          setError(isRtl ? 'حساب کاربری شما غیرفعال شده است' : 'Your account is disabled');
-          return;
+      // بررسی ۳: هشینگ SHA-256
+      if (!isPasswordValid) {
+        try {
+          const msgBuffer = new TextEncoder().encode(loginData.password);
+          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const sha256Hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+          
+          if (storedPassword === sha256Hash) {
+            isPasswordValid = true;
+          }
+        } catch (err) {
+          console.error("Hash comparison failed", err);
         }
+      }
 
+      // بررسی ۴: پشتیبان (Fallback) برای هش‌های ایمن (مثل bcrypt) که قابلیت dehash ندارند و باید در دیتابیس بررسی شوند
+      if (!isPasswordValid) {
+        const { data: rpcValid, error: rpcErr } = await supabase.schema('gen').rpc('verify_user_password', {
+          p_username: loginData.identifier,
+          p_password: loginData.password
+        });
+        
+        if (!rpcErr && rpcValid === true) {
+          isPasswordValid = true;
+        }
+      }
+
+      // ورود نهایی
+      if (isPasswordValid) {
         setIsLoggedIn(true);
         setError('');
       } else {
         setError(t.invalidCreds || (isRtl ? 'نام کاربری یا رمز عبور اشتباه است' : 'Invalid credentials'));
       }
+
     } catch (err) {
       console.error(err);
       setError(t.serverError || (isRtl ? 'خطای ارتباط با سرور' : 'Server error'));
@@ -96,10 +141,9 @@ const App = () => {
 
   const handleVerifyOtp = (e) => {
     e.preventDefault();
-    // MOCK LOGIC: Accept '123456' as the valid code
     if (recoveryData.otp === '123456') {
       setError('');
-      setAuthView('reset'); // Go to Change Password Page
+      setAuthView('reset'); 
     } else {
       setError(t.invalidOtp || 'Invalid OTP code');
     }
@@ -107,13 +151,10 @@ const App = () => {
 
   const handleUpdatePassword = (e) => {
     e.preventDefault();
-    // MOCK LOGIC: Validate passwords match
     if (!recoveryData.newPass || recoveryData.newPass !== recoveryData.confirmPass) {
        setError(isRtl ? 'رمز عبور و تکرار آن مطابقت ندارند' : 'Passwords do not match');
        return;
     }
-    
-    // Success scenario
     alert(t.resetSuccess || 'Password updated successfully');
     setAuthView('login');
     setError('');
@@ -127,36 +168,14 @@ const App = () => {
   }, [activeModuleId, MENU_DATA]);
   
   const renderContent = () => {
-    // Retrieve components from window object (loaded via script tags)
     const { 
-      KpiDashboard, 
-      UserManagement, 
-      GeneralWorkspace, 
-      ComponentShowcase, 
-      LoginPage, 
-      Roles,
-      Parties,
-      UserProfile,
-      OrganizationInfo,
-      CurrencySettings,
-      CostCenters,
-      Projects,
-      Branches,
-      OrgChart,
-      Ledgers,
-      Details,
-      FiscalPeriods,
-      DocTypes,
-      AutoNumbering,
-      ChartofAccounts 
+      KpiDashboard, UserManagement, GeneralWorkspace, ComponentShowcase, LoginPage, 
+      Roles, Parties, UserProfile, OrganizationInfo, CurrencySettings, CostCenters, 
+      Projects, Branches, OrgChart, Ledgers, Details, FiscalPeriods, DocTypes, 
+      AutoNumbering, ChartofAccounts 
     } = window;
 
-    // --- Routing Logic ---
-    
-    // 1. User Profile
     if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error: UserProfile Component Not Loaded</div>;
-
-    // 2. Base Information
     if (activeId === 'org_info') return OrganizationInfo ? <OrganizationInfo t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrganizationInfo Component Not Loaded</div>;
     if (activeId === 'currency_settings') return CurrencySettings ? <CurrencySettings t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: CurrencySettings Component Not Loaded</div>;
     if (activeId === 'parties') return Parties ? <Parties t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Parties Component Not Loaded</div>;
@@ -164,26 +183,18 @@ const App = () => {
     if (activeId === 'projects') return Projects ? <Projects t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Projects Component Not Loaded</div>;
     if (activeId === 'branches') return Branches ? <Branches t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Branches Component Not Loaded</div>;
     if (activeId === 'org_chart') return OrgChart ? <OrgChart t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrgChart Component Not Loaded</div>;
-
-    // 2.1 Financial Base Info (General Ledger)
     if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
     if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Details Component Not Loaded</div>;
-    if (activeId === 'acc_structure') return ChartofAccounts ? <ChartofAccounts t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: ChartofAccounts Component Not Loaded</div>; // <--- ADDED ROUTE
+    if (activeId === 'acc_structure') return ChartofAccounts ? <ChartofAccounts t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: ChartofAccounts Component Not Loaded</div>; 
     if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
     if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
     if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
-
-
-    // 3. Security & Access
     if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
     if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Roles Component Not Loaded</div>;
-
-    // 4. Workspaces & Dashboards
     if (activeId === 'workspace_gen') return GeneralWorkspace ? <GeneralWorkspace t={t} isRtl={isRtl} /> : <div>Loading...</div>;
     if (activeId === 'dashboards_gen') return KpiDashboard ? <KpiDashboard t={t} isRtl={isRtl} /> : <div>Loading...</div>;
     if (activeId === 'ui_showcase') return ComponentShowcase ? <ComponentShowcase t={t} isRtl={isRtl} /> : <div>Loading...</div>;
 
-    // 5. Default / Empty State
     return (
       <div className="flex flex-col items-center justify-center h-full text-center space-y-6 opacity-60">
           <div className="p-8 bg-white rounded-[2rem] shadow-sm border border-slate-200">
@@ -215,8 +226,6 @@ const App = () => {
         error={error} 
         handleLogin={handleLogin} 
         toggleLanguage={() => setLang(l => l === 'en' ? 'fa' : 'en')} 
-        
-        // --- Added Handlers ---
         handleVerifyOtp={handleVerifyOtp} 
         handleUpdatePassword={handleUpdatePassword} 
       />
@@ -225,8 +234,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      
-      {/* SIDEBAR - Module Rail */}
       <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-40 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative overflow-x-hidden`}>
         <div className="bg-indigo-700 w-10 h-10 rounded-xl text-white mb-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
           <BarChart3 size={20} strokeWidth={2.5} />
@@ -275,7 +282,6 @@ const App = () => {
         </div>
       </aside>
 
-      {/* SIDEBAR - Sub Menu */}
       <aside className={`
         bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 
         flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)]
@@ -309,14 +315,13 @@ const App = () => {
                AD
              </div>
              <div className="min-w-0">
-                <div className="text-[12px] font-bold text-slate-700 truncate">Admin User</div>
-                <div className="text-[10px] text-slate-400 truncate">Product Manager</div>
+                <div className="text-[12px] font-bold text-slate-700 truncate">{loginData.identifier || 'User'}</div>
+                <div className="text-[10px] text-slate-400 truncate">System User</div>
              </div>
           </div>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50 relative">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-20">
            <div className="flex items-center gap-4">
