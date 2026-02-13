@@ -8,6 +8,7 @@ const Parties = ({ t, isRtl }) => {
     Button, InputField, SelectField, Toggle, Badge, 
     DataGrid, Modal, ToggleChip, SelectionGrid, DatePicker, FilterSection 
   } = UI;
+  const supabase = window.supabase;
 
   const { 
     Users, Building2, User, Plus, Edit, Trash2, Check, X, 
@@ -69,11 +70,7 @@ const Parties = ({ t, isRtl }) => {
   ];
 
   // --- STATES ---
-  const [parties, setParties] = useState([
-    { id: 1, type: 'person', firstName: 'علی', lastName: 'محمدی', fullName: 'علی محمدی', nationalId: '1270001122', nationality: 'iranian', isActive: true, roles: ['customer'], detailCode: '101001', addresses: ['تهران، خیابان ولیعصر'] },
-    { id: 2, type: 'company', name: 'شرکت فناوران نوین', fullName: 'شرکت فناوران نوین', nationalId: '1010254877', nationality: 'iranian', isActive: true, roles: ['supplier'], detailCode: '', addresses: ['اصفهان، شهرک صنعتی'] },
-  ]);
-
+  const [parties, setParties] = useState([]);
   const [filterValues, setFilterValues] = useState({ roles: [], detailCode: '', status: 'all', type: 'all' });
   const [appliedFilters, setAppliedFilters] = useState({ roles: [], detailCode: '', status: 'all', type: 'all' });
 
@@ -94,6 +91,219 @@ const Parties = ({ t, isRtl }) => {
     addresses: [''], roles: [], isActive: true
   };
   const [formData, setFormData] = useState(initialForm);
+
+  // --- EFFECTS ---
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // --- DB OPERATIONS ---
+  const fetchData = async () => {
+    // Fetch Parties
+    const { data: partiesData, error: pErr } = await supabase
+      .schema('gen')
+      .from('parties')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (pErr) {
+      console.error('Error fetching parties:', pErr);
+      return;
+    }
+
+    // Fetch Linked Details
+    const { data: detailsData, error: dErr } = await supabase
+      .schema('gl')
+      .from('detail_instances')
+      .select('*')
+      .eq('ref_entity_name', 'gen.parties');
+
+    if (dErr) {
+      console.error('Error fetching details:', dErr);
+      return;
+    }
+
+    // Map and Merge Data
+    const mappedParties = partiesData.map(p => {
+      const meta = p.metadata || {};
+      const detailInst = detailsData.find(d => d.entity_code === p.code);
+      return {
+        id: p.id,
+        code: p.code,
+        type: p.party_type,
+        fullName: p.name,
+        nationalId: p.national_id,
+        phone: p.phone,
+        isActive: p.is_active,
+        
+        // Fields from metadata
+        firstName: meta.firstName || '',
+        lastName: meta.lastName || '',
+        name: meta.name || '',
+        nationality: meta.nationality || 'iranian',
+        roles: meta.roles || [],
+        addresses: meta.addresses || [],
+        alias: meta.alias || '',
+        gender: meta.gender || 'male',
+        fatherName: meta.fatherName || '',
+        birthDate: meta.birthDate || '',
+        birthCertificateNo: meta.birthCertificateNo || '',
+        birthPlace: meta.birthPlace || '',
+        province: meta.province || '',
+        mobile: meta.mobile || '',
+        email: meta.email || '',
+        website: meta.website || '',
+        regNo: meta.regNo || '',
+        
+        // Fields from details table
+        detailCode: detailInst ? detailInst.detail_code : null,
+        detailInstanceId: detailInst ? detailInst.id : null
+      };
+    });
+
+    setParties(mappedParties);
+  };
+
+  const handleSave = async () => {
+    if (formData.type === 'person') {
+      if (!formData.firstName || !formData.lastName || !formData.nationalId) return alert(t.alert_req_fields);
+    } else {
+      if (!formData.name || !formData.nationalId) return alert(t.alert_req_fields);
+    }
+
+    const finalFullName = formData.type === 'person' ? `${formData.firstName} ${formData.lastName}`.trim() : formData.name;
+    
+    const metadata = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      name: formData.name,
+      nationality: formData.nationality,
+      roles: formData.roles,
+      addresses: formData.addresses,
+      alias: formData.alias,
+      gender: formData.gender,
+      fatherName: formData.fatherName,
+      birthDate: formData.birthDate,
+      birthCertificateNo: formData.birthCertificateNo,
+      birthPlace: formData.birthPlace,
+      province: formData.province,
+      mobile: formData.mobile,
+      email: formData.email,
+      website: formData.website,
+      regNo: formData.regNo
+    };
+
+    const payload = {
+      name: finalFullName,
+      party_type: formData.type,
+      national_id: formData.nationalId,
+      phone: formData.phone,
+      is_active: formData.isActive,
+      metadata: metadata
+    };
+
+    if (editingParty && editingParty.id) {
+      const { error } = await supabase
+        .schema('gen')
+        .from('parties')
+        .update(payload)
+        .eq('id', editingParty.id);
+
+      if (error) {
+        console.error('Error updating party:', error);
+        alert(isRtl ? 'خطا در ویرایش اطلاعات' : 'Error updating data');
+        return;
+      }
+    } else {
+      payload.code = `PRT-${Date.now()}`;
+      const { error } = await supabase
+        .schema('gen')
+        .from('parties')
+        .insert([payload]);
+
+      if (error) {
+        console.error('Error inserting party:', error);
+        alert(isRtl ? 'خطا در ثبت اطلاعات' : 'Error saving data');
+        return;
+      }
+    }
+
+    setIsModalOpen(false);
+    fetchData();
+  };
+
+  const handleDelete = async (ids) => {
+    if (confirm(t.confirm_delete?.replace('{0}', ids.length) || `Delete ${ids.length} items?`)) {
+      const { error } = await supabase
+        .schema('gen')
+        .from('parties')
+        .delete()
+        .in('id', ids);
+
+      if (error) {
+        console.error('Error deleting parties:', error);
+        alert(isRtl ? 'خطا در حذف اطلاعات' : 'Error deleting data');
+        return;
+      }
+      fetchData();
+    }
+  };
+
+  const handleToggleActive = async (id, newVal) => {
+    const { error } = await supabase
+      .schema('gen')
+      .from('parties')
+      .update({ is_active: newVal })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error toggling status:', error);
+      return;
+    }
+    fetchData();
+  };
+
+  const handleSaveDetailCode = async () => {
+    if (!targetForDetail) return;
+
+    const codeValue = detailCodeInput || null;
+
+    if (targetForDetail.detailInstanceId) {
+      // Update existing record in gl.detail_instances
+      const { error } = await supabase
+        .schema('gl')
+        .from('detail_instances')
+        .update({ detail_code: codeValue, title: targetForDetail.fullName })
+        .eq('id', targetForDetail.detailInstanceId);
+
+      if (error) {
+        console.error('Error updating detail instance:', error);
+        alert(isRtl ? 'خطا در بروزرسانی کد تفصیل' : 'Error updating detail code');
+        return;
+      }
+    } else {
+      // Insert new record in gl.detail_instances
+      const { error } = await supabase
+        .schema('gl')
+        .from('detail_instances')
+        .insert([{
+          detail_type_code: 'sys_partner',
+          entity_code: targetForDetail.code,
+          title: targetForDetail.fullName,
+          detail_code: codeValue,
+          ref_entity_name: 'gen.parties'
+        }]);
+
+      if (error) {
+        console.error('Error inserting detail instance:', error);
+        alert(isRtl ? 'خطا در تخصیص کد تفصیل' : 'Error assigning detail code');
+        return;
+      }
+    }
+
+    setIsDetailModalOpen(false);
+    fetchData();
+  };
 
   // --- FILTER LOGIC ---
   const filteredParties = useMemo(() => {
@@ -117,50 +327,16 @@ const Parties = ({ t, isRtl }) => {
     setEditingParty(row);
     setFormData({
       ...row,
-      addresses: row.addresses || [''],
+      addresses: row.addresses && row.addresses.length > 0 ? row.addresses : [''],
       roles: row.roles || []
     });
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
-    if (formData.type === 'person') {
-      if (!formData.firstName || !formData.lastName || !formData.nationalId) return alert(t.alert_req_fields);
-    } else {
-      if (!formData.name || !formData.nationalId) return alert(t.alert_req_fields);
-    }
-
-    const finalFullName = formData.type === 'person' ? `${formData.firstName} ${formData.lastName}`.trim() : formData.name;
-    const newParty = { ...formData, id: editingParty ? editingParty.id : Date.now(), fullName: finalFullName };
-
-    if (editingParty) setParties(prev => prev.map(p => p.id === editingParty.id ? newParty : p));
-    else setParties(prev => [...prev, newParty]);
-
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (ids) => {
-    if (confirm(t.confirm_delete.replace('{0}', ids.length))) {
-      setParties(prev => prev.filter(item => !ids.includes(item.id)));
-    }
-  };
-
-  const handleToggleActive = (id, newVal) => {
-    setParties(prev => prev.map(item => item.id === id ? { ...item, isActive: newVal } : item));
-  };
-
-  // Detail Code Handlers
   const handleOpenDetailModal = (row) => {
     setTargetForDetail(row);
     setDetailCodeInput(row.detailCode || '');
     setIsDetailModalOpen(true);
-  };
-
-  const handleSaveDetailCode = () => {
-    if (targetForDetail) {
-      setParties(prev => prev.map(item => item.id === targetForDetail.id ? { ...item, detailCode: detailCodeInput || null } : item));
-      setIsDetailModalOpen(false);
-    }
   };
 
   // --- COLUMNS ---
@@ -254,7 +430,6 @@ const Parties = ({ t, isRtl }) => {
         />
       </div>
 
-      {/* Main Edit/Create Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingParty ? t.pt_edit : t.pt_new} size="xl"
         footer={<><Button variant="secondary" onClick={() => setIsModalOpen(false)}>{t.btn_cancel}</Button><Button variant="primary" icon={Check} onClick={handleSave}>{t.btn_save}</Button></>}>
         <div className="space-y-6">
@@ -316,7 +491,6 @@ const Parties = ({ t, isRtl }) => {
         </div>
       </Modal>
 
-      {/* Detail Code Assignment Modal */}
       <Modal 
         isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)}
         title={t.detail_assign_btn}
