@@ -1,5 +1,5 @@
 /* Filename: components/OrganizationInfo.js */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, Search, Plus, Edit, Trash2, MapPin, 
   Phone, FileText, Upload, X, Save, Printer 
@@ -8,16 +8,11 @@ import {
 const OrganizationInfo = ({ t, isRtl }) => {
   const UI = window.UI || {};
   const { Button, InputField, DataGrid, FilterSection, Modal, Badge } = UI;
+  const supabase = window.supabase;
 
   // --- States ---
-  const [data, setData] = useState([
-    { id: 1, code: 'ORG-001', name: 'دفتر مرکزی تهران', regNo: '123456', phone: '021-88888888', fax: '021-88888889', logo: null, addresses: [{ id: 1, text: 'تهران، میدان ونک، خیابان ملاصدرا' }] },
-    { id: 2, code: 'ORG-002', name: 'شعبه اصفهان', regNo: '654321', phone: '031-33333333', fax: '031-33333334', logo: null, addresses: [] },
-  ]);
-  
-  // Filter State
+  const [data, setData] = useState([]);
   const [filters, setFilters] = useState({ code: '', name: '' });
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -26,19 +21,101 @@ const OrganizationInfo = ({ t, isRtl }) => {
   const [formData, setFormData] = useState({});
   const [newAddress, setNewAddress] = useState('');
 
-  // --- Columns Definition ---
-  const columns = [
-    { field: 'code', header: t.org_code || 'Code', width: 'w-24', sortable: true },
-    { field: 'name', header: t.org_name || 'Name', width: 'w-64', sortable: true },
-    { field: 'regNo', header: t.org_regNo || 'Reg No', width: 'w-32' },
-    { field: 'phone', header: t.org_phone || 'Phone', width: 'w-32' },
-    { 
-      field: 'addressCount', 
-      header: t.org_addrCount || 'Addr Count', 
-      width: 'w-24', 
-      render: (row) => <Badge variant="info">{row.addresses?.length || 0}</Badge> 
+  // --- Effects ---
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // --- DB Operations ---
+  const fetchData = async () => {
+    const { data: orgs, error } = await supabase
+      .schema('gen')
+      .from('organization_info')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching data:', error);
+      return;
     }
-  ];
+
+    const mappedData = orgs.map(item => ({
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      regNo: item.reg_no,
+      phone: item.phone,
+      fax: item.fax,
+      logo: item.logo,
+      addresses: item.addresses || []
+    }));
+    
+    setData(mappedData);
+  };
+
+  const handleSave = async () => {
+    if (!formData.code || !formData.name) {
+      alert(isRtl ? 'لطفاً کد و نام سازمان را وارد کنید.' : 'Please enter Organization Code and Name.');
+      return;
+    }
+
+    const payload = {
+      code: formData.code,
+      name: formData.name,
+      reg_no: formData.regNo,
+      phone: formData.phone,
+      fax: formData.fax,
+      logo: formData.logo,
+      addresses: formData.addresses || []
+    };
+
+    if (currentRecord && currentRecord.id) {
+      const { error } = await supabase
+        .schema('gen')
+        .from('organization_info')
+        .update(payload)
+        .eq('id', currentRecord.id);
+
+      if (error) {
+        console.error('Error updating:', error);
+        alert(isRtl ? 'خطا در ویرایش اطلاعات.' : 'Error updating data.');
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .schema('gen')
+        .from('organization_info')
+        .insert([payload]);
+
+      if (error) {
+        console.error('Error inserting:', error);
+        alert(isRtl ? 'خطا در ثبت اطلاعات.' : 'Error inserting data.');
+        return;
+      }
+    }
+
+    setIsModalOpen(false);
+    fetchData();
+  };
+
+  const handleDelete = async (ids) => {
+    if (confirm(t.confirm_delete?.replace('{0}', ids.length) || `Delete ${ids.length} items?`)) {
+      const { error } = await supabase
+        .schema('gen')
+        .from('organization_info')
+        .delete()
+        .in('id', ids);
+
+      if (error) {
+        console.error('Error deleting:', error);
+        alert(isRtl ? 'خطا در حذف اطلاعات.' : 'Error deleting data.');
+        return;
+      }
+
+      setSelectedIds([]);
+      fetchData();
+    }
+  };
 
   // --- Handlers ---
   const handleOpenModal = (record = null) => {
@@ -49,27 +126,6 @@ const OrganizationInfo = ({ t, isRtl }) => {
     }
     setCurrentRecord(record);
     setIsModalOpen(true);
-  };
-
-  const handleSave = () => {
-    if (!formData.code || !formData.name) {
-      alert(isRtl ? 'لطفاً کد و نام سازمان را وارد کنید.' : 'Please enter Organization Code and Name.');
-      return;
-    }
-
-    if (currentRecord) {
-      setData(prev => prev.map(item => item.id === currentRecord.id ? { ...formData, id: item.id } : item));
-    } else {
-      setData(prev => [...prev, { ...formData, id: Date.now() }]);
-    }
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (ids) => {
-    if (confirm(t.confirm_delete.replace('{0}', ids.length))) {
-      setData(prev => prev.filter(item => !ids.includes(item.id)));
-      setSelectedIds([]);
-    }
   };
 
   const handleAddAddress = () => {
@@ -91,10 +147,27 @@ const OrganizationInfo = ({ t, isRtl }) => {
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setFormData(prev => ({ ...prev, logo: url }));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, logo: reader.result }));
+      };
+      reader.readAsDataURL(file);
     }
   };
+
+  // --- Columns Definition ---
+  const columns = [
+    { field: 'code', header: t.org_code || 'Code', width: 'w-24', sortable: true },
+    { field: 'name', header: t.org_name || 'Name', width: 'w-64', sortable: true },
+    { field: 'regNo', header: t.org_regNo || 'Reg No', width: 'w-32' },
+    { field: 'phone', header: t.org_phone || 'Phone', width: 'w-32' },
+    { 
+      field: 'addressCount', 
+      header: t.org_addrCount || 'Addr Count', 
+      width: 'w-24', 
+      render: (row) => <Badge variant="info">{row.addresses?.length || 0}</Badge> 
+    }
+  ];
 
   // --- Filter Logic ---
   const filteredData = data.filter(item => {

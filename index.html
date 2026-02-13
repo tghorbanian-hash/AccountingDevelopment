@@ -41,7 +41,8 @@
       "imports": {
         "react": "https://esm.sh/react@18.2.0",
         "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.344.0"
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
       }
     }
     </script>
@@ -66,6 +67,8 @@
 </head>
 <body class="bg-slate-100 text-slate-800">
     <div id="root"></div>
+
+    <script type="text/babel" data-type="module" src="./supabaseConfig.js"></script>
 
     <script type="text/babel" data-type="module" src="./app-data.js"></script>
     <script type="text/babel" data-type="module" src="./financial/generalledger/gl-data.js"></script>
