@@ -1,10 +1,4 @@
-/* توضیحات آپدیت: 
-   - ورود (Login) از قبل در فایل app.js به صورت کامل به سیستم اعتبارسنجی واقعی Supabase متصل شده است.
-   - در این فایل، فرآیند "تغییر کلمه عبور" (Reset Password) نیز به صورت کامل بازنویسی شد و به پایگاه داده و تابع امنیتی `reset_user_password` در Supabase متصل گردید.
-   - نکته: مرحله دریافت کد OTP به دلیل نبود پنل پیامکی صرفاً برای شبیه‌سازی رابط کاربری است، اما اعمال نهایی رمز عبور در پایگاه داده واقعی و رمزنگاری‌شده (Hash) خواهد بود.
-   
-   Filename: components/LoginPage.js 
-*/
+/* Filename: components/LoginPage.js */
 import React, { useState } from 'react';
 import { User, Lock, Mail, Smartphone, ArrowRight, ArrowLeft, KeyRound, Building2, CheckCircle2, ShieldCheck, Globe, Loader2 } from 'lucide-react';
 
@@ -46,10 +40,11 @@ const LoginPage = ({
          return;
       }
       
-      const { error: resetErr } = await supabase.rpc('reset_user_password', {
+      // Fix: Use chain .schema().rpc() instead of options
+      const { error: resetErr } = await supabase.schema('gen').rpc('reset_user_password', {
          p_user_id: userData.id,
          p_new_password: resetData.newPassword
-      }, { schema: 'gen' });
+      });
       
       if (resetErr) {
          alert(isRtl ? 'خطا در تغییر رمز عبور. با مدیر سیستم تماس بگیرید.' : 'Error resetting password.');

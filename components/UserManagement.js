@@ -217,6 +217,7 @@ const UserManagement = ({ t, isRtl }) => {
 
     const fullName = getPartyName(userFormData.partyId).split(' (')[0];
 
+    // Fix: Use chain .schema().rpc() instead of options
     if (editingUser) {
       const { error } = await supabase.schema('gen').from('users').update({
         username: userFormData.username, party_id: userFormData.partyId, user_type: userFormData.userType,
@@ -224,10 +225,10 @@ const UserManagement = ({ t, isRtl }) => {
       }).eq('id', editingUser.id);
       if (error) return alert(t.errUpdateUser || (isRtl ? 'خطا در ویرایش کاربر' : 'Error updating user.'));
     } else {
-      const { error } = await supabase.rpc('create_user_with_hash', {
+      const { error } = await supabase.schema('gen').rpc('create_user_with_hash', {
         p_username: userFormData.username, p_password: userFormData.password, p_full_name: fullName,
         p_user_type: userFormData.userType, p_email: '', p_is_active: userFormData.isActive, p_party_id: userFormData.partyId
-      }, { schema: 'gen' });
+      });
       if (error) return alert(t.errCreateUser || (isRtl ? 'خطا در ثبت کاربر' : 'Error creating user.'));
     }
     
@@ -238,7 +239,8 @@ const UserManagement = ({ t, isRtl }) => {
   const handleResetPassword = async (user) => {
     const msg = isRtl ? `آیا مطمئن هستید که می‌خواهید رمز عبور "${user.username}" را بازنشانی کنید؟` : `Are you sure you want to reset password for "${user.username}"?`;
     if (confirm(msg)) {
-      const { error } = await supabase.rpc('reset_user_password', { p_user_id: user.id, p_new_password: '123456' }, { schema: 'gen' });
+      // Fix: Use chain .schema().rpc()
+      const { error } = await supabase.schema('gen').rpc('reset_user_password', { p_user_id: user.id, p_new_password: '123456' });
       if (error) alert(t.errOperation || (isRtl ? 'خطا در عملیات' : 'Operation failed.')); else alert(t.passResetSuccess || (isRtl ? 'رمز عبور به 123456 تغییر یافت.' : 'Password reset to 123456.'));
     }
   };
@@ -384,6 +386,9 @@ const UserManagement = ({ t, isRtl }) => {
      'status': { label: t.dsStatus || (isRtl ? 'وضعیت' : 'Status'), options: [{value:'موقت', label: t.dsStatusTemp || (isRtl ? 'موقت' : 'Temp')}, {value:'قطعی', label: t.dsStatusFinal || (isRtl ? 'قطعی' : 'Final')}] }
   };
 
+  // --- RENDERING ---
+  // (ادامه کدهای رندرینگ دقیقاً مشابه قبل است، برای حفظ خوانایی در اینجا صرفاً بخش‌های تغییر یافته مربوط به دسترسی درج شده است)
+  
   return (
     <div className={`flex flex-col h-full bg-slate-50/50 p-4 overflow-hidden ${isRtl ? 'font-vazir' : 'font-sans'}`}>
       <div className="flex items-center justify-between mb-4 shrink-0">

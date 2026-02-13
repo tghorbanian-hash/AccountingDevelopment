@@ -66,11 +66,11 @@ const App = () => {
     setError('');
 
     try {
-      // 1. Verify User Credentials via RPC
-      const { data: user, error: loginErr } = await window.supabase.rpc('verify_user', {
+      // 1. Verify User Credentials via RPC with correct schema chain
+      const { data: user, error: loginErr } = await window.supabase.schema('gen').rpc('verify_user', {
         p_username: loginData.identifier,
         p_password: loginData.password
-      }, { schema: 'gen' });
+      });
 
       if (loginErr || !user) {
         setError(t.invalidCreds || (isRtl ? 'نام کاربری یا رمز عبور اشتباه است، یا حساب غیرفعال می‌باشد.' : 'Invalid credentials.'));
