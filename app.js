@@ -94,29 +94,41 @@ const App = () => {
         } catch (err) {}
       }
 
-      // 3. SHA-256 Check
+      // 3. SHA-256 Check with Safe Fallback for HTTP environments
       if (!isPasswordValid) {
         try {
-          const msgBuffer = new TextEncoder().encode(loginData.password);
-          const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-          const hashArray = Array.from(new Uint8Array(hashBuffer));
-          const sha256Hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-          
-          if (storedPassword === sha256Hash) {
-            isPasswordValid = true;
+          if (window.crypto && window.crypto.subtle) {
+            const msgBuffer = new TextEncoder().encode(loginData.password);
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const sha256Hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            
+            if (storedPassword === sha256Hash) {
+              isPasswordValid = true;
+            }
+          } else {
+            console.warn("Security warning: crypto.subtle is not available. This usually happens in non-HTTPS environments. Skipping local SHA-256 check.");
           }
-        } catch (err) {}
+        } catch (err) {
+          console.error("SHA-256 Hash check error:", err);
+        }
       }
 
-      // 4. Supabase RPC validation check (Bcrypt or advanced hash)
+      // 4. Supabase RPC validation check
       if (!isPasswordValid) {
-        const { data: rpcValid, error: rpcErr } = await supabase.schema('gen').rpc('verify_user_password', {
-          p_username: loginData.identifier,
-          p_password: loginData.password
-        });
-        
-        if (!rpcErr && rpcValid === true) {
-          isPasswordValid = true;
+        try {
+          const { data: rpcValid, error: rpcErr } = await supabase.schema('gen').rpc('verify_user_password', {
+            p_username: loginData.identifier,
+            p_password: loginData.password
+          });
+          
+          if (!rpcErr && rpcValid === true) {
+            isPasswordValid = true;
+          } else if (rpcErr) {
+            console.warn("RPC verify_user_password error or function not found:", rpcErr.message);
+          }
+        } catch (err) {
+          console.error("RPC call failed:", err);
         }
       }
 
