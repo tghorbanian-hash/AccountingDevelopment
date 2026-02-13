@@ -1,11 +1,4 @@
-/* * پاسخ به سوال شما: خیر، فایل LoginPage.js کاملا درست است و نیازی به اصلاح ندارد 
- * چون از قبل برای فراموشی رمز، از تابع دیتابیسی (RPC) استفاده می‌کند. مشکل منحصراً مربوط 
- * به فایل UserManagement.js بود که در آن رمز عبور با کدهای سمت کاربر هش می‌شد 
- * و باعث ناهماهنگی در فرآیند لاگین می‌گردید. اکنون این مشکل در کد زیر با جایگزینی
- * تابع دیتابیسی (rpc('reset_user_password')) به طور کامل برطرف شده است.
- *
- * Filename: components/UserManagement.js 
- */
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Users, Search, Plus, Edit, Trash2, Key, Shield, 
@@ -16,7 +9,7 @@ import {
 const UserManagement = ({ t, isRtl }) => {
   const UI = window.UI || {};
   const { 
-    Button, InputField, SelectField, Toggle, Badge, DataGrid, 
+    Button, InputField, SelectField, Badge, DataGrid, 
     FilterSection, Modal, SelectionGrid, ToggleChip 
   } = UI;
   const supabase = window.supabase;
@@ -219,7 +212,7 @@ const UserManagement = ({ t, isRtl }) => {
   };
 
   const handleSaveUser = async () => {
-    if (!userFormData.username || !userFormData.partyId) return alert(t.reqUsernameParty || (isRtl ? 'لطفا نام کاربری و طرف حساب را مشخص کنید.' : 'Please provide Username and Party.'));
+    if (!userFormData.username || !userFormData.partyId) return alert(t.reqUsernameParty || (isRtl ? 'لطفا نام کاربری و پرسنل مرتبط را مشخص کنید.' : 'Please provide Username and Personnel.'));
     if (!editingUser && !userFormData.password) return alert(t.reqPassword || (isRtl ? 'لطفا رمز عبور را وارد کنید.' : 'Please provide Password.'));
 
     const fullName = getPartyName(userFormData.partyId).split(' (')[0];
@@ -229,13 +222,37 @@ const UserManagement = ({ t, isRtl }) => {
         username: userFormData.username, party_id: userFormData.partyId, user_type: userFormData.userType,
         is_active: userFormData.isActive, full_name: fullName
       }).eq('id', editingUser.id);
-      if (error) return alert(t.errUpdateUser || (isRtl ? 'خطا در ویرایش کاربر' : 'Error updating user.'));
+      
+      if (error) {
+        console.error(error);
+        return alert(t.errUpdateUser || (isRtl ? 'خطا در ویرایش کاربر' : 'Error updating user.'));
+      }
     } else {
-      const { error } = await supabase.schema('gen').rpc('create_user_with_hash', {
-        p_username: userFormData.username, p_password: userFormData.password, p_full_name: fullName,
-        p_user_type: userFormData.userType, p_email: '', p_is_active: userFormData.isActive, p_party_id: userFormData.partyId
-      });
-      if (error) return alert(t.errCreateUser || (isRtl ? 'خطا در ثبت کاربر' : 'Error creating user.'));
+      // ایجاد رمز عبور با الگوریتم SHA-256 دقیقاً مشابه سیستم لاگین
+      let hashedPassword = userFormData.password;
+      if (window.crypto && window.crypto.subtle) {
+          const msgBuffer = new TextEncoder().encode(userFormData.password);
+          const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          hashedPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+
+      // درج مستقیم در جدول به جای استفاده از RPC
+      const { error } = await supabase.schema('gen').from('users').insert([{
+          username: userFormData.username, 
+          password: hashedPassword,
+          password_hash: hashedPassword,
+          password_hash_value: hashedPassword,
+          full_name: fullName,
+          user_type: userFormData.userType, 
+          is_active: userFormData.isActive, 
+          party_id: userFormData.partyId
+      }]);
+      
+      if (error) {
+         console.error(error);
+         return alert(t.errCreateUser || (isRtl ? 'خطا در ثبت کاربر' : 'Error creating user.'));
+      }
     }
     
     setIsEditModalOpen(false);
@@ -246,16 +263,32 @@ const UserManagement = ({ t, isRtl }) => {
     const msg = isRtl ? `آیا مطمئن هستید که می‌خواهید رمز عبور "${user.username}" را بازنشانی کنید؟` : `Are you sure you want to reset password for "${user.username}"?`;
     if (confirm(msg)) {
       try {
-        const { error } = await supabase.schema('gen').rpc('reset_user_password', {
-           p_user_id: user.id,
-           p_new_password: '123456'
-        });
+        const defaultPassword = '123456';
+        let hashedPassword = defaultPassword;
+        
+        // محاسبه هش با روش استاندارد SHA-256 سازگار با فرم لاگین
+        if (window.crypto && window.crypto.subtle) {
+          const msgBuffer = new TextEncoder().encode(defaultPassword);
+          const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          hashedPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        } else {
+           // پشتیبان: رشته هگزادسیمال SHA-256 از 123456
+           hashedPassword = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
+        }
+
+        // آپدیت مستقیم ردیف کاربر در دیتابیس بدون درگیری با الگوریتم‌های بک‌اند دیتابیس
+        const { error } = await supabase.schema('gen').from('users').update({
+           password: hashedPassword,
+           password_hash: hashedPassword,
+           password_hash_value: hashedPassword
+        }).eq('id', user.id);
 
         if (error) {
            console.error(error);
-           alert(t.errOperation || (isRtl ? 'خطا در عملیات' : 'Operation failed.'));
+           alert(t.errOperation || (isRtl ? 'خطا در عملیات دیتابیس' : 'Operation failed.'));
         } else {
-           alert(t.passResetSuccess || (isRtl ? 'رمز عبور به 123456 تغییر یافت.' : 'Password reset to 123456.'));
+           alert(t.passResetSuccess || (isRtl ? 'رمز عبور با موفقیت به 123456 تغییر یافت.' : 'Password reset to 123456.'));
         }
       } catch (err) {
         console.error(err);
@@ -436,7 +469,7 @@ const UserManagement = ({ t, isRtl }) => {
             </SelectField>
             <div className="col-span-2 grid grid-cols-2 gap-4">
                 {!editingUser ? <InputField label={t.password || (isRtl ? "رمز عبور" : "Password")} type="password" value={userFormData.password} onChange={(e) => setUserFormData({...userFormData, password: e.target.value})} isRtl={isRtl} className="dir-ltr" placeholder="********" /> : <div className="opacity-50"><InputField label={t.password || (isRtl ? "رمز عبور" : "Password")} disabled value="********" isRtl={isRtl} /></div>}
-                <SelectField label={t.linkToParty || (isRtl ? "اتصال به شخص / طرف حساب" : "Link to Party")} value={userFormData.partyId} onChange={(e) => setUserFormData({...userFormData, partyId: e.target.value})} isRtl={isRtl}><option value="">-- {t.select || (isRtl ? "انتخاب کنید" : "Select")} --</option>{partiesList.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}</SelectField>
+                <SelectField label={t.linkToParty || (isRtl ? "اتصال به پرسنل مرتبط" : "Link to Personnel")} value={userFormData.partyId} onChange={(e) => setUserFormData({...userFormData, partyId: e.target.value})} isRtl={isRtl}><option value="">-- {t.select || (isRtl ? "انتخاب کنید" : "Select")} --</option>{partiesList.map(p => <option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}</SelectField>
             </div>
             <div className="col-span-2 flex items-center pt-2 gap-2">
                <input 
