@@ -7,8 +7,110 @@ import {
   Menu, Circle
 } from 'lucide-react';
 
-// NOTE: Components are loaded via script tags in index.html and accessed via window object
-// Do NOT import custom components here using 'import ... from ...' statements.
+// --- Pure JS SHA-256 Fallback ---
+const computeSHA256 = async (message) => {
+  if (window.crypto && window.crypto.subtle) {
+    try {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+      console.warn("Native SHA-256 failed, falling back to JS implementation.", e);
+    }
+  }
+  
+  function _sha256(ascii) {
+    function rightRotate(value, amount) { return (value>>>amount) | (value<<(32 - amount)); }
+    var mathPow = Math.pow;
+    var maxWord = mathPow(2, 32);
+    var lengthProperty = 'length';
+    var i, j;
+    var result = '';
+    var words = [];
+    var asciiBitLength = ascii[lengthProperty]*8;
+    var hash = [], k = [];
+    var primeCounter = k[lengthProperty];
+    var isComposite = {};
+    for (var candidate = 2; primeCounter < 64; candidate++) {
+      if (!isComposite[candidate]) {
+        for (i = 0; i < 313; i += candidate) { isComposite[i] = candidate; }
+        hash[primeCounter] = (mathPow(candidate, .5)*maxWord)|0;
+        k[primeCounter++] = (mathPow(candidate, 1/3)*maxWord)|0;
+      }
+    }
+    ascii += '\x80';
+    while (ascii[lengthProperty]%64 - 56) ascii += '\x00';
+    for (i = 0; i < ascii[lengthProperty]; i++) {
+      j = ascii.charCodeAt(i);
+      if (j>>8) return; 
+      words[i>>2] |= j << ((3 - i)%4)*8;
+    }
+    words[words[lengthProperty]] = ((asciiBitLength/maxWord)|0);
+    words[words[lengthProperty]] = (asciiBitLength);
+    for (j = 0; j < words[lengthProperty];) {
+      var w = words.slice(j, j += 16);
+      var oldHash = hash;
+      hash = hash.slice(0, 8);
+      for (i = 0; i < 64; i++) {
+        var w15 = w[i - 15], w2 = w[i - 2];
+        var a = hash[0], e = hash[4];
+        var temp1 = hash[7]
+          + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25))
+          + ((e&hash[5])^((~e)&hash[6]))
+          + k[i]
+          + (w[i] = (i < 16) ? w[i] : (
+              w[i - 16]
+              + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15>>>3))
+              + w[i - 7]
+              + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2>>>10))
+            )|0
+          );
+        var temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22))
+          + ((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+        hash = [(temp1 + temp2)|0].concat(hash);
+        hash[4] = (hash[4] + temp1)|0;
+      }
+      for (i = 0; i < 8; i++) { hash[i] = (hash[i] + oldHash[i])|0; }
+    }
+    for (i = 0; i < 8; i++) {
+      for (j = 3; j + 1; j--) {
+        var b = (hash[i]>>(j*8))&255;
+        result += ((b < 16) ? 0 : '') + b.toString(16);
+      }
+    }
+    return result;
+  }
+  return _sha256(message);
+};
+
+// --- Global Permission Handler ---
+window.USER_PERMISSIONS = new Set();
+window.IS_ADMIN = false;
+
+window.hasAccess = (resource, action = null) => {
+  // 1. Global Admin Override
+  if (window.IS_ADMIN) return true;
+
+  const permissions = window.USER_PERMISSIONS;
+  if (!permissions) return false;
+
+  const resStr = String(resource).toLowerCase();
+
+  // Level 1: Form Access (Check if they have the form, or ANY action under this form)
+  if (!action) {
+    for (const p of permissions) {
+      if (p === resStr || p.startsWith(`${resStr}.`)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Level 2: Specific Action Access
+  const actStr = String(action).toLowerCase();
+  return permissions.has(`${resStr}.${actStr}`);
+};
 
 const App = () => {
   const translations = window.translations || { en: {}, fa: {} };
@@ -20,8 +122,8 @@ const App = () => {
   const [menuData, setMenuData] = useState([]);
   
   const [lang, setLang] = useState('fa'); 
-  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); // Default
-  const [activeId, setActiveId] = useState('workspace_gen'); // Default
+  const [activeModuleId, setActiveModuleId] = useState('gl_base_info'); 
+  const [activeId, setActiveId] = useState('workspace_gen'); 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Authentication States
@@ -81,12 +183,11 @@ const App = () => {
       }
 
       let isPasswordValid = false;
+      const cleanStored = String(storedPassword).trim().toLowerCase();
 
-      // 1. Plain text comparison
-      if (storedPassword === loginData.password) {
+      if (cleanStored === loginData.password.trim().toLowerCase() || storedPassword === loginData.password) {
         isPasswordValid = true;
       } else {
-        // 2. Base64 fallback
         try {
           if (atob(storedPassword) === loginData.password || btoa(loginData.password) === storedPassword) {
             isPasswordValid = true;
@@ -94,27 +195,17 @@ const App = () => {
         } catch (err) {}
       }
 
-      // 3. SHA-256 Check with Safe Fallback for HTTP environments
       if (!isPasswordValid) {
         try {
-          if (window.crypto && window.crypto.subtle) {
-            const msgBuffer = new TextEncoder().encode(loginData.password);
-            const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const sha256Hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            
-            if (storedPassword === sha256Hash) {
-              isPasswordValid = true;
-            }
-          } else {
-            console.warn("Security warning: crypto.subtle is not available. This usually happens in non-HTTPS environments. Skipping local SHA-256 check.");
+          const sha256Hash = await computeSHA256(loginData.password);
+          if (cleanStored === sha256Hash) {
+            isPasswordValid = true;
           }
         } catch (err) {
           console.error("SHA-256 Hash check error:", err);
         }
       }
 
-      // 4. Supabase RPC validation check
       if (!isPasswordValid) {
         try {
           const { data: rpcValid, error: rpcErr } = await supabase.schema('gen').rpc('verify_user_password', {
@@ -124,8 +215,6 @@ const App = () => {
           
           if (!rpcErr && rpcValid === true) {
             isPasswordValid = true;
-          } else if (rpcErr) {
-            console.warn("RPC verify_user_password error or function not found:", rpcErr.message);
           }
         } catch (err) {
           console.error("RPC call failed:", err);
@@ -172,6 +261,8 @@ const App = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
     setMenuData([]);
+    window.USER_PERMISSIONS = new Set();
+    window.IS_ADMIN = false;
   };
 
   // --- Dynamic Menu & Permissions Logic ---
@@ -181,13 +272,15 @@ const App = () => {
 
     const buildMenu = async () => {
       const rawMenu = window.MENU_DATA || [];
-      const userType = currentUser.user_type || '';
-      // Admin Check Rule
-      const isSysAdmin = userType === 'System Admin' || userType === 'مدیر سیستم' || userType.toLowerCase().includes('admin');
+      const userType = currentUser.user_type || currentUser.UserType || '';
+      
+      const isSysAdmin = userType === 'System Admin' || userType === 'مدیر سیستم';
+      
+      window.IS_ADMIN = isSysAdmin;
 
       if (isSysAdmin) {
-        // Admins bypass all permissions and get the full static menu directly
         setMenuData(rawMenu);
+        window.USER_PERMISSIONS = new Set(); 
         if (rawMenu.length > 0 && !activeModuleId) setActiveModuleId(rawMenu[0].id);
         return;
       }
@@ -196,35 +289,36 @@ const App = () => {
         const supabase = window.supabase;
         let allowedCodes = new Set();
         
-        // 1. Fetch Role Permissions
         const { data: userRoles } = await supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', currentUser.id);
         const roleIds = userRoles ? userRoles.map(ur => ur.role_id) : [];
 
         if (roleIds.length > 0) {
           const { data: rPerms } = await supabase.schema('gen').from('permissions').select('resource_code').in('role_id', roleIds);
-          if (rPerms) rPerms.forEach(p => allowedCodes.add(p.resource_code));
+          if (rPerms) {
+            rPerms.forEach(p => {
+              if (p.resource_code) allowedCodes.add(p.resource_code.toLowerCase());
+            });
+          }
         }
 
-        // 2. Fetch Direct User Permissions
         const { data: uPerms } = await supabase.schema('gen').from('permissions').select('resource_code').eq('user_id', currentUser.id);
-        if (uPerms) uPerms.forEach(p => allowedCodes.add(p.resource_code));
+        if (uPerms) {
+          uPerms.forEach(p => {
+            if (p.resource_code) allowedCodes.add(p.resource_code.toLowerCase());
+          });
+        }
 
-        // 3. Filter Static UI Menu using Allowed Database Codes
+        window.USER_PERMISSIONS = allowedCodes;
+
         const filterMenu = (nodes) => {
           return nodes.map(node => {
-            // Leaf node (form level)
             if (!node.children || node.children.length === 0) {
-              return allowedCodes.has(node.id) ? node : null;
+              return window.hasAccess(node.id) ? node : null;
             }
-            
-            // Parent node (module/folder level)
             const filteredChildren = filterMenu(node.children);
-            
-            // Show parent only if at least one child is allowed
             if (filteredChildren.length > 0) {
               return { ...node, children: filteredChildren };
             }
-            
             return null;
           }).filter(Boolean);
         };
@@ -241,12 +335,12 @@ const App = () => {
       } catch (err) {
         console.error("Error fetching permissions", err);
         setMenuData([]);
+        window.USER_PERMISSIONS = new Set();
       }
     };
 
     buildMenu();
   }, [currentUser]);
-
 
   // --- App Logic & Rendering ---
 
@@ -404,7 +498,7 @@ const App = () => {
              </div>
              <div className="min-w-0">
                 <div className="text-[12px] font-bold text-slate-700 truncate">{currentUser?.full_name || currentUser?.username || 'User'}</div>
-                <div className="text-[10px] text-slate-400 truncate">{currentUser?.user_type || 'System User'}</div>
+                <div className="text-[10px] text-slate-400 truncate">{currentUser?.user_type || currentUser?.UserType || 'System User'}</div>
              </div>
           </div>
         </div>
