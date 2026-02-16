@@ -10,19 +10,29 @@ const OrganizationInfo = ({ t, isRtl }) => {
   const { Button, InputField, DataGrid, FilterSection, Modal, Badge } = UI;
   const supabase = window.supabase;
 
-  // --- Permission Checks (Level 2) ---
-  // Security Fix: Default return MUST be false.
-  const checkAccess = (action) => {
-    if (window.hasAccess) {
-      return window.hasAccess('org_info', action);
+  // --- Resilient Permission Checks (Level 1 & 2) ---
+  const checkAccess = (action = null) => {
+    if (!window.hasAccess) return false;
+    
+    // Check multiple possible naming conventions to guarantee a match
+    const variations = ['org_info', 'organization_info', 'organizationinfo', 'OrganizationInfo'];
+    
+    for (const res of variations) {
+       if (window.hasAccess(res, action)) return true;
     }
-    return false; // FAIL SECURE
+    
+    return false;
   };
 
-  const canView   = checkAccess('view') || checkAccess(); // View is default if Level 1 is passed, or explicit 'view'
-  const canCreate = checkAccess('create');
-  const canEdit   = checkAccess('edit');
-  const canDelete = checkAccess('delete');
+  // If user has NO action specified, they are doing a Level 1 access. 
+  // By default, if they have form access (Level 1), we let them "View" so they don't get the error page immediately.
+  const canEnterForm = checkAccess(); // Any Level 1 access
+  const canView   = canEnterForm || checkAccess('view') || checkAccess('read') || checkAccess('show');
+  
+  // Specific Level 2 checks support multiple synonyms
+  const canCreate = checkAccess('create') || checkAccess('new') || checkAccess('add') || checkAccess('insert');
+  const canEdit   = checkAccess('edit') || checkAccess('update') || checkAccess('modify');
+  const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
 
   // --- States ---
   const [data, setData] = useState([]);
@@ -72,11 +82,11 @@ const OrganizationInfo = ({ t, isRtl }) => {
   const handleSave = async () => {
     // Security: Double Check permission
     if (currentRecord && currentRecord.id && !canEdit) {
-      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'));
+      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز برای ویرایش' : 'Access Denied for Edit'));
       return;
     }
     if ((!currentRecord || !currentRecord.id) && !canCreate) {
-      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'));
+      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز برای ایجاد' : 'Access Denied for Create'));
       return;
     }
 
@@ -126,7 +136,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
 
   const handleDelete = async (ids) => {
     if (!canDelete) {
-      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'));
+      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز برای حذف' : 'Access Denied for Delete'));
       return;
     }
 
@@ -152,10 +162,16 @@ const OrganizationInfo = ({ t, isRtl }) => {
   // --- Handlers ---
   const handleOpenModal = (record = null) => {
     if (record) {
-      if (!canEdit) return;
+      if (!canEdit) {
+         alert(isRtl ? 'شما مجوز ویرایش ندارید' : 'You do not have edit permission');
+         return;
+      }
       setFormData({ ...record });
     } else {
-      if (!canCreate) return;
+      if (!canCreate) {
+         alert(isRtl ? 'شما مجوز ایجاد اطلاعات جدید ندارید' : 'You do not have create permission');
+         return;
+      }
       setFormData({ code: '', name: '', regNo: '', phone: '', fax: '', logo: null, addresses: [] });
     }
     setCurrentRecord(record);
@@ -189,7 +205,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
     }
   };
 
-  // --- Access Denied View ---
+  // --- Access Denied View (If they somehow navigate here without Level 1 access) ---
   if (!canView) {
     return (
       <div className={`flex flex-col items-center justify-center h-full bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
