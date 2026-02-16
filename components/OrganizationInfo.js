@@ -1,24 +1,27 @@
-```javascript
 /* Filename: components/OrganizationInfo.js */
 import React, { useState, useEffect } from 'react';
 import { 
   Building2, Search, Plus, Edit, Trash2, MapPin, 
-  Phone, FileText, Upload, X, Save, Printer, Ban 
+  Phone, FileText, Upload, X, Save, Printer 
 } from 'lucide-react';
 
 const OrganizationInfo = ({ t, isRtl }) => {
   const UI = window.UI || {};
   const { Button, InputField, DataGrid, FilterSection, Modal, Badge } = UI;
   const supabase = window.supabase;
-  const hasAccess = window.hasAccess || (() => false);
 
   // --- Permission Checks (Level 2) ---
-  // Resource Code: 'org_info'
-  // Actions: 'view', 'create', 'edit', 'delete'
-  const canView   = hasAccess('org_info', 'view');
-  const canCreate = hasAccess('org_info', 'create');
-  const canEdit   = hasAccess('org_info', 'edit');
-  const canDelete = hasAccess('org_info', 'delete');
+  const checkAccess = (action) => {
+    if (window.hasAccess) {
+      return window.hasAccess('org_info', action);
+    }
+    return true; 
+  };
+
+  const canView   = checkAccess('view');
+  const canCreate = checkAccess('create');
+  const canEdit   = checkAccess('edit');
+  const canDelete = checkAccess('delete');
 
   // --- States ---
   const [data, setData] = useState([]);
@@ -66,13 +69,12 @@ const OrganizationInfo = ({ t, isRtl }) => {
   };
 
   const handleSave = async () => {
-    // Security: Check permission again before execution
     if (currentRecord && currentRecord.id && !canEdit) {
-      alert(t.err_access_denied || 'Access Denied');
+      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'));
       return;
     }
     if ((!currentRecord || !currentRecord.id) && !canCreate) {
-      alert(t.err_access_denied || 'Access Denied');
+      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'));
       return;
     }
 
@@ -121,9 +123,8 @@ const OrganizationInfo = ({ t, isRtl }) => {
   };
 
   const handleDelete = async (ids) => {
-    // Security: Check permission again before execution
     if (!canDelete) {
-      alert(t.err_access_denied || 'Access Denied');
+      alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'));
       return;
     }
 
@@ -149,11 +150,9 @@ const OrganizationInfo = ({ t, isRtl }) => {
   // --- Handlers ---
   const handleOpenModal = (record = null) => {
     if (record) {
-      // Permission check for opening edit modal
       if (!canEdit) return;
       setFormData({ ...record });
     } else {
-      // Permission check for opening new modal
       if (!canCreate) return;
       setFormData({ code: '', name: '', regNo: '', phone: '', fax: '', logo: null, addresses: [] });
     }
@@ -188,13 +187,12 @@ const OrganizationInfo = ({ t, isRtl }) => {
     }
   };
 
-  // --- Access Denied View ---
   if (!canView) {
     return (
       <div className={`flex flex-col items-center justify-center h-full bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
         <div className="p-6 bg-white rounded-2xl shadow-sm text-center border border-red-100">
            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-             <Ban className="text-red-500" size={32} />
+             <X className="text-red-500" size={32} />
            </div>
            <h2 className="text-lg font-bold text-slate-800">{t.accessDenied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied')}</h2>
            <p className="text-sm text-slate-500 mt-2">{t.noViewPermission || (isRtl ? 'شما مجوز مشاهده این فرم را ندارید.' : 'You do not have permission to view this form.')}</p>
@@ -266,9 +264,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
           selectedIds={selectedIds}
           onSelectRow={(id, checked) => setSelectedIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))}
           onSelectAll={(checked) => setSelectedIds(checked ? filteredData.map(d => d.id) : [])}
-          // Condition: Check 'canCreate'
           onCreate={canCreate ? () => handleOpenModal() : undefined}
-          // Condition: Check 'canDelete'
           onDelete={canDelete ? handleDelete : undefined}
           isRtl={isRtl}
           actions={(row) => (
@@ -392,5 +388,3 @@ const OrganizationInfo = ({ t, isRtl }) => {
 };
 
 window.OrganizationInfo = OrganizationInfo;
-
-```
