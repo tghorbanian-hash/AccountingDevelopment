@@ -89,7 +89,6 @@ window.USER_PERMISSIONS = new Set();
 window.IS_ADMIN = false;
 
 window.hasAccess = (resource, action = null) => {
-  // 1. Global Admin Override
   if (window.IS_ADMIN) return true;
 
   const permissions = window.USER_PERMISSIONS;
@@ -97,12 +96,11 @@ window.hasAccess = (resource, action = null) => {
 
   const resStr = String(resource).trim().toLowerCase();
 
-  // Level 1: Check Form Access (Menu Visibility)
+  // Level 1: Form Access
   if (!action) {
+    if (permissions.has(resStr)) return true;
     for (const p of permissions) {
-      if (p === resStr || p === `${resStr}.*` || p.startsWith(`${resStr}.`)) {
-        return true;
-      }
+      if (p.startsWith(`${resStr}.`)) return true;
     }
     return false;
   }
@@ -110,7 +108,6 @@ window.hasAccess = (resource, action = null) => {
   // Level 2: Specific Action Check
   const actStr = String(action).trim().toLowerCase();
   
-  // Exact match (e.g. org_info.edit) or Wildcard (e.g. org_info.*)
   if (permissions.has(`${resStr}.${actStr}`)) return true;
   if (permissions.has(`${resStr}.*`)) return true;
 
@@ -131,7 +128,6 @@ const App = () => {
   const [activeId, setActiveId] = useState('workspace_gen'); 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Authentication States
   const [authView, setAuthView] = useState('login'); 
   const [loginMethod, setLoginMethod] = useState('standard');
   const [loginData, setLoginData] = useState({ identifier: '', password: '' });
@@ -145,8 +141,6 @@ const App = () => {
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
   }, [lang, isRtl]);
-
-  // --- Auth Handlers ---
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -271,7 +265,6 @@ const App = () => {
   };
 
   // --- Dynamic Menu & Permissions Logic ---
-
   useEffect(() => {
     if (!currentUser) return;
 
@@ -294,37 +287,52 @@ const App = () => {
         const supabase = window.supabase;
         let allowedCodes = new Set();
         
-        // 1. Fetch Role Permissions
+        const processPerms = (perms) => {
+          perms.forEach(p => {
+            if (p.resource_code) {
+              const resCode = String(p.resource_code).trim().toLowerCase();
+              allowedCodes.add(resCode); 
+
+              if (p.actions) {
+                let actionsArray = [];
+                if (Array.isArray(p.actions)) {
+                  actionsArray = p.actions;
+                } else if (typeof p.actions === 'string') {
+                  try {
+                    actionsArray = JSON.parse(p.actions);
+                  } catch (e) {
+                    if (p.actions.includes(',')) {
+                      actionsArray = p.actions.split(',');
+                    } else {
+                      actionsArray = [p.actions];
+                    }
+                  }
+                }
+                
+                if (Array.isArray(actionsArray)) {
+                  actionsArray.forEach(act => {
+                    const cleanAct = String(act).trim().toLowerCase();
+                    allowedCodes.add(`${resCode}.${cleanAct}`);
+                  });
+                }
+              }
+            }
+          });
+        };
+
         const { data: userRoles } = await supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', currentUser.id);
         const roleIds = userRoles ? userRoles.map(ur => ur.role_id) : [];
 
         if (roleIds.length > 0) {
-          const { data: rPerms } = await supabase.schema('gen').from('permissions').select('resource_code').in('role_id', roleIds);
-          if (rPerms) {
-            rPerms.forEach(p => {
-              if (p.resource_code) {
-                 // Clean up string: trim spaces, convert to lowercase
-                 const cleaned = String(p.resource_code).split('.').map(s => s.trim().toLowerCase()).join('.');
-                 allowedCodes.add(cleaned);
-              }
-            });
-          }
+          const { data: rPerms } = await supabase.schema('gen').from('permissions').select('resource_code, actions').in('role_id', roleIds);
+          if (rPerms) processPerms(rPerms);
         }
 
-        // 2. Fetch Direct User Permissions
-        const { data: uPerms } = await supabase.schema('gen').from('permissions').select('resource_code').eq('user_id', currentUser.id);
-        if (uPerms) {
-          uPerms.forEach(p => {
-            if (p.resource_code) {
-               const cleaned = String(p.resource_code).split('.').map(s => s.trim().toLowerCase()).join('.');
-               allowedCodes.add(cleaned);
-            }
-          });
-        }
+        const { data: uPerms } = await supabase.schema('gen').from('permissions').select('resource_code, actions').eq('user_id', currentUser.id);
+        if (uPerms) processPerms(uPerms);
 
         window.USER_PERMISSIONS = allowedCodes;
 
-        // 3. Filter Static UI Menu using Allowed Database Codes (Level 1)
         const filterMenu = (nodes) => {
           return nodes.map(node => {
             if (!node.children || node.children.length === 0) {
@@ -356,8 +364,6 @@ const App = () => {
 
     buildMenu();
   }, [currentUser]);
-
-  // --- App Logic & Rendering ---
 
   const currentModule = useMemo(() => {
     return menuData.find(m => m.id === activeModuleId) || menuData[0] || {};

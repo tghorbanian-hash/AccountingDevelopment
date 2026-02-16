@@ -14,7 +14,6 @@ const OrganizationInfo = ({ t, isRtl }) => {
   const checkAccess = (action = null) => {
     if (!window.hasAccess) return false;
     
-    // Check multiple possible naming conventions to guarantee a match
     const variations = ['org_info', 'organization_info', 'organizationinfo', 'OrganizationInfo'];
     
     for (const res of variations) {
@@ -24,12 +23,9 @@ const OrganizationInfo = ({ t, isRtl }) => {
     return false;
   };
 
-  // If user has NO action specified, they are doing a Level 1 access. 
-  // By default, if they have form access (Level 1), we let them "View" so they don't get the error page immediately.
-  const canEnterForm = checkAccess(); // Any Level 1 access
+  const canEnterForm = checkAccess(); 
   const canView   = canEnterForm || checkAccess('view') || checkAccess('read') || checkAccess('show');
   
-  // Specific Level 2 checks support multiple synonyms
   const canCreate = checkAccess('create') || checkAccess('new') || checkAccess('add') || checkAccess('insert');
   const canEdit   = checkAccess('edit') || checkAccess('update') || checkAccess('modify');
   const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
@@ -80,7 +76,6 @@ const OrganizationInfo = ({ t, isRtl }) => {
   };
 
   const handleSave = async () => {
-    // Security: Double Check permission
     if (currentRecord && currentRecord.id && !canEdit) {
       alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز برای ویرایش' : 'Access Denied for Edit'));
       return;
@@ -205,7 +200,6 @@ const OrganizationInfo = ({ t, isRtl }) => {
     }
   };
 
-  // --- Access Denied View (If they somehow navigate here without Level 1 access) ---
   if (!canView) {
     return (
       <div className={`flex flex-col items-center justify-center h-full bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
@@ -220,7 +214,6 @@ const OrganizationInfo = ({ t, isRtl }) => {
     );
   }
 
-  // --- Columns Definition ---
   const columns = [
     { field: 'code', header: t.org_code || (isRtl ? 'کد' : 'Code'), width: 'w-24', sortable: true },
     { field: 'name', header: t.org_name || (isRtl ? 'نام' : 'Name'), width: 'w-64', sortable: true },
@@ -234,7 +227,6 @@ const OrganizationInfo = ({ t, isRtl }) => {
     }
   ];
 
-  // --- Filter Logic ---
   const filteredData = data.filter(item => {
     const matchCode = filters.code ? item.code.toLowerCase().includes(filters.code.toLowerCase()) : true;
     const matchName = filters.name ? item.name.toLowerCase().includes(filters.name.toLowerCase()) : true;
@@ -308,7 +300,6 @@ const OrganizationInfo = ({ t, isRtl }) => {
         }
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Logo Section */}
           <div className="md:col-span-2 flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
              {formData.logo ? (
                <div className="relative group">
@@ -369,7 +360,6 @@ const OrganizationInfo = ({ t, isRtl }) => {
              />
           </div>
 
-          {/* Addresses Section */}
           <div className="md:col-span-2 bg-slate-50 rounded-xl p-4 border border-slate-200">
              <label className="block text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-2">
                <MapPin size={14}/> {t.org_address || (isRtl ? 'آدرس‌ها' : 'Addresses')}
