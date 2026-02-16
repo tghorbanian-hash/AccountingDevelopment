@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Building2, Search, Plus, Edit, Trash2, MapPin, 
-  Phone, FileText, Upload, X, Save, Printer 
+  Phone, FileText, Upload, X, Save, Printer, Ban 
 } from 'lucide-react';
 
 const OrganizationInfo = ({ t, isRtl }) => {
@@ -11,14 +11,15 @@ const OrganizationInfo = ({ t, isRtl }) => {
   const supabase = window.supabase;
 
   // --- Permission Checks (Level 2) ---
+  // Security Fix: Default return MUST be false.
   const checkAccess = (action) => {
     if (window.hasAccess) {
       return window.hasAccess('org_info', action);
     }
-    return true; 
+    return false; // FAIL SECURE
   };
 
-  const canView   = checkAccess('view');
+  const canView   = checkAccess('view') || checkAccess(); // View is default if Level 1 is passed, or explicit 'view'
   const canCreate = checkAccess('create');
   const canEdit   = checkAccess('edit');
   const canDelete = checkAccess('delete');
@@ -69,6 +70,7 @@ const OrganizationInfo = ({ t, isRtl }) => {
   };
 
   const handleSave = async () => {
+    // Security: Double Check permission
     if (currentRecord && currentRecord.id && !canEdit) {
       alert(t.err_access_denied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'));
       return;
@@ -187,12 +189,13 @@ const OrganizationInfo = ({ t, isRtl }) => {
     }
   };
 
+  // --- Access Denied View ---
   if (!canView) {
     return (
       <div className={`flex flex-col items-center justify-center h-full bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
         <div className="p-6 bg-white rounded-2xl shadow-sm text-center border border-red-100">
            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-             <X className="text-red-500" size={32} />
+             <Ban className="text-red-500" size={32} />
            </div>
            <h2 className="text-lg font-bold text-slate-800">{t.accessDenied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied')}</h2>
            <p className="text-sm text-slate-500 mt-2">{t.noViewPermission || (isRtl ? 'شما مجوز مشاهده این فرم را ندارید.' : 'You do not have permission to view this form.')}</p>
