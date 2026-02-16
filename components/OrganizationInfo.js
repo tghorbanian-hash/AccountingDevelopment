@@ -1,19 +1,24 @@
+```javascript
 /* Filename: components/OrganizationInfo.js */
 import React, { useState, useEffect } from 'react';
 import { 
   Building2, Search, Plus, Edit, Trash2, MapPin, 
-  Phone, FileText, Upload, X, Save, Printer 
+  Phone, FileText, Upload, X, Save, Printer, Ban 
 } from 'lucide-react';
 
 const OrganizationInfo = ({ t, isRtl }) => {
   const UI = window.UI || {};
   const { Button, InputField, DataGrid, FilterSection, Modal, Badge } = UI;
   const supabase = window.supabase;
+  const hasAccess = window.hasAccess || (() => false);
 
-  // --- Permission Checks ---
-  const canCreate = window.hasAccess ? window.hasAccess('org_info', 'create') : true;
-  const canEdit   = window.hasAccess ? window.hasAccess('org_info', 'edit') : true;
-  const canDelete = window.hasAccess ? window.hasAccess('org_info', 'delete') : true;
+  // --- Permission Checks (Level 2) ---
+  // Resource Code: 'org_info'
+  // Actions: 'view', 'create', 'edit', 'delete'
+  const canView   = hasAccess('org_info', 'view');
+  const canCreate = hasAccess('org_info', 'create');
+  const canEdit   = hasAccess('org_info', 'edit');
+  const canDelete = hasAccess('org_info', 'delete');
 
   // --- States ---
   const [data, setData] = useState([]);
@@ -28,8 +33,10 @@ const OrganizationInfo = ({ t, isRtl }) => {
 
   // --- Effects ---
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (canView) {
+      fetchData();
+    }
+  }, [canView]);
 
   // --- DB Operations ---
   const fetchData = async () => {
@@ -59,6 +66,16 @@ const OrganizationInfo = ({ t, isRtl }) => {
   };
 
   const handleSave = async () => {
+    // Security: Check permission again before execution
+    if (currentRecord && currentRecord.id && !canEdit) {
+      alert(t.err_access_denied || 'Access Denied');
+      return;
+    }
+    if ((!currentRecord || !currentRecord.id) && !canCreate) {
+      alert(t.err_access_denied || 'Access Denied');
+      return;
+    }
+
     if (!formData.code || !formData.name) {
       alert(t.req_org_fields || (isRtl ? 'لطفاً کد و نام سازمان را وارد کنید.' : 'Please enter Organization Code and Name.'));
       return;
@@ -104,6 +121,12 @@ const OrganizationInfo = ({ t, isRtl }) => {
   };
 
   const handleDelete = async (ids) => {
+    // Security: Check permission again before execution
+    if (!canDelete) {
+      alert(t.err_access_denied || 'Access Denied');
+      return;
+    }
+
     const confirmMsg = t.confirm_delete?.replace('{0}', ids.length) || (isRtl ? `آیا از حذف ${ids.length} مورد اطمینان دارید؟` : `Delete ${ids.length} items?`);
     if (confirm(confirmMsg)) {
       const { error } = await supabase
@@ -126,8 +149,12 @@ const OrganizationInfo = ({ t, isRtl }) => {
   // --- Handlers ---
   const handleOpenModal = (record = null) => {
     if (record) {
+      // Permission check for opening edit modal
+      if (!canEdit) return;
       setFormData({ ...record });
     } else {
+      // Permission check for opening new modal
+      if (!canCreate) return;
       setFormData({ code: '', name: '', regNo: '', phone: '', fax: '', logo: null, addresses: [] });
     }
     setCurrentRecord(record);
@@ -160,6 +187,21 @@ const OrganizationInfo = ({ t, isRtl }) => {
       reader.readAsDataURL(file);
     }
   };
+
+  // --- Access Denied View ---
+  if (!canView) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-full bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+        <div className="p-6 bg-white rounded-2xl shadow-sm text-center border border-red-100">
+           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+             <Ban className="text-red-500" size={32} />
+           </div>
+           <h2 className="text-lg font-bold text-slate-800">{t.accessDenied || (isRtl ? 'دسترسی غیرمجاز' : 'Access Denied')}</h2>
+           <p className="text-sm text-slate-500 mt-2">{t.noViewPermission || (isRtl ? 'شما مجوز مشاهده این فرم را ندارید.' : 'You do not have permission to view this form.')}</p>
+        </div>
+      </div>
+    );
+  }
 
   // --- Columns Definition ---
   const columns = [
@@ -224,7 +266,9 @@ const OrganizationInfo = ({ t, isRtl }) => {
           selectedIds={selectedIds}
           onSelectRow={(id, checked) => setSelectedIds(prev => checked ? [...prev, id] : prev.filter(x => x !== id))}
           onSelectAll={(checked) => setSelectedIds(checked ? filteredData.map(d => d.id) : [])}
+          // Condition: Check 'canCreate'
           onCreate={canCreate ? () => handleOpenModal() : undefined}
+          // Condition: Check 'canDelete'
           onDelete={canDelete ? handleDelete : undefined}
           isRtl={isRtl}
           actions={(row) => (
@@ -348,3 +392,5 @@ const OrganizationInfo = ({ t, isRtl }) => {
 };
 
 window.OrganizationInfo = OrganizationInfo;
+
+```
