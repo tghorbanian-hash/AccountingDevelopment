@@ -64,6 +64,7 @@ const Roles = ({ t, isRtl }) => {
   const [permissions, setPermissions] = useState({});
   const [dynamicMenu, setDynamicMenu] = useState([]);
   const [allForms, setAllForms] = useState([]);
+  const [customActionsMap, setCustomActionsMap] = useState({}); // Dynamic custom actions per form
 
   // --- UI STATES ---
   const [selectedRows, setSelectedRows] = useState([]);
@@ -84,8 +85,14 @@ const Roles = ({ t, isRtl }) => {
 
   // --- CONFIG ---
   const AVAILABLE_ACTIONS = [
-    { id: 'create', label: t.actCreate || (isRtl ? 'ایجاد' : 'Create') }, { id: 'view', label: t.actView || (isRtl ? 'مشاهده' : 'View') }, { id: 'edit', label: t.actEdit || (isRtl ? 'ویرایش' : 'Edit') }, { id: 'delete', label: t.actDelete || (isRtl ? 'حذف' : 'Delete') },
-    { id: 'print', label: t.actPrint || (isRtl ? 'چاپ' : 'Print') }, { id: 'approve', label: t.actApprove || (isRtl ? 'تایید' : 'Approve') }, { id: 'export', label: t.actExport || (isRtl ? 'خروجی' : 'Export') }, { id: 'share', label: t.actShare || (isRtl ? 'اشتراک' : 'Share') },
+    { id: 'create', label: t.actCreate || (isRtl ? 'ایجاد' : 'Create') }, 
+    { id: 'view', label: t.actView || (isRtl ? 'مشاهده' : 'View') }, 
+    { id: 'edit', label: t.actEdit || (isRtl ? 'ویرایش' : 'Edit') }, 
+    { id: 'delete', label: t.actDelete || (isRtl ? 'حذف' : 'Delete') },
+    { id: 'print', label: t.actPrint || (isRtl ? 'چاپ' : 'Print') }, 
+    { id: 'approve', label: t.actApprove || (isRtl ? 'تایید' : 'Approve') }, 
+    { id: 'export', label: t.actExport || (isRtl ? 'خروجی' : 'Export') }, 
+    { id: 'share', label: t.actShare || (isRtl ? 'اشتراک' : 'Share') },
   ];
 
   const DATA_SCOPES = {
@@ -106,13 +113,47 @@ const Roles = ({ t, isRtl }) => {
       const map = new Map();
       const roots = [];
       const formsList = [];
-      resData.forEach(r => map.set(r.id, { id: r.code, uuid: r.id, label: { fa: r.title_fa, en: r.title_en }, type: r.type, parent_id: r.parent_id, children: [] }));
+      const cActionsMap = {};
+
+      resData.forEach(r => map.set(r.id, { 
+        id: r.code, 
+        uuid: r.id, 
+        label: { fa: r.title_fa, en: r.title_en }, 
+        type: r.type, 
+        parent_id: r.parent_id, 
+        children: [] 
+      }));
+
       resData.forEach(r => {
         const node = map.get(r.id);
-        if (r.parent_id && map.has(r.parent_id)) map.get(r.parent_id).children.push(node);
-        else roots.push(node);
+        
+        // 1. If it is an action, assign it to its parent's custom actions map
+        if (r.type === 'action') {
+           if (r.parent_id && map.has(r.parent_id)) {
+              const parentNode = map.get(r.parent_id);
+              if (!cActionsMap[parentNode.id]) cActionsMap[parentNode.id] = [];
+              
+              // Extract purely the action part (e.g. 'cost_centers.assign_detail' -> 'assign_detail')
+              const actionId = r.code.includes('.') ? r.code.split('.').pop() : r.code;
+              
+              cActionsMap[parentNode.id].push({
+                 id: actionId,
+                 label: isRtl ? (r.title_fa || r.title_en || actionId) : (r.title_en || r.title_fa || actionId)
+              });
+           }
+        } 
+        // 2. If it is a form or module, build the visual tree
+        else {
+           if (r.parent_id && map.has(r.parent_id)) {
+              map.get(r.parent_id).children.push(node);
+           } else {
+              roots.push(node);
+           }
+        }
       });
+      
       setDynamicMenu(roots);
+      setCustomActionsMap(cActionsMap);
 
       const traverse = (nodes, path = '') => {
         nodes.forEach(n => {
@@ -139,7 +180,16 @@ const Roles = ({ t, isRtl }) => {
       const permsMap = {};
       pData.forEach(p => {
         if (!permsMap[p.role_id]) permsMap[p.role_id] = {};
-        permsMap[p.role_id][p.resource_code] = { actions: p.actions || [], dataScopes: p.data_scopes || {} };
+        
+        let actionsArr = [];
+        if (typeof p.actions === 'string') {
+           try { actionsArr = JSON.parse(p.actions); } 
+           catch (e) { actionsArr = p.actions.includes(',') ? p.actions.split(',') : [p.actions]; }
+        } else if (Array.isArray(p.actions)) {
+           actionsArr = p.actions;
+        }
+
+        permsMap[p.role_id][p.resource_code] = { actions: actionsArr, dataScopes: p.data_scopes || {} };
       });
       setPermissions(permsMap);
     }
@@ -246,14 +296,20 @@ const Roles = ({ t, isRtl }) => {
     const targetIds = getAllDescendantIds(selectedModule);
     const msg = isRtl ? `این عملیات روی آیتم‌های زیرمجموعه نیز اعمال می‌شود. ادامه می‌دهید؟` : `This will affect child items. Continue?`;
     if (targetIds.length > 1 && !confirm(msg)) return;
+    
     setTempPermissions(prev => {
       const next = { ...prev };
       targetIds.forEach(id => {
-        if (mode === 'revoke') delete next[id];
-        else {
+        if (mode === 'revoke') {
+          delete next[id];
+        } else {
           let allScopes = {};
           if (DATA_SCOPES[id]) DATA_SCOPES[id].forEach(scope => { allScopes[scope.id] = scope.options.map(o => o.value); });
-          next[id] = { actions: AVAILABLE_ACTIONS.map(a => a.id), dataScopes: allScopes };
+          
+          // Combine standard actions + dynamic custom actions attached to this module in DB
+          const nodeActions = [...AVAILABLE_ACTIONS, ...(customActionsMap[id] || [])].map(a => a.id);
+          
+          next[id] = { actions: nodeActions, dataScopes: allScopes };
         }
       });
       return next;
@@ -394,7 +450,11 @@ const Roles = ({ t, isRtl }) => {
                      <div className="flex-1 overflow-y-auto p-5 space-y-6">
                         <div>
                            <div className="text-[11px] font-bold text-slate-500 uppercase mb-2">{t.actions || (isRtl ? 'عملیات' : 'Actions')}</div>
-                           <SelectionGrid items={AVAILABLE_ACTIONS} selectedIds={tempPermissions[selectedModule.id]?.actions || []} onToggle={(id) => updateAction(selectedModule.id, id)} />
+                           <SelectionGrid 
+                             items={[...AVAILABLE_ACTIONS, ...(customActionsMap[selectedModule.id] || [])]} 
+                             selectedIds={tempPermissions[selectedModule.id]?.actions || []} 
+                             onToggle={(id) => updateAction(selectedModule.id, id)} 
+                           />
                         </div>
                         {DATA_SCOPES[selectedModule.id] && (
                            <div className="pt-4 border-t border-slate-100">
