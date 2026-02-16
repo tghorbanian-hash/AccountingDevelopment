@@ -89,6 +89,7 @@ window.USER_PERMISSIONS = new Set();
 window.IS_ADMIN = false;
 
 window.hasAccess = (resource, action = null) => {
+  // If user is Admin, grant full access immediately
   if (window.IS_ADMIN) return true;
 
   const permissions = window.USER_PERMISSIONS;
@@ -270,13 +271,19 @@ const App = () => {
 
     const buildMenu = async () => {
       const rawMenu = window.MENU_DATA || [];
-      const userType = currentUser.user_type || currentUser.UserType || '';
       
-      const isSysAdmin = userType === 'System Admin' || userType === 'مدیر سیستم';
+      // Standardize user type string for accurate checking
+      const userTypeRaw = currentUser.user_type || currentUser.UserType || '';
+      const userTypeClean = String(userTypeRaw).trim().toLowerCase();
+      
+      // Broadened list of valid admin types to ensure 'admin' is caught correctly
+      const adminRoles = ['system admin', 'مدیر سیستم', 'admin', 'administrator', 'super admin'];
+      const isSysAdmin = adminRoles.includes(userTypeClean);
       
       window.IS_ADMIN = isSysAdmin;
 
       if (isSysAdmin) {
+        // Admins skip all permission queries and get the full menu directly
         setMenuData(rawMenu);
         window.USER_PERMISSIONS = new Set(); 
         if (rawMenu.length > 0 && !activeModuleId) setActiveModuleId(rawMenu[0].id);
