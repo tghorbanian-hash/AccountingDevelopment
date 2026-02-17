@@ -87,7 +87,7 @@ const AccountForm = ({
         return null;
      };
      const pNode = findNode(treeData, formData.parentId);
-     if (pNode) prefix = pNode.fullCode || pNode.code;
+     if (pNode) prefix = pNode.dynamicFullCode || pNode.fullCode || pNode.code;
   }
 
   const maxLen = isGroup ? structure.groupLen : (isGeneral ? structure.generalLen : structure.subsidiaryLen);
@@ -234,7 +234,7 @@ const TafsilSelector = ({ formData, setFormData, isRtl, detailTypes }) => {
                           : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
                     `}
                  >
-                    {t.type === 'user' && <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}><User size={10} className="text-indigo-500" /></div>}
+                    {!t.is_system && <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}><User size={10} className="text-indigo-500" /></div>}
                     <div className="text-[12px] flex items-center justify-center gap-1">{t.title}</div>
                  </div>
               )
@@ -286,8 +286,7 @@ const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onTog
   const color = isGroup ? 'text-indigo-700' : isGeneral ? 'text-slate-700' : 'text-slate-500';
   const icon = isGroup ? <Layers size={14}/> : isGeneral ? <Folder size={14}/> : <FileText size={14}/>;
 
-  // Use fullCode instead of base code for display
-  const displayCode = node.fullCode || node.code;
+  const displayCode = node.dynamicFullCode || node.fullCode || node.code;
 
   return (
     <div className="select-none">
@@ -540,7 +539,7 @@ const AccountTreeView = ({
           return null;
        };
        const pNode = findNode(treeData, formData.parentId);
-       if (pNode) parentFullCode = pNode.fullCode || pNode.code;
+       if (pNode) parentFullCode = pNode.dynamicFullCode || pNode.fullCode || pNode.code;
     }
     
     let fullCode = formData.level === 'group' ? formData.code : (parentFullCode + formData.code);
@@ -636,7 +635,13 @@ const AccountTreeView = ({
      let result = [];
      nodes.forEach(node => {
         const currentPath = parentPath ? `${parentPath} > ${node.title}` : node.title;
-        if (node.level === 'subsidiary') result.push({ ...node, pathTitle: currentPath });
+        if (node.level === 'subsidiary') {
+            result.push({ 
+               ...node, 
+               pathTitle: currentPath,
+               fullCode: node.dynamicFullCode || node.fullCode || node.code 
+            });
+        }
         if (node.children) result = result.concat(flattenSubsidiariesWithPaths(node.children, currentPath));
      });
      return result;
@@ -649,7 +654,7 @@ const AccountTreeView = ({
   const getContraAccountName = (id) => {
      if (!id) return '';
      const acc = flattenSubsidiariesWithPaths(treeData).find(n => n.id === id);
-     return acc ? `${acc.fullCode} - ${acc.title}` : '';
+     return acc ? `${acc.dynamicFullCode || acc.fullCode || acc.code} - ${acc.title}` : '';
   };
 
   const handleNodeSelect = (node) => {
@@ -714,7 +719,7 @@ const AccountTreeView = ({
                    <div className="p-6 border-b border-slate-100 flex justify-between items-start shrink-0">
                       <div>
                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="neutral" className="font-mono text-lg px-2">{selectedNode.fullCode || selectedNode.code}</Badge>
+                            <Badge variant="neutral" className="font-mono text-lg px-2">{selectedNode.dynamicFullCode || selectedNode.fullCode || selectedNode.code}</Badge>
                             <h2 className="text-lg font-bold text-slate-800">{selectedNode.title}</h2>
                          </div>
                          <div className="text-xs text-slate-500">{selectedNode.titleEn}</div>
@@ -775,7 +780,7 @@ const AccountTreeView = ({
                                     <div className="flex flex-wrap gap-1">
                                         {(selectedNode.tafsils || []).map(tId => {
                                             const tObj = detailTypes.find(x => String(x.id) === String(tId) || x.code === String(tId));
-                                            if (!tObj) return null; // فیلتر کردن کدهای رشته‌ای اشتباه و پاک شده
+                                            if (!tObj) return null;
                                             return <Badge key={tId} variant="neutral">{tObj.title}</Badge>;
                                         })}
                                         {(!selectedNode.tafsils || selectedNode.tafsils.length === 0 || !selectedNode.tafsils.some(tId => detailTypes.find(x => String(x.id) === String(tId) || x.code === String(tId)))) && <span className="text-xs text-slate-400 italic">{isRtl ? 'موردی یافت نشد' : 'None'}</span>}
@@ -950,11 +955,14 @@ const ChartofAccounts = ({ t, isRtl }) => {
            }
         });
 
-        const sortTree = (nodes) => {
+        const sortAndBuildFullCodes = (nodes, parentFullCode = '') => {
            nodes.sort((a,b) => a.code.localeCompare(b.code));
-           nodes.forEach(n => { if(n.children) sortTree(n.children); });
+           nodes.forEach(n => { 
+               n.dynamicFullCode = parentFullCode + n.code;
+               if(n.children) sortAndBuildFullCodes(n.children, n.dynamicFullCode); 
+           });
         };
-        sortTree(roots);
+        sortAndBuildFullCodes(roots, '');
 
         setTreeData(roots);
         return { roots, map };
