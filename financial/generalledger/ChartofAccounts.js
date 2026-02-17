@@ -230,7 +230,7 @@ const TafsilSelector = ({ formData, setFormData, isRtl, detailTypes }) => {
                           : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
                     `}
                  >
-                    {!t.is_system && <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}><User size={10} className="text-indigo-500" /></div>}
+                    {t.type === 'user' && <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}><User size={10} className="text-indigo-500" /></div>}
                     <div className="text-[12px] flex items-center justify-center gap-1">{t.title}</div>
                  </div>
               )
