@@ -38,6 +38,16 @@ const csvToArray = (text) => {
     return ret.filter(r => r.length > 1 || r[0] !== '');
 };
 
+// --- HIGHLIGHT HELPER ---
+const highlightText = (text, highlight) => {
+  if (!highlight || !text) return text;
+  const parts = String(text).split(new RegExp(`(${highlight})`, 'gi'));
+  return parts.map((part, index) => 
+    part.toLowerCase() === highlight.toLowerCase() ? 
+      <mark key={index} className="bg-yellow-200 text-yellow-900 rounded-[2px] px-0.5">{part}</mark> : part
+  );
+};
+
 // --- SHARED HELPERS & SUB-COMPONENTS ---
 const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
   <div 
@@ -293,7 +303,7 @@ const StandardDesc = ({ formData, setFormData, isRtl }) => {
 };
 
 // --- CUSTOM TREE RENDERER ---
-const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onToggle, isRtl }) => {
+const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onToggle, isRtl, searchTerm }) => {
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedKeys.has(node.id);
   const isSelected = selectedId === node.id;
@@ -334,8 +344,12 @@ const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onTog
         
         <div className={`flex items-center gap-2 truncate flex-1 ${color}`}>
            {icon}
-           <span className="font-mono text-[11px] font-bold bg-white/60 border border-slate-200/50 px-1 rounded">{displayCode}</span>
-           <span className="text-[12px] truncate">{node.title}</span>
+           <span className="font-mono text-[11px] font-bold bg-white/60 border border-slate-200/50 px-1 rounded">
+              {highlightText(displayCode, searchTerm)}
+           </span>
+           <span className="text-[12px] truncate">
+              {highlightText(node.title, searchTerm)}
+           </span>
            {node.isActive === false && <span className="bg-red-100 text-red-600 text-[9px] px-1 rounded">{isRtl ? 'غیرفعال' : 'Inactive'}</span>}
         </div>
       </div>
@@ -347,6 +361,7 @@ const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onTog
               key={child.id} node={child} level={level + 1} 
               selectedId={selectedId} onSelect={onSelect} 
               expandedKeys={expandedKeys} onToggle={onToggle} isRtl={isRtl} 
+              searchTerm={searchTerm}
             />
           ))}
         </div>
@@ -921,6 +936,7 @@ const AccountTreeView = ({
                       key={node.id} node={node} level={0} 
                       selectedId={selectedNode?.id} onSelect={handleNodeSelect} 
                       expandedKeys={expandedKeys} onToggle={toggleExpand} isRtl={isRtl} 
+                      searchTerm={treeSearchTerm}
                    />
                 )) : (
                    <div className="text-center text-slate-400 text-xs italic mt-10">
