@@ -57,22 +57,21 @@ const CostCenters = ({ t, isRtl }) => {
       if (!supabase) throw new Error("Supabase connection is missing.");
 
       const { data: dbData, error } = await supabase
-        .schema('gen')
         .from('cost_centers')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
 
       if (error) throw error;
 
       const mappedData = (dbData || []).map(item => ({
         id: item.id,
-        code: item.code,
-        title: item.title,
+        code: item.code || '',
+        title: item.title || '',
         type: item.type || 'production',
         address: item.address || '',
-        detailCode: item.detail_code,
-        active: item.is_active
-      }));
+        detailCode: item.detail_code || '',
+        active: item.is_active !== undefined ? item.is_active : true,
+        createdAt: item.created_at || new Date().toISOString()
+      })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       
       setData(mappedData);
     } catch (err) {
@@ -107,7 +106,6 @@ const CostCenters = ({ t, isRtl }) => {
 
       if (currentRecord && currentRecord.id) {
         const { error } = await supabase
-          .schema('gen')
           .from('cost_centers')
           .update(payload)
           .eq('id', currentRecord.id);
@@ -115,7 +113,6 @@ const CostCenters = ({ t, isRtl }) => {
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .schema('gen')
           .from('cost_centers')
           .insert([payload]);
 
@@ -140,7 +137,6 @@ const CostCenters = ({ t, isRtl }) => {
     if (confirm(confirmMsg)) {
       try {
         const { error } = await supabase
-          .schema('gen')
           .from('cost_centers')
           .delete()
           .in('id', ids);
@@ -163,7 +159,6 @@ const CostCenters = ({ t, isRtl }) => {
     }
     try {
       const { error } = await supabase
-        .schema('gen')
         .from('cost_centers')
         .update({ is_active: newVal })
         .eq('id', id);
@@ -195,7 +190,6 @@ const CostCenters = ({ t, isRtl }) => {
     if (targetForDetail) {
       try {
         const { error } = await supabase
-          .schema('gen')
           .from('cost_centers')
           .update({ detail_code: detailCodeInput || null })
           .eq('id', targetForDetail.id);
@@ -232,8 +226,8 @@ const CostCenters = ({ t, isRtl }) => {
   // --- Filter Data ---
   const filteredData = useMemo(() => {
     return data.filter(item => {
-      const matchCode = filters.code ? item.code.toLowerCase().includes(filters.code.toLowerCase()) : true;
-      const matchTitle = filters.title ? item.title.toLowerCase().includes(filters.title.toLowerCase()) : true;
+      const matchCode = filters.code ? String(item.code || '').toLowerCase().includes(filters.code.toLowerCase()) : true;
+      const matchTitle = filters.title ? String(item.title || '').toLowerCase().includes(filters.title.toLowerCase()) : true;
       const matchType = filters.type ? item.type === filters.type : true;
       return matchCode && matchTitle && matchType;
     });
