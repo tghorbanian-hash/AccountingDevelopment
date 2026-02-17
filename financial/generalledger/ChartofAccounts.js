@@ -354,6 +354,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
            fullCode: n.full_code,
            title: n.title,
            titleEn: n.title_en || '',
+           // فیکس مربوط به خطای TreeView: آبجکت label باید ساخته شود
+           label: { fa: n.title, en: n.title_en || n.title },
            level: n.level,
            type: n.type || 'permanent',
            nature: n.nature || 'debit',
