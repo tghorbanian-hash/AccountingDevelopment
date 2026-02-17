@@ -152,6 +152,7 @@ const FiscalPeriods = ({ t, isRtl }) => {
 
   const fetchUsers = async () => {
     try {
+      // Assuming gen.users exists with these exact columns based on standard structure
       const { data, error } = await supabase.schema('gen').from('users').select('id, username, full_name').eq('is_active', true);
       if (!error && data) setUsers(data);
     } catch (err) {
@@ -490,7 +491,7 @@ const FiscalPeriods = ({ t, isRtl }) => {
       </Modal>
 
       {/* Modal: Period Manager */}
-      <Modal isOpen={showPeriodModal} onClose={()=>{setShowPeriodModal(false); setShowExPanel(false);}} title={`${isRtl ? 'دوره‌های مالی:' : 'Periods for:'} ${activeYear?.title}`} size="3xl">
+      <Modal isOpen={showPeriodModal} onClose={()=>{setShowPeriodModal(false); setShowExPanel(false);}} title={`${isRtl ? 'دوره‌های مالی:' : 'Periods for:'} ${activeYear?.title}`} size="lg">
         <div className="flex flex-col gap-4 h-[650px] relative overflow-hidden">
           
           {/* Top Panel: Auto Generation Guide & Tools */}
