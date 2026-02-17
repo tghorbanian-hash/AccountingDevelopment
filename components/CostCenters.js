@@ -57,6 +57,7 @@ const CostCenters = ({ t, isRtl }) => {
       if (!supabase) throw new Error("Supabase connection is missing.");
 
       const { data: dbData, error } = await supabase
+        .schema('gen')
         .from('cost_centers')
         .select('*');
 
@@ -106,6 +107,7 @@ const CostCenters = ({ t, isRtl }) => {
 
       if (currentRecord && currentRecord.id) {
         const { error } = await supabase
+          .schema('gen')
           .from('cost_centers')
           .update(payload)
           .eq('id', currentRecord.id);
@@ -113,6 +115,7 @@ const CostCenters = ({ t, isRtl }) => {
         if (error) throw error;
       } else {
         const { error } = await supabase
+          .schema('gen')
           .from('cost_centers')
           .insert([payload]);
 
@@ -137,6 +140,7 @@ const CostCenters = ({ t, isRtl }) => {
     if (confirm(confirmMsg)) {
       try {
         const { error } = await supabase
+          .schema('gen')
           .from('cost_centers')
           .delete()
           .in('id', ids);
@@ -159,6 +163,7 @@ const CostCenters = ({ t, isRtl }) => {
     }
     try {
       const { error } = await supabase
+        .schema('gen')
         .from('cost_centers')
         .update({ is_active: newVal })
         .eq('id', id);
@@ -190,6 +195,7 @@ const CostCenters = ({ t, isRtl }) => {
     if (targetForDetail) {
       try {
         const { error } = await supabase
+          .schema('gen')
           .from('cost_centers')
           .update({ detail_code: detailCodeInput || null })
           .eq('id', targetForDetail.id);
