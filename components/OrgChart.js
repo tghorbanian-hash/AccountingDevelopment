@@ -28,6 +28,19 @@ const OrgChart = ({ t, isRtl }) => {
   const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
   const canDesign = checkAccess('design');
 
+  // --- Data Sanitization Helpers (Prevents Supabase 400 Bad Request) ---
+  const cleanDate = (d) => {
+    if (!d) return null;
+    const trimmed = String(d).trim().replace(/\//g, '-');
+    return trimmed === '' ? null : trimmed;
+  };
+
+  const cleanStr = (s) => {
+    if (!s) return null;
+    const trimmed = String(s).trim();
+    return trimmed === '' ? null : trimmed;
+  };
+
   // --- INTERNAL: CUSTOM TREE COMPONENT ---
   const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onToggle, isRtl }) => {
     const hasChildren = node.children && node.children.length > 0;
@@ -251,20 +264,26 @@ const OrgChart = ({ t, isRtl }) => {
     }
     try {
        const payload = {
-          code: chartFormData.code,
-          title: chartFormData.title,
+          code: cleanStr(chartFormData.code),
+          title: cleanStr(chartFormData.title),
           type: chartFormData.type,
-          start_date: chartFormData.startDate || null,
-          end_date: chartFormData.endDate || null,
+          start_date: cleanDate(chartFormData.startDate),
+          end_date: cleanDate(chartFormData.endDate),
           is_active: chartFormData.active
        };
 
        if (chartFormData.id) {
           const { error } = await supabase.schema('gen').from('org_charts').update(payload).eq('id', chartFormData.id);
-          if (error) throw error;
+          if (error) {
+             if (error.code === '22008') return alert(isRtl ? 'فرمت تاریخ نامعتبر است.' : 'Invalid Date Format.');
+             throw error;
+          }
        } else {
           const { error } = await supabase.schema('gen').from('org_charts').insert([payload]);
-          if (error) throw error;
+          if (error) {
+             if (error.code === '22008') return alert(isRtl ? 'فرمت تاریخ نامعتبر است.' : 'Invalid Date Format.');
+             throw error;
+          }
        }
        setIsChartModalOpen(false);
        fetchCharts();
@@ -361,9 +380,9 @@ const OrgChart = ({ t, isRtl }) => {
      try {
         const payload = {
            chart_id: activeChart.id,
-           code: nodeForm.code,
-           title: nodeForm.title,
-           parent_id: nodeForm.parentId || null,
+           code: cleanStr(nodeForm.code),
+           title: cleanStr(nodeForm.title),
+           parent_id: cleanStr(nodeForm.parentId),
            is_active: nodeForm.active
         };
 
@@ -382,6 +401,7 @@ const OrgChart = ({ t, isRtl }) => {
         await fetchDesignerData(activeChart.id);
         setExpandedKeys(currentExpanded);
         
+        // Clear selection to avoid stale state issues after tree rebuild
         handlePrepareNewNode();
         setSelectedNode(null);
 
@@ -439,18 +459,26 @@ const OrgChart = ({ t, isRtl }) => {
     try {
        const payload = {
           node_id: selectedNode.id,
-          person_id: assignData.personId,
-          person_name: personName,
-          from_date: assignData.fromDate || null,
-          to_date: assignData.toDate || null
+          person_id: Number(assignData.personId),
+          person_name: cleanStr(personName),
+          from_date: cleanDate(assignData.fromDate),
+          to_date: cleanDate(assignData.toDate)
        };
 
        if (assignData.id) {
           const { error } = await supabase.schema('gen').from('org_chart_personnel').update(payload).eq('id', assignData.id);
-          if (error) throw error;
+          if (error) {
+             console.error("Supabase Error:", error);
+             if (error.code === '22008' || error.message?.includes('date format')) return alert(isRtl ? 'فرمت تاریخ نامعتبر است. از تاریخ میلادی صحیح استفاده کنید.' : 'Invalid Date Format.');
+             throw error;
+          }
        } else {
           const { error } = await supabase.schema('gen').from('org_chart_personnel').insert([payload]);
-          if (error) throw error;
+          if (error) {
+             console.error("Supabase Error:", error);
+             if (error.code === '22008' || error.message?.includes('date format')) return alert(isRtl ? 'فرمت تاریخ نامعتبر است. از تاریخ میلادی صحیح استفاده کنید.' : 'Invalid Date Format.');
+             throw error;
+          }
        }
 
        await fetchDesignerData(activeChart.id);
