@@ -1,336 +1,511 @@
 /* Filename: financial/generalledger/FiscalPeriods.js */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Calendar, Edit, Trash2, Plus, Play, Lock, 
-  Clock, Users, Zap, UserPlus, X, Trash, Info, CheckCircle2
+  CalendarDays, Calendar, Plus, Edit, Trash2, 
+  Save, ShieldAlert, Check, X, Search, Ban, Lock, Unlock 
 } from 'lucide-react';
 
 const FiscalPeriods = ({ t, isRtl }) => {
+  const UI = window.UI || {};
   const { 
-    Button, InputField, SelectField, Toggle, DataGrid, 
-    FilterSection, Modal, Badge, Callout 
-  } = window.UI;
+    Button, InputField, SelectField, DataGrid, 
+    FilterSection, Modal, Badge, DatePicker 
+  } = UI;
+  const supabase = window.supabase;
 
-  // --- State: Data ---
-  const [fiscalYears, setFiscalYears] = useState([
-    { id: 1, code: '1403', title: 'سال مالی ۱۴۰۳', startDate: '2024-03-20', endDate: '2025-03-20', calendarType: 'jalali', isActive: true },
-    { id: 2, code: '2025', title: 'Fiscal Year 2025', startDate: '2025-01-01', endDate: '2025-12-31', calendarType: 'gregorian', isActive: true },
-  ]);
+  // --- Permission Checks ---
+  const checkAccess = (action = null) => {
+    if (!window.hasAccess) return false;
+    const variations = ['fiscal_periods', 'fiscalperiods', 'periods'];
+    for (const res of variations) {
+       if (window.hasAccess(res, action)) return true;
+    }
+    return false;
+  };
 
-  const [operationalPeriods, setOperationalPeriods] = useState([
-    { 
-      id: 10, 
-      yearId: 1, 
-      code: '01', 
-      title: 'فروردین ۱۴۰۳', 
-      startDate: '2024-03-20', 
-      endDate: '2024-04-20', 
-      status: 'open', 
-      exceptions: [{ user: 'Financial Manager', allowedStatuses: ['closed', 'not_open'] }] 
-    },
-  ]);
+  const canEnterForm = checkAccess(); 
+  const canView   = canEnterForm || checkAccess('view') || checkAccess('read') || checkAccess('show');
+  const canCreate = checkAccess('create') || checkAccess('new') || checkAccess('add') || checkAccess('insert');
+  const canEdit   = checkAccess('edit') || checkAccess('update') || checkAccess('modify');
+  const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
+  const canManagePeriods = checkAccess('manage_periods');
 
-  // --- State: UI ---
-  const [showYearModal, setShowYearModal] = useState(false);
-  const [showPeriodModal, setShowPeriodModal] = useState(false);
-  const [showExPanel, setShowExPanel] = useState(false);
-  const [activeYear, setActiveYear] = useState(null);
+  // --- States ---
+  const [years, setYears] = useState([]);
+  const [periods, setPeriods] = useState([]);
+  const [exceptions, setExceptions] = useState([]);
+  const [users, setUsers] = useState([]);
+
+  // Modals & Selections
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
+  const [isPeriodModalOpen, setIsPeriodModalOpen] = useState(false);
+  const [isExceptionModalOpen, setIsExceptionModalOpen] = useState(false);
+
+  const [selectedYear, setSelectedYear] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState(null);
-  const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({});
-  const [searchParams, setSearchParams] = useState({ code: '', title: '' });
-  const [newPeriodData, setNewPeriodData] = useState({ code: '', title: '', startDate: '', endDate: '', status: 'not_open' });
-  const [exUser, setExUser] = useState('');
-  const [exStatuses, setExStatuses] = useState([]);
 
-  // --- Logic Helpers ---
-  const checkOverlap = (start, end, list, excludeId = null) => {
-    return list.some(p => {
-      if (excludeId && p.id === excludeId) return false;
-      return (start <= p.endDate && end >= p.startDate);
-    });
+  // Forms
+  const [yearForm, setYearForm] = useState({ id: null, title: '', startDate: '', endDate: '', status: 'open', isActive: true });
+  const [periodForm, setPeriodForm] = useState({ id: null, title: '', startDate: '', endDate: '', status: 'open' });
+  const [excFormUser, setExcFormUser] = useState(''); // Holds User ID
+
+  // Search Filters
+  const [yearSearch, setYearSearch] = useState('');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const userDropdownRef = useRef(null);
+
+  // --- Effects ---
+  useEffect(() => {
+    if (canView) {
+      fetchYears();
+      fetchUsers();
+    }
+  }, [canView]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setIsUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // --- DB Operations ---
+  const cleanDate = (d) => {
+    if (!d) return null;
+    const trimmed = String(d).trim().replace(/\//g, '-');
+    return trimmed === '' ? null : trimmed;
   };
 
-  // --- Handlers: Year ---
-  const handleSaveYear = () => {
-    if (!formData.code || !formData.startDate || !formData.endDate) return alert(t.alert_req_fields);
-    if (checkOverlap(formData.startDate, formData.endDate, fiscalYears, editingItem?.id)) {
-      return alert(isRtl ? "این بازه زمانی با سال مالی دیگری تداخل دارد" : "Date range overlaps with another year");
-    }
-    if (editingItem) {
-      setFiscalYears(prev => prev.map(y => y.id === editingItem.id ? { ...formData, id: y.id } : y));
-    } else {
-      setFiscalYears(prev => [...prev, { ...formData, id: Date.now() }]);
-    }
-    setShowYearModal(false);
-  };
-
-  const handleDeleteYear = (id) => {
-    const yearPeriods = operationalPeriods.filter(p => p.yearId === id);
-    if (yearPeriods.some(p => p.status !== 'not_open')) {
-      return alert(isRtl ? "به دلیل وجود دوره‌های باز یا بسته، حذف سال امکان‌پذیر نیست" : "Cannot delete year with open/closed periods");
-    }
-    if (window.confirm(isRtl ? "آیا از حذف این سال مالی و تمام دوره‌های آن اطمینان دارید؟" : "Delete year and all its periods?")) {
-      setFiscalYears(prev => prev.filter(y => y.id !== id));
-      setOperationalPeriods(prev => prev.filter(p => p.yearId !== id));
-    }
-  };
-
-  // --- Handlers: Periods ---
-  const handleSavePeriod = () => {
-    if (!newPeriodData.code || !newPeriodData.startDate || !newPeriodData.endDate) return alert(t.alert_req_fields);
-    const yearPeriods = operationalPeriods.filter(p => p.yearId === activeYear.id);
-    if (checkOverlap(newPeriodData.startDate, newPeriodData.endDate, yearPeriods, newPeriodData.id)) {
-      return alert(isRtl ? "تداخل با دوره‌های موجود" : "Overlaps with existing periods");
-    }
-
-    if (newPeriodData.id) {
-      setOperationalPeriods(prev => prev.map(p => p.id === newPeriodData.id ? { ...newPeriodData } : p));
-    } else {
-      setOperationalPeriods(prev => [...prev, { ...newPeriodData, id: Date.now(), yearId: activeYear.id, exceptions: [] }]);
-    }
-    setNewPeriodData({ code: '', title: '', startDate: '', endDate: '', status: 'not_open' });
-  };
-
-  const generateAuto = (months) => {
-    const existing = operationalPeriods.filter(p => p.yearId === activeYear.id);
-    if (existing.some(p => p.status !== 'not_open')) {
-      return alert(isRtl ? "به دلیل وجود دوره باز/بسته، امکان تولید مجدد نیست" : "Regeneration blocked by open/closed periods");
-    }
-    if (!window.confirm(isRtl ? "دوره‌های فعلی حذف و جایگزین شوند؟" : "Replace current periods?")) return;
-
-    const generated = [];
-    let start = new Date(activeYear.startDate);
-    const total = Math.ceil(12 / months);
-    for (let i = 1; i <= total; i++) {
-      let currentStart = new Date(start);
-      let currentEnd = new Date(start.setMonth(start.getMonth() + months));
-      currentEnd.setDate(currentEnd.getDate() - 1);
-      generated.push({
-        id: Date.now() + i,
-        yearId: activeYear.id,
-        code: i.toString().padStart(2, '0'),
-        title: (isRtl ? "دوره " : "Period ") + i,
-        startDate: currentStart.toISOString().split('T')[0],
-        endDate: currentEnd.toISOString().split('T')[0],
-        status: 'not_open',
-        exceptions: []
-      });
-      start.setDate(start.getDate() + 1);
-    }
-    setOperationalPeriods(prev => [...prev.filter(p => p.yearId !== activeYear.id), ...generated]);
-  };
-
-  const deletePeriod = (id) => {
-    const period = operationalPeriods.find(p => p.id === id);
-    if (period && period.status !== 'not_open') {
-      return alert(isRtl ? "فقط دوره‌های 'باز نشده' قابل حذف هستند." : "Only 'Not Open' periods can be deleted.");
-    }
-    if (window.confirm(isRtl ? "آیا این دوره حذف شود؟" : "Delete this period?")) {
-      setOperationalPeriods(prev => prev.filter(p => p.id !== id));
-      if (selectedPeriod?.id === id) setShowExPanel(false);
+  const fetchYears = async () => {
+    try {
+      const { data, error } = await supabase.schema('gl').from('fiscal_years').select('*').order('start_date', { ascending: false });
+      if (error) throw error;
+      setYears(data || []);
+    } catch (err) {
+      console.error(err);
+      alert(isRtl ? 'خطا در دریافت سال‌های مالی' : 'Error fetching fiscal years');
     }
   };
 
-  // --- Handlers: Exceptions ---
-  const toggleStatusInEx = (status) => {
-    setExStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
+  const fetchPeriods = async (yearId) => {
+    try {
+      const { data, error } = await supabase.schema('gl').from('fiscal_periods').select('*').eq('year_id', yearId).order('start_date', { ascending: true });
+      if (error) throw error;
+      setPeriods(data || []);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const addEx = () => {
-    if (!exUser || exStatuses.length === 0) return alert(isRtl ? "کاربر و وضعیت را انتخاب کنید" : "Select user and status");
-    // Check if user already exists, if so update, else add
-    const existingIndex = selectedPeriod.exceptions.findIndex(e => e.user === exUser);
-    let updated;
+  const fetchUsers = async () => {
+    try {
+      // Assuming gen.users exists with these exact columns based on standard structure
+      const { data, error } = await supabase.schema('gen').from('users').select('id, username, full_name').eq('is_active', true);
+      if (!error && data) setUsers(data);
+    } catch (err) {
+      console.error('Fetch users error:', err);
+    }
+  };
+
+  const fetchExceptions = async (periodId) => {
+    try {
+      const { data, error } = await supabase.schema('gl').from('fiscal_period_exceptions').select('*').eq('period_id', periodId);
+      if (error) throw error;
+      setExceptions(data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- Year Handlers ---
+  const filteredYears = useMemo(() => {
+    return years.filter(y => y.title.toLowerCase().includes(yearSearch.toLowerCase()));
+  }, [years, yearSearch]);
+
+  const handleOpenYearModal = (year = null) => {
+    if (year && !canEdit) return alert(isRtl ? 'دسترسی ویرایش ندارید' : 'Access Denied');
+    if (!year && !canCreate) return alert(isRtl ? 'دسترسی ایجاد ندارید' : 'Access Denied');
     
-    if (existingIndex >= 0) {
-       updated = [...selectedPeriod.exceptions];
-       updated[existingIndex] = { user: exUser, allowedStatuses: exStatuses };
+    if (year) {
+      setYearForm({ id: year.id, title: year.title, startDate: year.start_date, endDate: year.end_date, status: year.status, isActive: year.is_active });
     } else {
-       updated = [...(selectedPeriod.exceptions || []), { user: exUser, allowedStatuses: exStatuses }];
+      setYearForm({ id: null, title: '', startDate: '', endDate: '', status: 'open', isActive: true });
+    }
+    setIsYearModalOpen(true);
+  };
+
+  const handleSaveYear = async () => {
+    if (!yearForm.title || !yearForm.startDate || !yearForm.endDate) {
+      return alert(isRtl ? 'تکمیل عنوان و تاریخ‌ها الزامی است.' : 'Title and dates are required.');
     }
 
-    setOperationalPeriods(prev => prev.map(p => p.id === selectedPeriod.id ? { ...p, exceptions: updated } : p));
-    setSelectedPeriod(prev => ({ ...prev, exceptions: updated }));
-    setExUser(''); setExStatuses([]);
+    const payload = {
+      title: yearForm.title.trim(),
+      start_date: cleanDate(yearForm.startDate),
+      end_date: cleanDate(yearForm.endDate),
+      status: yearForm.status,
+      is_active: yearForm.isActive
+    };
+
+    try {
+      if (yearForm.id) {
+        const { error } = await supabase.schema('gl').from('fiscal_years').update(payload).eq('id', yearForm.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.schema('gl').from('fiscal_years').insert([payload]);
+        if (error) throw error;
+      }
+      setIsYearModalOpen(false);
+      fetchYears();
+    } catch (err) {
+      console.error(err);
+      if (err.code === '22008') alert(isRtl ? 'فرمت تاریخ نامعتبر است.' : 'Invalid Date Format.');
+      else alert(isRtl ? 'خطا در ذخیره اطلاعات' : 'Save Error');
+    }
   };
 
-  const removeEx = (userName) => {
-    const updated = selectedPeriod.exceptions.filter(e => e.user !== userName);
-    setOperationalPeriods(prev => prev.map(p => p.id === selectedPeriod.id ? { ...p, exceptions: updated } : p));
-    setSelectedPeriod(prev => ({ ...prev, exceptions: updated }));
+  const handleDeleteYear = async (ids) => {
+    if (!canDelete) return alert(isRtl ? 'دسترسی حذف ندارید' : 'Access Denied');
+    if (confirm(t.confirm_delete?.replace('{0}', ids.length) || `Delete ${ids.length} items?`)) {
+      try {
+        const { error } = await supabase.schema('gl').from('fiscal_years').delete().in('id', ids);
+        if (error) throw error;
+        fetchYears();
+      } catch (err) { console.error(err); }
+    }
   };
 
-  // --- Constants ---
-  const statusStyles = {
-    open: "text-green-600 font-black bg-green-50 border-green-200",
-    closed: "text-red-600 font-black bg-red-50 border-red-200",
-    not_open: "text-slate-500 font-black bg-slate-50 border-slate-200"
+  const handleToggleYearActive = async (id, currentVal) => {
+    if (!canEdit) return;
+    try {
+      await supabase.schema('gl').from('fiscal_years').update({ is_active: !currentVal }).eq('id', id);
+      fetchYears();
+    } catch(err) { console.error(err); }
   };
+
+  // --- Period Handlers ---
+  const handleOpenManagePeriods = (year) => {
+    if (!canManagePeriods) return alert(isRtl ? 'دسترسی مدیریت دوره‌ها ندارید' : 'Access Denied');
+    setSelectedYear(year);
+    setPeriodForm({ id: null, title: '', startDate: '', endDate: '', status: 'open' });
+    fetchPeriods(year.id);
+    setIsPeriodModalOpen(true);
+  };
+
+  const handleEditPeriod = (period) => {
+    setPeriodForm({ id: period.id, title: period.title, startDate: period.start_date, endDate: period.end_date, status: period.status });
+  };
+
+  const handleSavePeriod = async () => {
+    if (!periodForm.title || !periodForm.startDate || !periodForm.endDate) return alert(isRtl ? 'فیلدهای دوره الزامی است.' : 'Period fields required.');
+    
+    const payload = {
+      year_id: selectedYear.id,
+      title: periodForm.title.trim(),
+      start_date: cleanDate(periodForm.startDate),
+      end_date: cleanDate(periodForm.endDate),
+      status: periodForm.status
+    };
+
+    try {
+      if (periodForm.id) {
+        const { error } = await supabase.schema('gl').from('fiscal_periods').update(payload).eq('id', periodForm.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.schema('gl').from('fiscal_periods').insert([payload]);
+        if (error) throw error;
+      }
+      setPeriodForm({ id: null, title: '', startDate: '', endDate: '', status: 'open' });
+      fetchPeriods(selectedYear.id);
+    } catch (err) {
+      console.error(err);
+      if (err.code === '22008') alert(isRtl ? 'فرمت تاریخ نامعتبر است.' : 'Invalid Date Format.');
+    }
+  };
+
+  const handleDeletePeriod = async (id) => {
+    if (!confirm(isRtl ? 'دوره حذف شود؟' : 'Delete period?')) return;
+    try {
+      await supabase.schema('gl').from('fiscal_periods').delete().eq('id', id);
+      fetchPeriods(selectedYear.id);
+    } catch (err) { console.error(err); }
+  };
+
+  // --- Exception Handlers ---
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => 
+      (u.username && u.username.toLowerCase().includes(userSearchTerm.toLowerCase())) ||
+      (u.full_name && u.full_name.toLowerCase().includes(userSearchTerm.toLowerCase()))
+    );
+  }, [users, userSearchTerm]);
+
+  const handleOpenExceptions = (period) => {
+    setSelectedPeriod(period);
+    setExcFormUser('');
+    setUserSearchTerm('');
+    fetchExceptions(period.id);
+    setIsExceptionModalOpen(true);
+  };
+
+  const handleAddException = async () => {
+    if (!excFormUser || !selectedPeriod) return;
+    const userObj = users.find(u => String(u.id) === String(excFormUser));
+    if (!userObj) return;
+
+    try {
+      const payload = {
+        period_id: selectedPeriod.id,
+        user_id: userObj.id,
+        user_name: userObj.full_name || userObj.username
+      };
+      const { error } = await supabase.schema('gl').from('fiscal_period_exceptions').insert([payload]);
+      if (error) {
+         if (error.code === '23505') return alert(isRtl ? 'این کاربر قبلا اضافه شده است.' : 'User already exists.');
+         throw error;
+      }
+      setExcFormUser('');
+      setUserSearchTerm('');
+      fetchExceptions(selectedPeriod.id);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteException = async (id) => {
+    try {
+      await supabase.schema('gl').from('fiscal_period_exceptions').delete().eq('id', id);
+      fetchExceptions(selectedPeriod.id);
+    } catch (err) { console.error(err); }
+  };
+
+
+  // --- Render Functions ---
+  if (!canView) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-full bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+        <div className="p-6 bg-white rounded-2xl shadow-sm text-center border border-red-100">
+           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4"><Ban className="text-red-500" size={32} /></div>
+           <h2 className="text-lg font-bold text-slate-800">{isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'}</h2>
+           <p className="text-sm text-slate-500 mt-2">{isRtl ? 'شما مجوز مشاهده این فرم را ندارید.' : 'You do not have permission to view this form.'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const renderStatusBadge = (status) => {
+     if (status === 'closed') return <Badge variant="danger" icon={Lock}>{isRtl ? 'بسته' : 'Closed'}</Badge>;
+     return <Badge variant="success" icon={Unlock}>{isRtl ? 'باز' : 'Open'}</Badge>;
+  };
+
+  const yearColumns = [
+    { field: 'title', header: t.fy_title || (isRtl ? 'عنوان سال' : 'Title'), width: 'w-48', sortable: true },
+    { field: 'start_date', header: t.fy_start || (isRtl ? 'تاریخ شروع' : 'Start Date'), width: 'w-32', className: 'text-center dir-ltr font-mono' },
+    { field: 'end_date', header: t.fy_end || (isRtl ? 'تاریخ پایان' : 'End Date'), width: 'w-32', className: 'text-center dir-ltr font-mono' },
+    { 
+      field: 'status', header: t.fy_status || (isRtl ? 'وضعیت' : 'Status'), width: 'w-32',
+      render: (row) => renderStatusBadge(row.status)
+    },
+    { 
+      field: 'is_active', header: t.fy_active || (isRtl ? 'فعال' : 'Active'), width: 'w-20',
+      render: (row) => (
+         <div className="flex justify-center">
+            <input 
+              type="checkbox" 
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+              checked={row.is_active} 
+              onChange={() => handleToggleYearActive(row.id, row.is_active)} 
+            />
+         </div>
+      )
+    }
+  ];
 
   return (
-    <div className="h-full flex flex-col p-4">
-      <div className="mb-4">
-        <h1 className="text-xl font-bold text-slate-800">{t.fp_title}</h1>
-        <p className="text-slate-500 text-xs mt-1">{t.fp_subtitle}</p>
+    <div className={`flex flex-col h-full p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+      <div className="mb-6 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
+            <CalendarDays size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-800">{t.fy_page_title || (isRtl ? 'سال و دوره‌های مالی' : 'Fiscal Years & Periods')}</h1>
+            <p className="text-xs text-slate-500 font-medium mt-1">{t.fy_page_subtitle || (isRtl ? 'تعریف دوره‌های زمانی حسابداری' : 'Manage accounting timeframes')}</p>
+          </div>
+        </div>
       </div>
 
-      <FilterSection onSearch={()=>{}} onClear={()=>setSearchParams({code:'', title:''})} isRtl={isRtl} title={t.filter}>
-        <InputField label={t.fp_year_code} value={searchParams.code} onChange={e=>setSearchParams({...searchParams, code: e.target.value})} isRtl={isRtl} />
-        <InputField label={t.fp_year_title} value={searchParams.title} onChange={e=>setSearchParams({...searchParams, title: e.target.value})} isRtl={isRtl} />
+      <FilterSection isRtl={isRtl} onSearch={() => {}} onClear={() => setYearSearch('')}>
+         <InputField label={t.fy_title || (isRtl ? 'عنوان' : 'Title')} value={yearSearch} onChange={e => setYearSearch(e.target.value)} isRtl={isRtl} />
       </FilterSection>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <DataGrid 
-          columns={[
-            { field: 'code', header: t.fp_year_code, width: 'w-24' },
-            { field: 'title', header: t.fp_year_title, width: 'w-64' },
-            { field: 'calendarType', header: t.fp_calendar_type, width: 'w-32', render: r => <Badge variant="primary">{r.calendarType === 'jalali' ? t.fp_jalali : t.fp_gregorian}</Badge> },
-            { field: 'startDate', header: t.fp_start_date, width: 'w-32' },
-            { field: 'endDate', header: t.fp_end_date, width: 'w-32' },
-            { field: 'isActive', header: t.lg_status, width: 'w-24', render: r => <Badge variant={r.isActive ? 'success' : 'neutral'}>{r.isActive ? t.active : t.inactive}</Badge> }
-          ]} 
-          data={fiscalYears} isRtl={isRtl}
-          onCreate={()=>{setEditingItem(null); setFormData({isActive:true, calendarType:'jalali'}); setShowYearModal(true);}}
-          onDoubleClick={(row) => { setActiveYear(row); setShowPeriodModal(true); }}
+          columns={yearColumns} data={filteredYears} isRtl={isRtl}
+          onCreate={canCreate ? () => handleOpenYearModal() : undefined}
+          onDelete={canDelete ? handleDeleteYear : undefined}
           actions={(row) => (
-            <div className="flex gap-1">
-              <button onClick={() => { setActiveYear(row); setShowPeriodModal(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"><Calendar size={16}/></button>
-              <button onClick={() => { setEditingItem(row); setFormData({...row}); setShowYearModal(true); }} className="p-1.5 text-slate-600 hover:bg-slate-50 rounded"><Edit size={16}/></button>
-              <button onClick={() => handleDeleteYear(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
+            <div className="flex items-center gap-1">
+              {canManagePeriods && <Button variant="ghost" size="iconSm" icon={Calendar} title={isRtl ? 'مدیریت دوره‌ها' : 'Manage Periods'} className="text-indigo-600 hover:bg-indigo-50" onClick={() => handleOpenManagePeriods(row)} />}
+              {canEdit && <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenYearModal(row)} />}
+              {canDelete && <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteYear([row.id])} />}
             </div>
           )}
         />
       </div>
 
-      {/* Modal: Year Definition */}
-      <Modal isOpen={showYearModal} onClose={()=>setShowYearModal(false)} title={editingItem ? t.fp_edit_year : t.fp_new_year}
-        footer={<><Button variant="outline" onClick={()=>setShowYearModal(false)}>{t.btn_cancel}</Button><Button variant="primary" onClick={handleSaveYear}>{t.btn_save}</Button></>}>
-        <div className="grid grid-cols-2 gap-4">
-          <InputField label={t.fp_year_code} value={formData.code} onChange={e=>setFormData({...formData, code: e.target.value})} isRtl={isRtl} />
-          <InputField label={t.fp_year_title} value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} isRtl={isRtl} />
-          <SelectField label={t.fp_calendar_type} value={formData.calendarType} onChange={e=>setFormData({...formData, calendarType: e.target.value})} isRtl={isRtl}>
-            <option value="jalali">{t.fp_jalali}</option>
-            <option value="gregorian">{t.fp_gregorian}</option>
-          </SelectField>
-          <Toggle label={t.lg_status} checked={formData.isActive} onChange={v=>setFormData({...formData, isActive: v})} />
-          <InputField label={t.fp_start_date} type="date" value={formData.startDate} onChange={e=>setFormData({...formData, startDate: e.target.value})} isRtl={isRtl} />
-          <InputField label={t.fp_end_date} type="date" value={formData.endDate} onChange={e=>setFormData({...formData, endDate: e.target.value})} isRtl={isRtl} />
-        </div>
+      {/* Year Modal */}
+      <Modal isOpen={isYearModalOpen} onClose={() => setIsYearModalOpen(false)} title={yearForm.id ? (isRtl ? 'ویرایش سال مالی' : 'Edit Year') : (isRtl ? 'سال مالی جدید' : 'New Year')}
+         footer={<><Button variant="ghost" onClick={() => setIsYearModalOpen(false)}>{isRtl ? 'انصراف' : 'Cancel'}</Button><Button variant="primary" icon={Save} onClick={handleSaveYear}>{isRtl ? 'ذخیره' : 'Save'}</Button></>}>
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="md:col-span-2"><InputField label={`${isRtl ? 'عنوان سال' : 'Title'} *`} value={yearForm.title} onChange={e => setYearForm({...yearForm, title: e.target.value})} isRtl={isRtl} /></div>
+            <DatePicker label={`${isRtl ? 'تاریخ شروع' : 'Start Date'} *`} value={yearForm.startDate} onChange={e => setYearForm({...yearForm, startDate: e.target.value})} isRtl={isRtl} className="dir-ltr" />
+            <DatePicker label={`${isRtl ? 'تاریخ پایان' : 'End Date'} *`} value={yearForm.endDate} onChange={e => setYearForm({...yearForm, endDate: e.target.value})} isRtl={isRtl} className="dir-ltr" />
+            
+            <SelectField label={isRtl ? 'وضعیت' : 'Status'} value={yearForm.status} onChange={e => setYearForm({...yearForm, status: e.target.value})} isRtl={isRtl}>
+               <option value="open">{isRtl ? 'باز' : 'Open'}</option>
+               <option value="closed">{isRtl ? 'بسته' : 'Closed'}</option>
+            </SelectField>
+
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-4 h-10 mt-auto">
+               <span className="text-sm font-bold text-slate-700">{isRtl ? 'فعال' : 'Active'}</span>
+               <input type="checkbox" className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" checked={yearForm.isActive} onChange={e => setYearForm({...yearForm, isActive: e.target.checked})} />
+            </div>
+         </div>
       </Modal>
 
-      {/* Modal: Period Manager */}
-      <Modal isOpen={showPeriodModal} onClose={()=>{setShowPeriodModal(false); setShowExPanel(false);}} title={activeYear?.title} size="lg">
-        <div className="flex flex-col gap-4 h-[650px] relative overflow-hidden">
-          
-          {/* Top Panel: Auto Generation Guide & Tools */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-            <div className="flex flex-col gap-2 mb-4 border-b border-slate-200 pb-3">
-               <div className="flex items-center gap-2">
-                 <div className="flex items-center gap-1.5 text-[11px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100 uppercase tracking-tighter">
-                    <Info size={14}/> {t.fp_auto_gen}
-                 </div>
-                 <span className="text-[11px] text-slate-500 leading-none">
-                    {isRtl ? 'با کلیک بر روی دکمه‌های زیر، سیستم دوره‌های زمانی را بر اساس تاریخ شروع سال تولید می‌کند.' : 'Click buttons below to auto-generate periods starting from year begin date.'}
-                 </span>
+      {/* Manage Periods Modal */}
+      <Modal isOpen={isPeriodModalOpen} onClose={() => setIsPeriodModalOpen(false)} size="3xl" title={`${isRtl ? 'دوره‌های مالی:' : 'Periods for:'} ${selectedYear?.title}`}>
+         <div className="flex flex-col h-[500px]">
+            {/* Inline Add/Edit Form for Periods */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 flex gap-3 items-end shrink-0">
+               <div className="flex-1"><InputField label={isRtl ? 'عنوان دوره' : 'Period Title'} value={periodForm.title} onChange={e => setPeriodForm({...periodForm, title: e.target.value})} isRtl={isRtl} /></div>
+               <div className="w-32"><DatePicker label={isRtl ? 'شروع' : 'Start'} value={periodForm.startDate} onChange={e => setPeriodForm({...periodForm, startDate: e.target.value})} isRtl={isRtl} className="dir-ltr" /></div>
+               <div className="w-32"><DatePicker label={isRtl ? 'پایان' : 'End'} value={periodForm.endDate} onChange={e => setPeriodForm({...periodForm, endDate: e.target.value})} isRtl={isRtl} className="dir-ltr" /></div>
+               <div className="w-28">
+                  <SelectField label={isRtl ? 'وضعیت' : 'Status'} value={periodForm.status} onChange={e => setPeriodForm({...periodForm, status: e.target.value})} isRtl={isRtl}>
+                     <option value="open">{isRtl ? 'باز' : 'Open'}</option>
+                     <option value="closed">{isRtl ? 'بسته' : 'Closed'}</option>
+                  </SelectField>
                </div>
-               <div className="flex gap-2 mt-1">
-                  <Button variant="white" size="sm" onClick={()=>generateAuto(1)}>{t.fp_gen_monthly}</Button>
-                  <Button variant="white" size="sm" onClick={()=>generateAuto(3)}>{t.fp_gen_quarterly}</Button>
-                  <Button variant="white" size="sm" onClick={()=>generateAuto(6)}>{t.fp_gen_semi}</Button>
+               <div className="flex gap-1 pb-1">
+                  {periodForm.id && <Button variant="ghost" size="icon" icon={X} onClick={() => setPeriodForm({ id: null, title: '', startDate: '', endDate: '', status: 'open' })}/>}
+                  <Button variant="primary" icon={periodForm.id ? Save : Plus} onClick={handleSavePeriod}>{periodForm.id ? (isRtl ? 'بروزرسانی' : 'Update') : (isRtl ? 'افزودن' : 'Add')}</Button>
                </div>
             </div>
 
-            {/* Manual Entry */}
-            <div className="grid grid-cols-5 gap-2 items-end">
-              <InputField label={t.fp_period_code} size="sm" value={newPeriodData.code} onChange={e=>setNewPeriodData({...newPeriodData, code:e.target.value})} isRtl={isRtl} />
-              <InputField label={t.fp_period_title} size="sm" value={newPeriodData.title} onChange={e=>setNewPeriodData({...newPeriodData, title:e.target.value})} isRtl={isRtl} />
-              <InputField label={t.fp_start_date} type="date" size="sm" value={newPeriodData.startDate} onChange={e=>setNewPeriodData({...newPeriodData, startDate:e.target.value})} isRtl={isRtl} />
-              <InputField label={t.fp_end_date} type="date" size="sm" value={newPeriodData.endDate} onChange={e=>setNewPeriodData({...newPeriodData, endDate:e.target.value})} isRtl={isRtl} />
-              <Button variant="primary" size="sm" icon={Plus} onClick={handleSavePeriod}>{t.btn_add}</Button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-auto border border-slate-200 rounded-xl bg-white shadow-inner">
-             <table className={`w-full text-[12px] ${isRtl ? 'text-right' : 'text-left'}`}>
-                <thead className="sticky top-0 bg-slate-100 font-black text-slate-600 border-b z-10">
-                   <tr>
-                      <th className="p-2 w-16">{t.fp_period_code}</th>
-                      <th className="p-2">{t.fp_period_title}</th>
-                      <th className="p-2 w-28">{t.fp_start_date}</th>
-                      <th className="p-2 w-28">{t.fp_end_date}</th>
-                      <th className="p-2 w-32">{t.fp_status}</th>
-                      <th className="p-2 w-24 text-center">{t.col_actions}</th>
-                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                   {operationalPeriods.filter(p=>p.yearId === activeYear?.id).map(p=>(
-                     <tr key={p.id} className={`hover:bg-indigo-50/50 transition-colors ${selectedPeriod?.id === p.id ? 'bg-indigo-50 font-bold' : ''}`}>
-                        <td className="p-2 font-mono text-slate-400">{p.code}</td>
-                        <td className="p-2 text-slate-700">{p.title}</td>
-                        <td className="p-2 text-slate-500">{p.startDate}</td>
-                        <td className="p-2 text-slate-500">{p.endDate}</td>
-                        <td className="p-2">
-                           <select value={p.status} onChange={e=>setOperationalPeriods(prev=>prev.map(x=>x.id===p.id?{...x, status:e.target.value}:x))} className={`text-[11px] p-1 rounded border outline-none ${statusStyles[p.status]}`}>
-                              <option value="not_open">{t.fp_st_not_open}</option>
-                              <option value="open">{t.fp_st_open}</option>
-                              <option value="closed">{t.fp_st_closed}</option>
-                           </select>
-                        </td>
-                        <td className="p-2 flex gap-1 justify-center">
-                           <button onClick={()=>{setSelectedPeriod(p); setShowExPanel(true);}} className={`p-1.5 rounded bg-white border border-slate-200 shadow-sm ${p.exceptions.length > 0 ? 'text-indigo-600 border-indigo-200' : 'text-slate-400'}`}><Users size={14}/></button>
-                           <button onClick={()=>setNewPeriodData(p)} className="p-1.5 rounded bg-white border border-slate-200 shadow-sm text-slate-600"><Edit size={14}/></button>
-                           <button onClick={()=>deletePeriod(p.id)} disabled={p.status !== 'not_open'} className={`p-1.5 rounded bg-white border border-slate-200 shadow-sm ${p.status === 'not_open' ? 'text-red-500' : 'text-slate-200'}`}><Trash size={14}/></button>
-                        </td>
+            {/* Periods Grid */}
+            <div className="flex-1 border border-slate-200 rounded-xl overflow-hidden relative bg-white">
+               <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 sticky top-0 z-10">
+                     <tr>
+                        <th className={`px-4 py-2 font-bold ${isRtl ? 'text-right' : 'text-left'}`}>{isRtl ? 'عنوان' : 'Title'}</th>
+                        <th className="px-4 py-2 font-bold text-center">{isRtl ? 'شروع' : 'Start'}</th>
+                        <th className="px-4 py-2 font-bold text-center">{isRtl ? 'پایان' : 'End'}</th>
+                        <th className="px-4 py-2 font-bold text-center">{isRtl ? 'وضعیت' : 'Status'}</th>
+                        <th className="px-4 py-2 font-bold text-center w-24"></th>
                      </tr>
-                   ))}
-                </tbody>
-             </table>
-          </div>
-
-          <div className={`absolute top-0 ${isRtl ? 'left-0 border-r' : 'right-0 border-l'} w-80 h-full bg-white shadow-2xl z-20 flex flex-col transition-all duration-300 transform ${showExPanel ? 'translate-x-0' : (isRtl ? '-translate-x-full' : 'translate-x-full')}`}>
-             <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
-                <div className="flex items-center gap-2 font-black text-xs text-indigo-700 uppercase italic"><Users size={16}/> {t.fp_exceptions}</div>
-                <button onClick={()=>setShowExPanel(false)} className="text-slate-400 hover:text-slate-800"><X size={18}/></button>
-             </div>
-             <div className="p-4 flex flex-col gap-4 flex-1 overflow-hidden">
-                <div className="space-y-4 bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-inner">
-                   <SelectField label={t.fp_user} size="sm" value={exUser} onChange={e=>setExUser(e.target.value)}>
-                      <option value="">{t.fp_select_user}</option>
-                      <option value="Financial Manager">Financial Manager</option>
-                      <option value="System Admin">System Admin</option>
-                      <option value="Audit Team">Audit Team</option>
-                   </SelectField>
-                   <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase px-1">{isRtl ? 'وضعیت‌های مجاز' : 'Allowed Statuses'}</label>
-                      {['open', 'not_open', 'closed'].map(st => (
-                        <div key={st} onClick={() => toggleStatusInEx(st)} className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-all mb-1 ${exStatuses.includes(st) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
-                           <span className="text-[11px] font-bold">{t[`fp_st_${st}`]}</span>
-                           {exStatuses.includes(st) && <CheckCircle2 size={14}/>}
-                        </div>
-                      ))}
-                   </div>
-                   <Button variant="primary" size="sm" className="w-full" icon={UserPlus} onClick={addEx}>{t.btn_add}</Button>
-                </div>
-                <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar mt-2">
-                   {selectedPeriod?.exceptions.map(ex => (
-                     <div key={ex.user} className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm flex justify-between items-start group">
-                        <div>
-                           <div className="text-[11px] font-black text-slate-800 mb-2">{ex.user}</div>
-                           <div className="flex flex-wrap gap-1">
-                              {ex.allowedStatuses.map(st => (
-                                 <span key={st} className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${statusStyles[st]}`}>{t[`fp_st_${st}`]}</span>
-                              ))}
-                           </div>
-                        </div>
-                        <button onClick={()=>removeEx(ex.user)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><Trash2 size={14}/></button>
-                     </div>
-                   ))}
-                </div>
-             </div>
-          </div>
-        </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                     {periods.length > 0 ? periods.map(p => (
+                        <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                           <td className="px-4 py-2.5 font-bold text-slate-700">{p.title}</td>
+                           <td className="px-4 py-2.5 text-center font-mono text-slate-600 dir-ltr">{p.start_date}</td>
+                           <td className="px-4 py-2.5 text-center font-mono text-slate-600 dir-ltr">{p.end_date}</td>
+                           <td className="px-4 py-2.5 text-center">{renderStatusBadge(p.status)}</td>
+                           <td className="px-4 py-2.5 text-center">
+                              <div className="flex justify-center gap-1">
+                                 <button onClick={() => handleOpenExceptions(p)} title={isRtl ? 'استثنائات دسترسی' : 'Exceptions'} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><ShieldAlert size={16}/></button>
+                                 <button onClick={() => handleEditPeriod(p)} className="p-1 text-slate-500 hover:bg-slate-100 rounded"><Edit size={16}/></button>
+                                 <button onClick={() => handleDeletePeriod(p.id)} className="p-1 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
+                              </div>
+                           </td>
+                        </tr>
+                     )) : (
+                        <tr><td colSpan={5} className="py-8 text-center text-slate-400 italic">{isRtl ? 'دوره‌ای تعریف نشده است' : 'No periods defined'}</td></tr>
+                     )}
+                  </tbody>
+               </table>
+            </div>
+         </div>
       </Modal>
+
+      {/* Exceptions Modal */}
+      <Modal isOpen={isExceptionModalOpen} onClose={() => setIsExceptionModalOpen(false)} title={`${isRtl ? 'استثنائات دسترسی:' : 'Access Exceptions:'} ${selectedPeriod?.title}`} size="md" footer={<Button variant="ghost" onClick={() => setIsExceptionModalOpen(false)}>{isRtl ? 'بستن' : 'Close'}</Button>}>
+         <div className="space-y-4">
+            <div className="bg-orange-50 border border-orange-100 text-orange-800 text-xs p-3 rounded-lg leading-relaxed">
+               {isRtl ? 'کاربرانی که در این لیست قرار بگیرند، حتی در صورت بسته بودن دوره نیز امکان ثبت یا ویرایش سند در این بازه را خواهند داشت.' : 'Users in this list will be able to post documents even if the period is closed.'}
+            </div>
+
+            {/* Custom Searchable LOV for Users */}
+            <div className="flex items-end gap-2">
+               <div className="flex-1 relative" ref={userDropdownRef}>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">{isRtl ? 'جستجوی کاربر (نام یا کاربری)' : 'Search User (Name/Username)'}</label>
+                  <div className="relative">
+                     <input
+                        className={`w-full h-9 bg-white border border-slate-200 rounded text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all ${isRtl ? 'pr-2 pl-8' : 'pl-2 pr-8'}`}
+                        placeholder={isRtl ? "جستجو..." : "Search..."}
+                        value={userSearchTerm}
+                        onChange={e => {
+                           setUserSearchTerm(e.target.value);
+                           setExcFormUser('');
+                           setIsUserDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsUserDropdownOpen(true)}
+                     />
+                     {excFormUser ? (
+                        <X size={14} className={`absolute top-2.5 text-slate-400 cursor-pointer hover:text-red-500 ${isRtl ? 'left-2.5' : 'right-2.5'}`} onClick={() => { setExcFormUser(''); setUserSearchTerm(''); }} />
+                     ) : (
+                        <Search size={14} className={`absolute top-2.5 text-slate-400 ${isRtl ? 'left-2.5' : 'right-2.5'}`} />
+                     )}
+                  </div>
+                  
+                  {isUserDropdownOpen && (
+                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-[100] max-h-48 overflow-y-auto p-1">
+                        {filteredUsers.length > 0 ? filteredUsers.map(u => (
+                           <div key={u.id} className="px-3 py-2 text-xs cursor-pointer hover:bg-indigo-50 rounded flex flex-col transition-colors border-b border-slate-50 last:border-0" onClick={() => {
+                              setExcFormUser(u.id);
+                              setUserSearchTerm(`${u.full_name || ''} (${u.username})`.trim());
+                              setIsUserDropdownOpen(false);
+                           }}>
+                              <span className="font-bold text-slate-700">{u.full_name || u.username}</span>
+                              <span className="text-[10px] font-mono text-slate-400">{u.username}</span>
+                           </div>
+                        )) : <div className="p-3 text-center text-slate-400 text-xs">{isRtl ? 'کاربری یافت نشد.' : 'No users found.'}</div>}
+                     </div>
+                  )}
+               </div>
+               <Button variant="primary" icon={Plus} onClick={handleAddException} className="mb-0.5">{isRtl ? 'افزودن' : 'Add'}</Button>
+            </div>
+
+            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white max-h-64 overflow-y-auto mt-4">
+               <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 sticky top-0">
+                     <tr>
+                        <th className={`px-4 py-2 font-bold ${isRtl ? 'text-right' : 'text-left'}`}>{isRtl ? 'نام کاربر' : 'User Name'}</th>
+                        <th className="px-4 py-2 w-12"></th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                     {exceptions.length > 0 ? exceptions.map(exc => (
+                        <tr key={exc.id} className="hover:bg-slate-50/50">
+                           <td className="px-4 py-2.5 font-bold text-slate-700">{exc.user_name}</td>
+                           <td className="px-4 py-2.5 text-center">
+                              <button onClick={() => handleDeleteException(exc.id)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"><Trash2 size={16}/></button>
+                           </td>
+                        </tr>
+                     )) : (
+                        <tr><td colSpan={2} className="py-6 text-center text-slate-400 italic text-xs">{isRtl ? 'استثنایی تعریف نشده است' : 'No exceptions'}</td></tr>
+                     )}
+                  </tbody>
+               </table>
+            </div>
+         </div>
+      </Modal>
+
     </div>
   );
 };
