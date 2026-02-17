@@ -4,14 +4,13 @@ import {
   Folder, FolderOpen, FileText, Plus, Save, Trash2, 
   Settings, Search, Check, 
   AlertCircle, Layout, List, Layers, FileDigit, ArrowRight, Edit,
-  TreeDeciduous, ShieldCheck, X, User,
+  TreeDeciduous, ShieldCheck, X, User, Ban,
   ChevronsDown, ChevronsUp, Minimize2, Maximize2 
 } from 'lucide-react';
 
 // --- DATA CONSTANTS ---
 
 const ALL_TAFSIL_TYPES = [
-  // --- System Types ---
   { id: 'party', label: 'طرف تجاری', en: 'Business Party', isSystem: true },
   { id: 'costcenter', label: 'مرکز هزینه', en: 'Cost Center', isSystem: true },
   { id: 'project', label: 'پروژه', en: 'Project', isSystem: true },
@@ -25,8 +24,6 @@ const ALL_TAFSIL_TYPES = [
   { id: 'sales_office', label: 'دفتر فروش', en: 'Sales Office', isSystem: true },
   { id: 'price_zone', label: 'حوزه قیمت‌گذاری', en: 'Pricing Zone', isSystem: true },
   { id: 'product', label: 'کالا/خدمات', en: 'Product/Service', isSystem: true },
-  
-  // --- User Defined Types ---
   { id: 'contract', label: 'قراردادها', en: 'Contracts', isSystem: false },
   { id: 'vehicle', label: 'وسایل نقلیه', en: 'Vehicles', isSystem: false },
   { id: 'loan', label: 'تسهیلات', en: 'Loans', isSystem: false },
@@ -104,7 +101,7 @@ const AccountForm = ({
   if (!isGroup && selectedNode) {
      if (formData.id && selectedNode.fullCode) { 
         const ownCodeLen = formData.code ? formData.code.length : 0;
-        if (ownCodeLen > 0 && formData.fullCode.length > ownCodeLen) {
+        if (ownCodeLen > 0 && formData.fullCode && formData.fullCode.length > ownCodeLen) {
             prefix = formData.fullCode.substring(0, formData.fullCode.length - ownCodeLen);
         }
      } else { 
@@ -147,46 +144,20 @@ const AccountForm = ({
            </div>
         </div>
 
-        <InputField 
-          label={isRtl ? "عنوان حساب (فارسی)" : "Account Title (Local)"} 
-          value={formData.title || ''} 
-          onChange={e => setFormData(prev => ({...prev, title: e.target.value}))}
-          isRtl={isRtl}
-        />
-        <InputField 
-          label={isRtl ? "عنوان حساب (انگلیسی)" : "Account Title (English)"} 
-          value={formData.titleEn || ''} 
-          onChange={e => setFormData(prev => ({...prev, titleEn: e.target.value}))}
-          isRtl={isRtl}
-          dir="ltr"
-        />
+        <InputField label={isRtl ? "عنوان حساب (فارسی)" : "Account Title (Local)"} value={formData.title || ''} onChange={e => setFormData(prev => ({...prev, title: e.target.value}))} isRtl={isRtl} />
+        <InputField label={isRtl ? "عنوان حساب (انگلیسی)" : "Account Title (English)"} value={formData.titleEn || ''} onChange={e => setFormData(prev => ({...prev, titleEn: e.target.value}))} isRtl={isRtl} dir="ltr" />
         
-        <SelectField 
-          label={isRtl ? "نوع حساب" : "Account Type"}
-          value={formData.type}
-          onChange={e => setFormData(prev => ({...prev, type: e.target.value}))}
-          isRtl={isRtl}
-        >
+        <SelectField label={isRtl ? "نوع حساب" : "Account Type"} value={formData.type || ''} onChange={e => setFormData(prev => ({...prev, type: e.target.value}))} isRtl={isRtl}>
           {ACCOUNT_TYPES.map(t => <option key={t.id} value={t.id}>{isRtl ? t.labelFa : t.labelEn}</option>)}
         </SelectField>
 
-        <SelectField 
-          label={isRtl ? "ماهیت حساب" : "Account Nature"}
-          value={formData.nature}
-          onChange={e => setFormData(prev => ({...prev, nature: e.target.value}))}
-          isRtl={isRtl}
-        >
+        <SelectField label={isRtl ? "ماهیت حساب" : "Account Nature"} value={formData.nature || ''} onChange={e => setFormData(prev => ({...prev, nature: e.target.value}))} isRtl={isRtl}>
           {ACCOUNT_NATURES.map(n => <option key={n.id} value={n.id}>{isRtl ? n.labelFa : n.labelEn}</option>)}
         </SelectField>
         
         {isSubsidiary && (
            <div className="col-span-1 md:col-span-2">
-              <Checkbox 
-                 label={isRtl ? "فعال" : "Active"}
-                 checked={formData.isActive !== false}
-                 onChange={v => setFormData(prev => ({...prev, isActive: v}))}
-                 className="mb-4"
-              />
+              <Checkbox label={isRtl ? "فعال" : "Active"} checked={formData.isActive !== false} onChange={v => setFormData(prev => ({...prev, isActive: v}))} className="mb-4" />
            </div>
         )}
       </div>
@@ -194,84 +165,42 @@ const AccountForm = ({
       {isSubsidiary && (
         <div className="w-full animate-in slide-in-from-bottom-2">
            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3 mb-4">
-              <h4 className="font-bold text-[11px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                 <ShieldCheck size={14} />
-                 {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}
-              </h4>
+              <h4 className="font-bold text-[11px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2"><ShieldCheck size={14} />{isRtl ? "ویژگی‌های کنترلی" : "Control Features"}</h4>
               
               <div className="flex flex-col gap-2 pb-2 border-b border-slate-200">
-                 <Checkbox 
-                    label={isRtl ? "ویژگی ارزی (چند ارزی)" : "Currency Feature (Multi-currency)"}
-                    checked={!!formData.currencyFeature}
-                    onChange={v => setFormData(prev => ({...prev, currencyFeature: v}))}
-                 />
+                 <Checkbox label={isRtl ? "ویژگی ارزی (چند ارزی)" : "Currency Feature"} checked={!!formData.currencyFeature} onChange={v => setFormData(prev => ({...prev, currencyFeature: v}))} />
                  {formData.currencyFeature && (
                     <div className="mr-6 grid grid-cols-2 gap-2 animate-in slide-in-from-top-1">
-                       <SelectField 
-                          label={isRtl ? "ارز پیش‌فرض" : "Default Currency"} isRtl={isRtl}
-                          value={formData.defaultCurrency || ''}
-                          onChange={e => setFormData(prev => ({...prev, defaultCurrency: e.target.value}))}
-                       >
+                       <SelectField label={isRtl ? "ارز پیش‌فرض" : "Default Currency"} isRtl={isRtl} value={formData.defaultCurrency || ''} onChange={e => setFormData(prev => ({...prev, defaultCurrency: e.target.value}))}>
                           <option value="">-</option><option value="IRR">IRR</option><option value="USD">USD</option><option value="EUR">EUR</option>
                        </SelectField>
-                       <div className="mt-6">
-                         <Checkbox 
-                            label={isRtl ? "الزام ورود ارز" : "Mandatory Currency"} 
-                            checked={!!formData.currencyMandatory} 
-                            onChange={v => setFormData(prev => ({...prev, currencyMandatory: v}))}
-                         />
-                       </div>
+                       <div className="mt-6"><Checkbox label={isRtl ? "الزام ورود ارز" : "Mandatory Currency"} checked={!!formData.currencyMandatory} onChange={v => setFormData(prev => ({...prev, currencyMandatory: v}))} /></div>
                     </div>
                  )}
               </div>
 
               <div className="flex flex-col gap-2 pb-2 border-b border-slate-200">
-                 <Checkbox 
-                    label={isRtl ? "ویژگی پیگیری" : "Tracking Feature"}
-                    checked={!!formData.trackFeature}
-                    onChange={v => setFormData(prev => ({...prev, trackFeature: v}))}
-                 />
+                 <Checkbox label={isRtl ? "ویژگی پیگیری" : "Tracking Feature"} checked={!!formData.trackFeature} onChange={v => setFormData(prev => ({...prev, trackFeature: v}))} />
                  {formData.trackFeature && (
                     <div className="mr-6 flex gap-4 animate-in slide-in-from-top-1">
-                       <Checkbox 
-                          label={isRtl ? "اجباری" : "Mandatory"} 
-                          checked={!!formData.trackMandatory} 
-                          onChange={v => setFormData(prev => ({...prev, trackMandatory: v}))}
-                       />
-                       <Checkbox 
-                          label={isRtl ? "یکتا بودن شماره پیگیری" : "Unique Tracking No."} 
-                          checked={!!formData.trackUnique} 
-                          onChange={v => setFormData(prev => ({...prev, trackUnique: v}))}
-                       />
+                       <Checkbox label={isRtl ? "اجباری" : "Mandatory"} checked={!!formData.trackMandatory} onChange={v => setFormData(prev => ({...prev, trackMandatory: v}))} />
+                       <Checkbox label={isRtl ? "یکتا بودن شماره پیگیری" : "Unique Tracking No."} checked={!!formData.trackUnique} onChange={v => setFormData(prev => ({...prev, trackUnique: v}))} />
                     </div>
                  )}
               </div>
 
               <div className="flex flex-col gap-2">
-                 <Checkbox 
-                    label={isRtl ? "ویژگی مقداری" : "Quantity Feature"}
-                    checked={!!formData.qtyFeature}
-                    onChange={v => setFormData(prev => ({...prev, qtyFeature: v}))}
-                 />
+                 <Checkbox label={isRtl ? "ویژگی مقداری" : "Quantity Feature"} checked={!!formData.qtyFeature} onChange={v => setFormData(prev => ({...prev, qtyFeature: v}))} />
                  {formData.qtyFeature && (
                     <div className="mr-6 flex gap-4 animate-in slide-in-from-top-1">
-                       <Checkbox 
-                          label={isRtl ? "اجباری" : "Mandatory"} 
-                          checked={!!formData.qtyMandatory} 
-                          onChange={v => setFormData(prev => ({...prev, qtyMandatory: v}))}
-                       />
+                       <Checkbox label={isRtl ? "اجباری" : "Mandatory"} checked={!!formData.qtyMandatory} onChange={v => setFormData(prev => ({...prev, qtyMandatory: v}))} />
                     </div>
                  )}
               </div>
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 items-end">
-              <SelectField 
-                  label={isRtl ? "کنترل ماهیت طی دوره" : "Nature Control During Period"} 
-                  isRtl={isRtl}
-                  value={formData.natureControl || 'none'}
-                  onChange={e => setFormData(prev => ({...prev, natureControl: e.target.value}))}
-              >
+              <SelectField label={isRtl ? "کنترل ماهیت طی دوره" : "Nature Control"} isRtl={isRtl} value={formData.natureControl || 'none'} onChange={e => setFormData(prev => ({...prev, natureControl: e.target.value}))}>
                  <option value="none">{isRtl ? "بدون کنترل" : "No Control"}</option>
                  <option value="warn">{isRtl ? "هشدار" : "Warning"}</option>
                  <option value="block">{isRtl ? "خطا (جلوگیری)" : "Error (Block)"}</option>
@@ -301,9 +230,7 @@ const TafsilSelector = ({ formData, setFormData, isRtl }) => {
   return (
      <div className="space-y-4">
         <Callout variant="info">
-           {isRtl 
-              ? "انواع تفصیل‌های مجاز برای این حساب معین را انتخاب کنید." 
-              : "Select the detailed account types allowed for this subsidiary."}
+           {isRtl ? "انواع تفصیل‌های مجاز برای این حساب معین را انتخاب کنید." : "Select the detailed account types allowed for this subsidiary."}
         </Callout>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
            {ALL_TAFSIL_TYPES.map(t => (
@@ -321,14 +248,8 @@ const TafsilSelector = ({ formData, setFormData, isRtl }) => {
                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
                  `}
               >
-                 {!t.isSystem && (
-                     <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}>
-                        <User size={10} className="text-indigo-500" />
-                     </div>
-                 )}
-                 <div className="text-[12px] flex items-center justify-center gap-1">
-                    {t.label}
-                 </div>
+                 {!t.isSystem && <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}><User size={10} className="text-indigo-500" /></div>}
+                 <div className="text-[12px] flex items-center justify-center gap-1">{t.label}</div>
               </div>
            ))}
         </div>
@@ -352,33 +273,17 @@ const StandardDesc = ({ formData, setFormData, isRtl }) => {
   return (
      <div className="h-full flex flex-col">
         <div className="flex gap-2 mb-3">
-           <InputField 
-              placeholder={isRtl ? "شرح استاندارد جدید..." : "New standard description..."} 
-              value={descText} onChange={e=>setDescText(e.target.value)} 
-              className="flex-1" isRtl={isRtl}
-           />
+           <InputField placeholder={isRtl ? "شرح استاندارد جدید..." : "New standard description..."} value={descText} onChange={e=>setDescText(e.target.value)} className="flex-1" isRtl={isRtl} />
            <Button onClick={addDesc} icon={Plus} variant="secondary">{isRtl ? "افزودن" : "Add"}</Button>
         </div>
         <div className="flex-1 overflow-y-auto border border-slate-200 rounded-lg bg-slate-50 p-2 space-y-1">
            {list.map(item => (
               <div key={item.id} className="bg-white p-2 rounded border border-slate-200 flex justify-between items-center group">
                  <span className="text-[12px] text-slate-700">{item.text}</span>
-                 <button 
-                    onClick={() => {
-                       const newList = list.filter(l => l.id !== item.id);
-                       setFormData(prev => ({...prev, descriptions: newList}));
-                    }}
-                    className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                 >
-                    <Trash2 size={14}/>
-                 </button>
+                 <button onClick={() => setFormData(prev => ({...prev, descriptions: list.filter(l => l.id !== item.id)}))} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={14}/></button>
               </div>
            ))}
-           {list.length === 0 && (
-              <div className="text-center text-slate-400 text-xs mt-4 italic">
-                 {isRtl ? "موردی تعریف نشده است" : "No descriptions defined"}
-              </div>
-           )}
+           {list.length === 0 && <div className="text-center text-slate-400 text-xs mt-4 italic">{isRtl ? "موردی تعریف نشده است" : "No descriptions defined"}</div>}
         </div>
      </div>
   );
@@ -387,48 +292,101 @@ const StandardDesc = ({ formData, setFormData, isRtl }) => {
 // --- MAIN COMPONENT ---
 
 const ChartofAccounts = ({ t, isRtl }) => {
-  const { 
-    Button, InputField, SelectField, DataGrid, Modal, 
-    Badge, Callout, ToggleChip, SelectionGrid, TreeView,
-    FilterSection 
-  } = window.UI;
+  const { Button, InputField, DataGrid, Modal, Badge, TreeView, FilterSection } = window.UI;
+  const supabase = window.supabase;
+
+  // --- Resilient Permission Checks ---
+  const checkAccess = (action = null) => {
+    if (!window.hasAccess) return false;
+    const variations = ['chart_of_accounts', 'chartofaccounts', 'coa'];
+    for (const res of variations) {
+       if (window.hasAccess(res, action)) return true;
+    }
+    return false;
+  };
+
+  const canEnterForm = checkAccess(); 
+  const canView   = canEnterForm || checkAccess('view') || checkAccess('read') || checkAccess('show');
+  const canCreate = checkAccess('create') || checkAccess('new') || checkAccess('add') || checkAccess('insert');
+  const canEdit   = checkAccess('edit') || checkAccess('update') || checkAccess('modify');
+  const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
+  const canDesign = checkAccess('design_tree') || checkAccess('designtree');
 
   // --- GLOBAL STATE ---
-
   const [viewMode, setViewMode] = useState('list'); 
   const [activeStructure, setActiveStructure] = useState(null);
+  const [structures, setStructures] = useState([]);
+  const [treeData, setTreeData] = useState([]);
 
-  const [structures, setStructures] = useState([
-    { 
-      id: 1, code: '01', title: 'کدینگ حسابداری اصلی', status: true, 
-      groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false 
-    },
-    { 
-      id: 2, code: '02', title: 'کدینگ پروژه ای', status: true, 
-      groupLen: 2, generalLen: 3, subsidiaryLen: 4, useChar: true 
+  useEffect(() => {
+    if (canView) fetchStructures();
+  }, [canView]);
+
+  const fetchStructures = async () => {
+    try {
+      const { data, error } = await supabase.schema('gl').from('account_structures').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      setStructures((data || []).map(item => ({
+         id: item.id,
+         code: item.code,
+         title: item.title,
+         status: item.status,
+         groupLen: item.group_len,
+         generalLen: item.general_len,
+         subsidiaryLen: item.subsidiary_len,
+         useChar: item.use_char
+      })));
+    } catch (err) {
+      console.error('Error fetching structures:', err);
     }
-  ]);
+  };
 
-  const [allAccounts, setAllAccounts] = useState({
-    1: [
-      { 
-        id: '1', level: 'group', code: '1', 
-        title: 'دارایی‌های جاری', titleEn: 'Current Assets',
-        label: { fa: 'دارایی‌های جاری', en: 'Current Assets' },
-        type: 'permanent', nature: 'debit', 
-        children: [
-          {
-            id: '101', level: 'general', code: '01', fullCode: '101',
-            title: 'موجودی نقد و بانک', titleEn: 'Cash & Banks',
-            label: { fa: 'موجودی نقد و بانک', en: 'Cash & Banks' },
-            type: 'permanent', nature: 'debit',
-            children: []
-          }
-        ]
-      }
-    ],
-    2: []
-  });
+  const fetchTreeData = async (structureId, retainNodeId = null) => {
+     try {
+        const { data, error } = await supabase.schema('gl').from('accounts').select('*').eq('structure_id', structureId);
+        if (error) throw error;
+
+        const map = new Map();
+        (data || []).forEach(n => map.set(n.id, { 
+           id: n.id, 
+           parentId: n.parent_id,
+           code: n.code,
+           fullCode: n.full_code,
+           title: n.title,
+           titleEn: n.title_en || '',
+           level: n.level,
+           type: n.type || 'permanent',
+           nature: n.nature || 'debit',
+           isActive: n.is_active,
+           contraAccountId: n.contra_account_id,
+           ...n.metadata,
+           children: [] 
+        }));
+
+        const roots = [];
+        data.forEach(n => {
+           const node = map.get(n.id);
+           if (n.parent_id && map.has(n.parent_id)) {
+              map.get(n.parent_id).children.push(node);
+           } else {
+              roots.push(node);
+           }
+        });
+
+        // Ensure proper sorting inside TreeView based on code
+        const sortTree = (nodes) => {
+           nodes.sort((a,b) => a.code.localeCompare(b.code));
+           nodes.forEach(n => { if(n.children) sortTree(n.children); });
+        };
+        sortTree(roots);
+
+        setTreeData(roots);
+        return { roots, map };
+     } catch (err) {
+        console.error('Error fetching tree:', err);
+        return { roots: [], map: new Map() };
+     }
+  };
 
   // --- SUB-COMPONENT: STRUCTURE LIST VIEW ---
   
@@ -436,55 +394,65 @@ const ChartofAccounts = ({ t, isRtl }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
-    const [formData, setFormData] = useState({
-      code: '', title: '', status: true,
-      groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false
-    });
+    const [formData, setFormData] = useState({ code: '', title: '', status: true, groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false });
 
     const handleEdit = (row) => {
+      if(!canEdit) return alert(isRtl ? "دسترسی ندارید" : "Access Denied");
       setEditingItem(row);
       setFormData(row);
       setShowModal(true);
     };
 
     const handleCreate = () => {
+      if(!canCreate) return alert(isRtl ? "دسترسی ندارید" : "Access Denied");
       setEditingItem(null);
-      setFormData({
-        code: '', title: '', status: true,
-        groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false
-      });
+      setFormData({ code: '', title: '', status: true, groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false });
       setShowModal(true);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
       if (!formData.code || !formData.title) return alert(isRtl ? "کد و عنوان الزامی است" : "Code and Title are required");
-      
-      if (editingItem) {
-        setStructures(prev => prev.map(item => item.id === editingItem.id ? { ...formData, id: item.id } : item));
-      } else {
-        const newId = Date.now();
-        setStructures(prev => [...prev, { ...formData, id: newId }]);
-        setAllAccounts(prev => ({ ...prev, [newId]: [] })); 
+      try {
+         const payload = {
+            code: formData.code, title: formData.title, status: formData.status,
+            group_len: formData.groupLen, general_len: formData.generalLen, subsidiary_len: formData.subsidiaryLen, use_char: formData.useChar
+         };
+
+         if (editingItem) {
+            await supabase.schema('gl').from('account_structures').update(payload).eq('id', editingItem.id);
+         } else {
+            await supabase.schema('gl').from('account_structures').insert([payload]);
+         }
+         setShowModal(false);
+         fetchStructures();
+      } catch(err) {
+         console.error(err);
       }
-      setShowModal(false);
     };
 
-    const handleDelete = (ids) => {
-      if (confirm(isRtl ? "آیا از حذف موارد انتخاب شده اطمینان دارید؟" : "Are you sure?")) {
-        setStructures(prev => prev.filter(item => !ids.includes(item.id)));
+    const handleDelete = async (ids) => {
+      if(!canDelete) return alert(isRtl ? "دسترسی ندارید" : "Access Denied");
+      if (confirm(isRtl ? "آیا از حذف مطمئن هستید؟" : "Are you sure?")) {
+         try {
+            await supabase.schema('gl').from('account_structures').delete().in('id', ids);
+            fetchStructures();
+         } catch(err) { console.error(err); }
       }
     };
 
-    const handleOpenTree = (structure) => {
+    const handleOpenTree = async (structure) => {
+      if(!canDesign) return alert(t.err_access_denied || (isRtl ? "دسترسی طراحی ساختار ندارید" : "Access Denied for Designing"));
       setActiveStructure(structure);
+      await fetchTreeData(structure.id);
       setViewMode('tree');
     };
+
+    const filtered = structures.filter(s => s.code.includes(searchTerm) || s.title.includes(searchTerm));
 
     return (
       <div className="h-full flex flex-col animate-in fade-in duration-300">
         <FilterSection onSearch={() => {}} onClear={() => setSearchTerm('')} isRtl={isRtl}>
-           <InputField label={isRtl ? "کد ساختار" : "Structure Code"} value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} isRtl={isRtl}/>
-           <InputField label={isRtl ? "عنوان" : "Title"} isRtl={isRtl}/>
+           <InputField label={isRtl ? "جستجو (کد یا عنوان)" : "Search"} value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} isRtl={isRtl}/>
         </FilterSection>
 
         <div className="flex-1 overflow-hidden relative h-full">
@@ -492,49 +460,32 @@ const ChartofAccounts = ({ t, isRtl }) => {
             columns={[
               { field: 'code', header: isRtl ? 'کد' : 'Code', width: 'w-24' },
               { field: 'title', header: isRtl ? 'عنوان' : 'Title', width: 'w-64' },
-              { 
-                field: 'status', 
-                header: isRtl ? 'وضعیت' : 'Status', 
-                width: 'w-24', 
-                render: r => <Badge variant={r.status ? 'success' : 'neutral'}>{r.status ? (isRtl ? 'فعال' : 'Active') : (isRtl ? 'غیرفعال' : 'Inactive')}</Badge> 
-              },
+              { field: 'status', header: isRtl ? 'وضعیت' : 'Status', width: 'w-24', render: r => <Badge variant={r.status ? 'success' : 'neutral'}>{r.status ? (isRtl ? 'فعال' : 'Active') : (isRtl ? 'غیرفعال' : 'Inactive')}</Badge> },
               { field: 'groupLen', header: isRtl ? 'طول گروه' : 'Group Len', width: 'w-24' },
               { field: 'generalLen', header: isRtl ? 'طول کل' : 'General Len', width: 'w-24' },
               { field: 'subsidiaryLen', header: isRtl ? 'طول معین' : 'Sub Len', width: 'w-24' },
-              { field: 'useChar', header: isRtl ? 'کاراکتر' : 'Chars', width: 'w-24', type: 'toggle' },
             ]}
-            data={structures}
+            data={filtered}
             isRtl={isRtl}
-            onCreate={handleCreate}
-            onDelete={handleDelete}
+            onCreate={canCreate ? handleCreate : undefined}
+            onDelete={canDelete ? handleDelete : undefined}
             actions={(row) => (
               <div className="flex gap-1 justify-center">
-                 <button 
-                    onClick={() => handleOpenTree(row)} 
-                    title={isRtl ? "طراحی ساختار درختی" : "Design Tree Structure"}
-                    className="p-1.5 text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded transition-colors"
-                 >
-                    <TreeDeciduous size={16}/>
-                 </button>
-                 <button onClick={() => handleEdit(row)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded"><Edit size={16}/></button>
-                 <button className="p-1.5 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button>
+                 {canDesign && <button onClick={() => handleOpenTree(row)} title={isRtl ? "طراحی ساختار درختی" : "Design Tree Structure"} className="p-1.5 text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded transition-colors"><TreeDeciduous size={16}/></button>}
+                 {canEdit && <button onClick={() => handleEdit(row)} className="p-1.5 text-slate-600 hover:bg-slate-100 rounded"><Edit size={16}/></button>}
+                 {canDelete && <button onClick={()=>handleDelete([row.id])} className="p-1.5 text-red-500 hover:bg-red-50 rounded"><Trash2 size={16}/></button>}
               </div>
             )}
           />
         </div>
 
-        <Modal 
-          isOpen={showModal} 
-          onClose={() => setShowModal(false)} 
-          title={editingItem ? (isRtl ? "ویرایش ساختار حساب" : "Edit Account Structure") : (isRtl ? "تعریف ساختار حساب جدید" : "New Account Structure")}
-          footer={<><Button variant="outline" onClick={() => setShowModal(false)}>{isRtl ? "انصراف" : "Cancel"}</Button><Button variant="primary" onClick={handleSave}>{isRtl ? "ذخیره" : "Save"}</Button></>}
-        >
+        <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingItem ? (isRtl ? "ویرایش ساختار حساب" : "Edit Account Structure") : (isRtl ? "تعریف ساختار حساب جدید" : "New Account Structure")}
+          footer={<><Button variant="outline" onClick={() => setShowModal(false)}>{isRtl ? "انصراف" : "Cancel"}</Button><Button variant="primary" onClick={handleSave}>{isRtl ? "ذخیره" : "Save"}</Button></>}>
            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                  <InputField label={isRtl ? "کد ساختار" : "Code"} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} />
                  <InputField label={isRtl ? "عنوان ساختار" : "Title"} value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} isRtl={isRtl} />
               </div>
-              
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-4">
                  <h4 className="text-[11px] font-bold text-slate-500 uppercase">{isRtl ? "تنظیمات طول کدینگ" : "Coding Length Settings"}</h4>
                  <div className="grid grid-cols-3 gap-4">
@@ -547,7 +498,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
                     <span className="font-black text-indigo-700 text-lg">{(formData.groupLen || 0) + (formData.generalLen || 0) + (formData.subsidiaryLen || 0)}</span>
                  </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                  <Checkbox label={isRtl ? "استفاده از حروف در کد" : "Use Characters"} checked={formData.useChar} onChange={v => setFormData({...formData, useChar: v})} />
                  <Checkbox label={isRtl ? "فعال" : "Active"} checked={formData.status} onChange={v => setFormData({...formData, status: v})} />
@@ -560,19 +510,14 @@ const ChartofAccounts = ({ t, isRtl }) => {
 
   // --- SUB-COMPONENT: TREE DESIGNER VIEW ---
 
-  const AccountTreeView = ({ structure, data, onSaveTree, onBack }) => {
+  const AccountTreeView = ({ structure, onBack }) => {
     const [selectedNode, setSelectedNode] = useState(null);
     const [mode, setMode] = useState('view'); 
     const [activeTab, setActiveTab] = useState('info'); 
     const [formData, setFormData] = useState({});
-    
-    // Tree State Control
     const [expandedIds, setExpandedIds] = useState([]);
-
-    // Contra Account Modal State
     const [showContraModal, setShowContraModal] = useState(false);
 
-    // --- Helpers ---
     const getParentCode = (node) => {
       if (!node) return '';
       if (node.level === 'group') return node.code;
@@ -580,29 +525,18 @@ const ChartofAccounts = ({ t, isRtl }) => {
       return '';
     };
 
-    const flattenTree = (nodes, list = []) => {
-        nodes.forEach(node => { list.push(node); if (node.children) flattenTree(node.children, list); });
-        return list;
-    };
-
     const handleCreate = (level) => {
       if (level !== 'group' && !selectedNode) return;
       
       let defaults = {
-        level: level,
-        isActive: true,
-        type: 'permanent',
-        nature: 'debit',
-        tafsils: [],
-        descriptions: []
+        level: level, isActive: true, type: 'permanent', nature: 'debit',
+        tafsils: [], descriptions: []
       };
 
-      if (selectedNode) {
-        if (level === 'general' || level === 'subsidiary') {
-          defaults.parentId = selectedNode.id;
-          defaults.type = selectedNode.type;
-          defaults.nature = selectedNode.nature;
-        }
+      if (selectedNode && (level === 'general' || level === 'subsidiary')) {
+        defaults.parentId = selectedNode.id;
+        defaults.type = selectedNode.type;
+        defaults.nature = selectedNode.nature;
       }
       setFormData(defaults);
       setMode(`create_${level}`);
@@ -616,30 +550,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
       setActiveTab('info');
     };
 
-    // Recursive Updaters
-    const addNodeToTree = (nodes, parentId, newNode) => {
-      return nodes.map(node => {
-        if (node.id === parentId) {
-          return { ...node, children: [...(node.children || []), newNode] };
-        } else if (node.children) {
-          return { ...node, children: addNodeToTree(node.children, parentId, newNode) };
-        }
-        return node;
-      });
-    };
-
-    const updateNodeInTree = (nodes, updatedNode) => {
-      return nodes.map(node => {
-        if (node.id === updatedNode.id) {
-          return { ...node, ...updatedNode };
-        } else if (node.children) {
-          return { ...node, children: updateNodeInTree(node.children, updatedNode) };
-        }
-        return node;
-      });
-    };
-
-    // Find all ancestor IDs for a given node ID to expand the path
     const getAncestorIds = (nodes, targetId, path = []) => {
       for (const node of nodes) {
         if (node.id === targetId) return path;
@@ -651,7 +561,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
       return null;
     };
 
-    const handleSaveForm = () => {
+    const handleSaveForm = async () => {
       if (!formData.code || !formData.title) return alert(isRtl ? "کد و عنوان الزامی است" : "Code and Title Required");
       
       let requiredLen = 0;
@@ -669,52 +579,70 @@ const ChartofAccounts = ({ t, isRtl }) => {
         fullCode = parentCode + formData.code;
       }
 
-      const labelObj = { fa: formData.title, en: formData.titleEn || formData.title };
-      const nodeData = { ...formData, fullCode, label: labelObj };
+      const payload = {
+         structure_id: structure.id,
+         parent_id: formData.parentId || null,
+         code: formData.code,
+         full_code: fullCode,
+         title: formData.title,
+         title_en: formData.titleEn || null,
+         level: formData.level,
+         type: formData.type || null,
+         nature: formData.nature || null,
+         is_active: formData.isActive !== false,
+         contra_account_id: formData.contraAccountId || null,
+         metadata: {
+             currencyFeature: formData.currencyFeature,
+             defaultCurrency: formData.defaultCurrency,
+             currencyMandatory: formData.currencyMandatory,
+             trackFeature: formData.trackFeature,
+             trackMandatory: formData.trackMandatory,
+             trackUnique: formData.trackUnique,
+             qtyFeature: formData.qtyFeature,
+             qtyMandatory: formData.qtyMandatory,
+             natureControl: formData.natureControl,
+             tafsils: formData.tafsils,
+             descriptions: formData.descriptions
+         }
+      };
 
-      let newData;
-      let targetNodeId;
+      try {
+          let targetNodeId = formData.id;
+          if (mode === 'edit') {
+              await supabase.schema('gl').from('accounts').update(payload).eq('id', formData.id);
+          } else {
+              const { data, error } = await supabase.schema('gl').from('accounts').insert([payload]).select();
+              if(error) throw error;
+              if(data && data.length > 0) targetNodeId = data[0].id;
+          }
 
-      if (mode === 'edit') {
-        newData = updateNodeInTree(data, nodeData);
-        targetNodeId = nodeData.id;
-      } else {
-        const newNode = { ...nodeData, id: Date.now().toString(), children: [] };
-        targetNodeId = newNode.id;
-        if (formData.level === 'group') {
-          newData = [...data, newNode];
-        } else {
-          newData = addNodeToTree(data, selectedNode.id, newNode);
-        }
+          const { roots, map } = await fetchTreeData(structure.id);
+          
+          if(targetNodeId) {
+             const ancestors = getAncestorIds(roots, targetNodeId) || [];
+             setExpandedIds(prev => [...new Set([...prev, ...ancestors])]);
+             if(map.has(targetNodeId)) setSelectedNode(map.get(targetNodeId));
+          }
+          
+          setMode('view');
+      } catch (err) {
+          console.error(err);
+          alert(isRtl ? "خطا در ثبت اطلاعات" : "Save Error");
       }
-      
-      // 1. Calculate Path to expand BEFORE updating tree data
-      const ancestors = getAncestorIds(newData, targetNodeId) || [];
-      
-      // 2. Set Expanded IDs (Merge with existing)
-      setExpandedIds(prev => [...new Set([...prev, ...ancestors])]);
-
-      // 3. Find the new object reference in the new data structure
-      const newFlatData = flattenTree(newData);
-      const newSelectedNode = newFlatData.find(n => n.id === targetNodeId);
-      
-      // 4. Update Selected Node
-      setSelectedNode(newSelectedNode);
-
-      // 5. Save Data (This triggers prop update)
-      onSaveTree(newData);
-      
-      setMode('view');
     };
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
        if (selectedNode?.children?.length > 0) return alert(isRtl ? "حساب دارای زیرمجموعه است" : "Account has children");
-       alert(isRtl ? "عملیات حذف (شبیه‌سازی شده)" : "Delete simulated");
-       setSelectedNode(null);
-       setMode('view');
+       if (!confirm(isRtl ? "آیا مطمئن هستید؟" : "Are you sure?")) return;
+       
+       try {
+           await supabase.schema('gl').from('accounts').delete().eq('id', selectedNode.id);
+           await fetchTreeData(structure.id);
+           setSelectedNode(null);
+           setMode('view');
+       } catch (err) { console.error(err); }
     };
 
-    // --- Tree Controls ---
     const getAllParentIds = (nodes) => {
         let ids = [];
         nodes.forEach(node => {
@@ -726,48 +654,26 @@ const ChartofAccounts = ({ t, isRtl }) => {
         return ids;
     };
 
-    const handleExpandAll = () => {
-        const allIds = getAllParentIds(data);
-        setExpandedIds(allIds);
-    };
-
-    const handleCollapseAll = () => {
-        setExpandedIds([]);
-    };
-
-    // --- Helpers for Contra Account Modal (Path Building) ---
     const flattenSubsidiariesWithPaths = (nodes, parentPath = '') => {
        let result = [];
        nodes.forEach(node => {
           const currentPath = parentPath ? `${parentPath} > ${node.title}` : node.title;
-          
-          if (node.level === 'subsidiary') {
-             result.push({ 
-                 ...node, 
-                 pathTitle: currentPath 
-             });
-          }
-          
-          if (node.children) {
-             result = result.concat(flattenSubsidiariesWithPaths(node.children, currentPath));
-          }
+          if (node.level === 'subsidiary') result.push({ ...node, pathTitle: currentPath });
+          if (node.children) result = result.concat(flattenSubsidiariesWithPaths(node.children, currentPath));
        });
        return result;
     };
     
     const filteredSubsidiaries = useMemo(() => {
-       const list = flattenSubsidiariesWithPaths(data);
-       return list.filter(n => n.id !== formData.id); 
-    }, [data, formData.id]);
+       return flattenSubsidiariesWithPaths(treeData).filter(n => n.id !== formData.id); 
+    }, [treeData, formData.id]);
 
     const getContraAccountName = (id) => {
        if (!id) return '';
-       const list = flattenSubsidiariesWithPaths(data);
-       const acc = list.find(n => n.id === id);
+       const acc = flattenSubsidiariesWithPaths(treeData).find(n => n.id === id);
        return acc ? `${acc.fullCode} - ${acc.title}` : '';
     };
 
-    // --- Renderers ---
     const renderTreeContent = (node) => {
       const isGroup = node.level === 'group';
       const isGeneral = node.level === 'general';
@@ -783,7 +689,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
     };
 
     const handleNodeSelect = (nodeId) => {
-        const allNodes = flattenTree(data);
+        const flattenTree = (nodes, list = []) => { nodes.forEach(node => { list.push(node); if (node.children) flattenTree(node.children, list); }); return list; };
+        const allNodes = flattenTree(treeData);
         setSelectedNode(allNodes.find(n => n.id === nodeId));
         setMode('view');
     };
@@ -794,25 +701,14 @@ const ChartofAccounts = ({ t, isRtl }) => {
 
     return (
       <div className="h-full flex flex-col animate-in slide-in-from-right-8 duration-300">
-         {/* Tree Header */}
          <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm shrink-0">
             <div className="flex items-center gap-3">
-               <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={onBack} 
-                  icon={isRtl ? ArrowRight : ArrowRight} 
-                  className={isRtl ? '' : 'rotate-180'}
-               >
-                  {isRtl ? "بازگشت به فهرست" : "Back to List"} 
-               </Button>
+               <Button variant="outline" size="sm" onClick={onBack} icon={isRtl ? ArrowRight : ArrowRight} className={isRtl ? '' : 'rotate-180'}>{isRtl ? "بازگشت به فهرست" : "Back to List"}</Button>
                <div className="h-6 w-px bg-slate-200 mx-2"></div>
                <div>
                   <h2 className="font-bold text-slate-800 text-sm">{structure.title}</h2>
                   <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
-                     <span>Code: {structure.code}</span>
-                     <span>|</span>
-                     <span>Structure: {structure.groupLen}-{structure.generalLen}-{structure.subsidiaryLen}</span>
+                     <span>Code: {structure.code}</span><span>|</span><span>Structure: {structure.groupLen}-{structure.generalLen}-{structure.subsidiaryLen}</span>
                   </div>
                </div>
             </div>
@@ -822,18 +718,17 @@ const ChartofAccounts = ({ t, isRtl }) => {
          </div>
 
          <div className="flex-1 flex gap-4 p-4 overflow-hidden bg-slate-100">
-            {/* Tree Sidebar */}
             <div className="w-1/3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                   <span className="text-[11px] font-bold text-slate-500 uppercase">{isRtl ? "ساختار درختی" : "Tree Structure"}</span>
                   <div className="flex gap-1">
-                     <Button size="iconSm" variant="ghost" onClick={handleExpandAll} title={isRtl ? "باز کردن همه" : "Expand All"} icon={Maximize2} />
-                     <Button size="iconSm" variant="ghost" onClick={handleCollapseAll} title={isRtl ? "بستن همه" : "Collapse All"} icon={Minimize2} />
+                     <Button size="iconSm" variant="ghost" onClick={() => setExpandedIds(getAllParentIds(treeData))} title={isRtl ? "باز کردن همه" : "Expand All"} icon={Maximize2} />
+                     <Button size="iconSm" variant="ghost" onClick={() => setExpandedIds([])} title={isRtl ? "بستن همه" : "Collapse All"} icon={Minimize2} />
                   </div>
                </div>
                <div className="flex-1 overflow-y-auto p-2">
                   <TreeView 
-                     data={data} 
+                     data={treeData} 
                      onSelectNode={(node) => handleNodeSelect(node.id)}
                      selectedNodeId={selectedNode?.id}
                      renderNodeContent={renderTreeContent}
@@ -844,7 +739,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
                </div>
             </div>
 
-            {/* Details Panel */}
             <div className="w-2/3 flex flex-col">
                {!selectedNode && mode === 'view' && (
                   <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-slate-400">
@@ -853,7 +747,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
                   </div>
                )}
 
-               {/* VIEW MODE - READ ONLY DETAILS */}
                {selectedNode && mode === 'view' && (
                   <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto">
                      <div className="p-6 border-b border-slate-100 flex justify-between items-start">
@@ -882,9 +775,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
                            {selectedNode.contraAccountId && (
                                <div className="col-span-2">
                                    <label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "حساب مقابل (تعدیل ماهیت)" : "Contra Account"}</label>
-                                   <div className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100" dir="ltr">
-                                       {getContraAccountName(selectedNode.contraAccountId)}
-                                   </div>
+                                   <div className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100" dir="ltr">{getContraAccountName(selectedNode.contraAccountId)}</div>
                                </div>
                            )}
                         </div>
@@ -925,7 +816,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
                   </div>
                )}
 
-               {/* EDIT / CREATE MODE */}
                {mode !== 'view' && (
                   <div className="h-full bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
                      <div className="px-4 py-3 border-b border-slate-100 font-bold text-slate-700 flex items-center gap-2">
@@ -936,34 +826,9 @@ const ChartofAccounts = ({ t, isRtl }) => {
                      
                      <div className="p-4 flex-1 overflow-y-auto">
                         <Tabs tabs={activeTabs} activeTab={activeTab} onChange={setActiveTab} />
-                        
-                        {activeTab === 'info' && (
-                           <AccountForm 
-                             formData={formData} 
-                             setFormData={setFormData} 
-                             structure={structure} 
-                             selectedNode={selectedNode} 
-                             isRtl={isRtl}
-                             accountTypes={ACCOUNT_TYPES}
-                             accountNatures={ACCOUNT_NATURES}
-                             onOpenContraModal={() => setShowContraModal(true)}
-                             contraAccountName={getContraAccountName(formData.contraAccountId)}
-                           />
-                        )}
-                        {activeTab === 'tafsil' && (
-                           <TafsilSelector 
-                             formData={formData} 
-                             setFormData={setFormData} 
-                             isRtl={isRtl} 
-                           />
-                        )}
-                        {activeTab === 'desc' && (
-                           <StandardDesc 
-                             formData={formData} 
-                             setFormData={setFormData} 
-                             isRtl={isRtl} 
-                           />
-                        )}
+                        {activeTab === 'info' && <AccountForm formData={formData} setFormData={setFormData} structure={structure} selectedNode={selectedNode} isRtl={isRtl} onOpenContraModal={() => setShowContraModal(true)} contraAccountName={getContraAccountName(formData.contraAccountId)} />}
+                        {activeTab === 'tafsil' && <TafsilSelector formData={formData} setFormData={setFormData} isRtl={isRtl} />}
+                        {activeTab === 'desc' && <StandardDesc formData={formData} setFormData={setFormData} isRtl={isRtl} />}
                      </div>
                      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-xl">
                         <Button variant="outline" onClick={() => setMode('view')}>{isRtl ? "انصراف" : "Cancel"}</Button>
@@ -974,13 +839,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
             </div>
          </div>
 
-         {/* CONTRA ACCOUNT SELECTION MODAL */}
-         <Modal
-            isOpen={showContraModal}
-            onClose={() => setShowContraModal(false)}
-            title={isRtl ? "انتخاب حساب معین (تعدیل ماهیت)" : "Select Contra Account"}
-            maxWidth="max-w-4xl"
-         >
+         <Modal isOpen={showContraModal} onClose={() => setShowContraModal(false)} title={isRtl ? "انتخاب حساب معین (تعدیل ماهیت)" : "Select Contra Account"} maxWidth="max-w-4xl">
              <div className="h-[500px] flex flex-col">
                  <div className="flex-1 overflow-hidden border border-slate-200 rounded-lg relative">
                      <DataGrid 
@@ -989,34 +848,28 @@ const ChartofAccounts = ({ t, isRtl }) => {
                              { field: 'pathTitle', header: isRtl ? 'مسیر حساب' : 'Account Path', width: 'w-auto' }, 
                              { field: 'nature', header: isRtl ? 'ماهیت' : 'Nature', width: 'w-24', render: r => <Badge variant={r.nature === 'debit' ? 'info' : r.nature === 'credit' ? 'warning' : 'neutral'}>{r.nature}</Badge> }
                          ]}
-                         data={filteredSubsidiaries}
-                         isRtl={isRtl}
-                         actions={(row) => (
-                             <Button size="sm" onClick={() => {
-                                 setFormData(prev => ({...prev, contraAccountId: row.id}));
-                                 setShowContraModal(false);
-                             }}>
-                                 {isRtl ? "انتخاب" : "Select"}
-                             </Button>
-                         )}
+                         data={filteredSubsidiaries} isRtl={isRtl}
+                         actions={(row) => (<Button size="sm" onClick={() => { setFormData(prev => ({...prev, contraAccountId: row.id})); setShowContraModal(false); }}>{isRtl ? "انتخاب" : "Select"}</Button>)}
                      />
                  </div>
-                 <div className="mt-2 text-xs text-slate-400">
-                     {isRtl 
-                         ? `تعداد حساب‌های قابل انتخاب: ${filteredSubsidiaries.length}` 
-                         : `${filteredSubsidiaries.length} eligible accounts`}
-                 </div>
+                 <div className="mt-2 text-xs text-slate-400">{isRtl ? `تعداد: ${filteredSubsidiaries.length}` : `Count: ${filteredSubsidiaries.length}`}</div>
              </div>
          </Modal>
       </div>
     );
   };
 
-  // --- 4. MAIN RENDER ---
-
-  const handleUpdateTree = (newData) => {
-     setAllAccounts(prev => ({ ...prev, [activeStructure.id]: newData }));
-  };
+  if (!canView) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-full bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+        <div className="p-6 bg-white rounded-2xl shadow-sm text-center border border-red-100">
+           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4"><Ban className="text-red-500" size={32} /></div>
+           <h2 className="text-lg font-bold text-slate-800">{isRtl ? 'دسترسی غیرمجاز' : 'Access Denied'}</h2>
+           <p className="text-sm text-slate-500 mt-2">{isRtl ? 'شما مجوز مشاهده این فرم را ندارید.' : 'You do not have permission to view this form.'}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col p-4 bg-slate-100">
@@ -1036,12 +889,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
          {viewMode === 'list' ? (
             <StructureList />
          ) : (
-            <AccountTreeView 
-               structure={activeStructure} 
-               data={allAccounts[activeStructure.id] || []} 
-               onSaveTree={handleUpdateTree}
-               onBack={() => setViewMode('list')}
-            />
+            <AccountTreeView structure={activeStructure} onBack={() => setViewMode('list')} />
          )}
       </div>
     </div>
@@ -1049,5 +897,4 @@ const ChartofAccounts = ({ t, isRtl }) => {
 };
 
 window.ChartofAccounts = ChartofAccounts;
-
 export default ChartofAccounts;
