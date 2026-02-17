@@ -28,7 +28,7 @@ const OrgChart = ({ t, isRtl }) => {
   const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
   const canDesign = checkAccess('design');
 
-  // --- Data Sanitization Helpers (Prevents Supabase 400 Bad Request) ---
+  // --- Data Sanitization Helpers ---
   const cleanDate = (d) => {
     if (!d) return null;
     const trimmed = String(d).trim().replace(/\//g, '-');
@@ -176,7 +176,8 @@ const OrgChart = ({ t, isRtl }) => {
     }
   };
 
-  const fetchDesignerData = async (chartId) => {
+  // Modified to optionally retain selection
+  const fetchDesignerData = async (chartId, retainNodeId = null) => {
     try {
        const { data: nData, error: nErr } = await supabase.schema('gen').from('org_chart_nodes').select('*').eq('chart_id', chartId);
        if (nErr) throw nErr;
@@ -189,7 +190,6 @@ const OrgChart = ({ t, isRtl }) => {
           pData = personnelData || [];
        }
 
-       // Map and build Tree
        const map = new Map();
        nData.forEach(n => map.set(n.id, { 
           id: n.id, 
@@ -221,6 +221,20 @@ const OrgChart = ({ t, isRtl }) => {
        
        if (roots.length > 0 && expandedKeys.size === 0) {
           setExpandedKeys(new Set([roots[0].id]));
+       }
+
+       // Keep the previously selected node active if requested
+       if (retainNodeId && map.has(retainNodeId)) {
+          const updatedNode = map.get(retainNodeId);
+          setSelectedNode(updatedNode);
+          setNodeForm({ 
+             id: updatedNode.id, 
+             code: updatedNode.code || '', 
+             title: updatedNode.title, 
+             parentId: updatedNode.parentId || '', 
+             active: updatedNode.active 
+          });
+          setIsNodeEditMode(true);
        }
     } catch (err) {
        console.error(err);
@@ -386,24 +400,25 @@ const OrgChart = ({ t, isRtl }) => {
            is_active: nodeForm.active
         };
 
+        let targetNodeId = null;
+
         if (isNodeEditMode && selectedNode) {
            if (nodeForm.parentId === selectedNode.id) return alert(isRtl ? 'یک گره نمی‌تواند زیرمجموعه خودش باشد.' : 'Cannot be child of itself.');
            const { error } = await supabase.schema('gen').from('org_chart_nodes').update(payload).eq('id', selectedNode.id);
            if (error) throw error;
+           targetNodeId = selectedNode.id;
         } else {
-           const { error } = await supabase.schema('gen').from('org_chart_nodes').insert([payload]);
+           const { data, error } = await supabase.schema('gen').from('org_chart_nodes').insert([payload]).select();
            if (error) throw error;
+           if (data && data.length > 0) targetNodeId = data[0].id;
         }
 
         const currentExpanded = new Set(expandedKeys);
         if (nodeForm.parentId) currentExpanded.add(nodeForm.parentId);
         
-        await fetchDesignerData(activeChart.id);
+        // Pass targetNodeId to retain selection after refresh
+        await fetchDesignerData(activeChart.id, targetNodeId);
         setExpandedKeys(currentExpanded);
-        
-        // Clear selection to avoid stale state issues after tree rebuild
-        handlePrepareNewNode();
-        setSelectedNode(null);
 
      } catch (err) {
         console.error(err);
@@ -481,13 +496,8 @@ const OrgChart = ({ t, isRtl }) => {
           }
        }
 
-       await fetchDesignerData(activeChart.id);
-       
-       setTimeout(() => {
-          setSelectedNode(null);
-          handlePrepareNewNode();
-       }, 50);
-
+       // Refetch tree and retain the current selectedNode
+       await fetchDesignerData(activeChart.id, selectedNode.id);
        setIsAssignModalOpen(false);
     } catch(err) {
        console.error(err);
@@ -500,9 +510,8 @@ const OrgChart = ({ t, isRtl }) => {
         const { error } = await supabase.schema('gen').from('org_chart_personnel').delete().eq('id', pId);
         if (error) throw error;
         
-        await fetchDesignerData(activeChart.id);
-        setSelectedNode(null);
-        handlePrepareNewNode();
+        // Refetch tree and retain the current selectedNode
+        await fetchDesignerData(activeChart.id, selectedNode.id);
      } catch (err) {
         console.error(err);
      }
