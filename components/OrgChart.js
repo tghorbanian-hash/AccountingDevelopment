@@ -1,5 +1,5 @@
 /* Filename: components/OrgChart.js */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Network, Search, Plus, Edit, Trash2, Save, 
   ArrowLeft, ArrowRight, Users, FolderTree, Ban, X,
@@ -26,8 +26,6 @@ const OrgChart = ({ t, isRtl }) => {
   const canCreate = checkAccess('create') || checkAccess('new') || checkAccess('add') || checkAccess('insert');
   const canEdit   = checkAccess('edit') || checkAccess('update') || checkAccess('modify');
   const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
-  
-  // Custom Action Permission
   const canDesign = checkAccess('design');
 
   // --- INTERNAL: CUSTOM TREE COMPONENT ---
@@ -90,6 +88,7 @@ const OrgChart = ({ t, isRtl }) => {
   const [charts, setCharts] = useState([]);
   const [treeData, setTreeData] = useState([]);
   const [expandedKeys, setExpandedKeys] = useState(new Set());
+  const [employees, setEmployees] = useState([]);
 
   const [filters, setFilters] = useState({ code: '', title: '' });
   const [activeChart, setActiveChart] = useState(null); 
@@ -100,19 +99,30 @@ const OrgChart = ({ t, isRtl }) => {
   const [nodeForm, setNodeForm] = useState({ id: null, code: '', title: '', parentId: '', active: true });
   const [isNodeEditMode, setIsNodeEditMode] = useState(false); 
   
+  // Assign Modal States
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assignData, setAssignData] = useState({ id: null, personId: '', fromDate: '', toDate: '' });
-
-  const mockPersonnel = [
-    { id: 101, name: isRtl ? 'علی رضایی' : 'Ali Rezaei' },
-    { id: 102, name: isRtl ? 'سارا محمدی' : 'Sara Mohammadi' },
-    { id: 103, name: isRtl ? 'مهندس اکبری' : 'Eng. Akbari' },
-  ];
+  const [empSearchTerm, setEmpSearchTerm] = useState('');
+  const [isEmpDropdownOpen, setIsEmpDropdownOpen] = useState(false);
+  const empDropdownRef = useRef(null);
 
   // --- DB EFFECTS & FETCHES ---
   useEffect(() => {
-    if (canView) fetchCharts();
+    if (canView) {
+       fetchCharts();
+       fetchEmployees();
+    }
   }, [canView]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (empDropdownRef.current && !empDropdownRef.current.contains(event.target)) {
+        setIsEmpDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchCharts = async () => {
     try {
@@ -130,6 +140,26 @@ const OrgChart = ({ t, isRtl }) => {
     } catch (err) {
       console.error(err);
       alert(t.err_fetch || 'Error fetching charts');
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      const { data, error } = await supabase.schema('gen').from('parties')
+        .select('id, code, name, metadata, is_active')
+        .eq('party_type', 'person')
+        .eq('is_active', true);
+        
+      if (error) throw error;
+      
+      const emps = (data || []).filter(p => p.metadata?.roles?.includes('employee')).map(p => ({
+         id: p.id,
+         code: p.code || '',
+         name: p.name || ''
+      }));
+      setEmployees(emps);
+    } catch(err) {
+      console.error(err);
     }
   };
 
@@ -352,7 +382,6 @@ const OrgChart = ({ t, isRtl }) => {
         await fetchDesignerData(activeChart.id);
         setExpandedKeys(currentExpanded);
         
-        // Clear selection to avoid stale state issues after tree rebuild
         handlePrepareNewNode();
         setSelectedNode(null);
 
@@ -379,6 +408,13 @@ const OrgChart = ({ t, isRtl }) => {
   };
 
   // Personnel Handlers
+  const filteredEmployees = useMemo(() => {
+    return employees.filter(emp =>
+       (emp.name && emp.name.toLowerCase().includes(empSearchTerm.toLowerCase())) ||
+       (emp.code && emp.code.toLowerCase().includes(empSearchTerm.toLowerCase()))
+    );
+  }, [employees, empSearchTerm]);
+
   const handleOpenAssignModal = (assignment = null) => {
     if (assignment) {
        setAssignData({ 
@@ -387,15 +423,18 @@ const OrgChart = ({ t, isRtl }) => {
           fromDate: assignment.fromDate || '', 
           toDate: assignment.toDate || '' 
        });
+       const emp = employees.find(e => String(e.id) === String(assignment.personId));
+       setEmpSearchTerm(emp ? `${emp.name} (${emp.code})` : assignment.name || '');
     } else {
        setAssignData({ id: null, personId: '', fromDate: '', toDate: '' });
+       setEmpSearchTerm('');
     }
     setIsAssignModalOpen(true);
   };
 
   const handleSaveAssignment = async () => {
     if (!assignData.personId || !selectedNode) return;
-    const personName = mockPersonnel.find(p => String(p.id) === String(assignData.personId))?.name || '';
+    const personName = employees.find(p => String(p.id) === String(assignData.personId))?.name || '';
     
     try {
        const payload = {
@@ -416,10 +455,7 @@ const OrgChart = ({ t, isRtl }) => {
 
        await fetchDesignerData(activeChart.id);
        
-       // Re-select current node after refresh to see updated personnel
        setTimeout(() => {
-          // It's tricky to find it again easily, we simply let the user re-click for now
-          // or we can rely on React state being cleared
           setSelectedNode(null);
           handlePrepareNewNode();
        }, 50);
@@ -703,11 +739,46 @@ const OrgChart = ({ t, isRtl }) => {
 
       <Modal isOpen={isAssignModalOpen} onClose={() => setIsAssignModalOpen(false)} title={t.oc_assign_person || (isRtl ? 'تخصیص پرسنل' : 'Assign Personnel')} size="sm"
          footer={<><Button variant="ghost" onClick={() => setIsAssignModalOpen(false)}>{t.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button><Button variant="primary" onClick={handleSaveAssignment}>{t.oc_assign || (isRtl ? 'افزودن' : 'Add')}</Button></>}>
-         <div className="space-y-4">
-            <SelectField label={t.oc_select_person || (isRtl ? 'انتخاب شخص' : 'Select Person')} isRtl={isRtl} value={assignData.personId} onChange={e => setAssignData({...assignData, personId: e.target.value})}>
-               <option value="">-</option>
-               {mockPersonnel.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </SelectField>
+         <div className="space-y-4 overflow-visible">
+            
+            {/* Custom Searchable Select for Personnel */}
+            <div className="relative" ref={empDropdownRef}>
+               <label className="block text-[11px] font-bold text-slate-600 mb-1">{t.oc_select_person || (isRtl ? 'انتخاب شخص (کد یا نام)' : 'Select Person (Code or Name)')}</label>
+               <div className="relative">
+                  <input
+                     className={`w-full h-9 bg-white border border-slate-200 rounded text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all ${isRtl ? 'pr-2 pl-8' : 'pl-2 pr-8'}`}
+                     placeholder={isRtl ? "جستجو..." : "Search..."}
+                     value={empSearchTerm}
+                     onChange={e => {
+                        setEmpSearchTerm(e.target.value);
+                        setAssignData({...assignData, personId: ''});
+                        setIsEmpDropdownOpen(true);
+                     }}
+                     onFocus={() => setIsEmpDropdownOpen(true)}
+                  />
+                  {assignData.personId ? (
+                     <X size={14} className={`absolute top-2.5 text-slate-400 cursor-pointer hover:text-red-500 ${isRtl ? 'left-2.5' : 'right-2.5'}`} onClick={() => { setAssignData({...assignData, personId: ''}); setEmpSearchTerm(''); }} />
+                  ) : (
+                     <Search size={14} className={`absolute top-2.5 text-slate-400 ${isRtl ? 'left-2.5' : 'right-2.5'}`} />
+                  )}
+               </div>
+               
+               {isEmpDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-[100] max-h-48 overflow-y-auto p-1">
+                     {filteredEmployees.length > 0 ? filteredEmployees.map(emp => (
+                        <div key={emp.id} className="px-3 py-2 text-xs cursor-pointer hover:bg-indigo-50 rounded flex flex-col transition-colors border-b border-slate-50 last:border-0" onClick={() => {
+                           setAssignData({...assignData, personId: emp.id});
+                           setEmpSearchTerm(`${emp.name} (${emp.code})`);
+                           setIsEmpDropdownOpen(false);
+                        }}>
+                           <span className="font-bold text-slate-700">{emp.name}</span>
+                           <span className="text-[10px] font-mono text-slate-400">{emp.code}</span>
+                        </div>
+                     )) : <div className="p-3 text-center text-slate-400 text-xs">{isRtl ? 'موردی یافت نشد.' : 'No items found.'}</div>}
+                  </div>
+               )}
+            </div>
+
             <DatePicker label={t.oc_from_date || (isRtl ? 'از تاریخ' : 'From Date')} value={assignData.fromDate} onChange={e => setAssignData({...assignData, fromDate: e.target.value})} isRtl={isRtl} className="dir-ltr" />
             <DatePicker label={t.oc_to_date || (isRtl ? 'تا تاریخ' : 'To Date')} value={assignData.toDate} onChange={e => setAssignData({...assignData, toDate: e.target.value})} isRtl={isRtl} className="dir-ltr" />
          </div>
