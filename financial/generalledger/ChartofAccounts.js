@@ -5,32 +5,10 @@ import {
   Settings, Search, Check, 
   AlertCircle, Layout, List, Layers, FileDigit, ArrowRight, Edit,
   TreeDeciduous, ShieldCheck, X, User, Ban,
-  ChevronsDown, ChevronsUp, Minimize2, Maximize2 
+  ChevronDown, Minimize2, Maximize2 
 } from 'lucide-react';
 
 // --- DATA CONSTANTS ---
-
-const ALL_TAFSIL_TYPES = [
-  { id: 'party', label: 'طرف تجاری', en: 'Business Party', isSystem: true },
-  { id: 'costcenter', label: 'مرکز هزینه', en: 'Cost Center', isSystem: true },
-  { id: 'project', label: 'پروژه', en: 'Project', isSystem: true },
-  { id: 'personnel', label: 'پرسنل', en: 'Personnel', isSystem: true },
-  { id: 'bank', label: 'حساب بانکی', en: 'Bank Account', isSystem: true },
-  { id: 'cash', label: 'صندوق', en: 'Cash Box', isSystem: true },
-  { id: 'petty_cash', label: 'تنخواه', en: 'Petty Cash', isSystem: true },
-  { id: 'branch', label: 'شعبه', en: 'Branch', isSystem: true },
-  { id: 'customer_group', label: 'گروه مشتری', en: 'Customer Group', isSystem: true },
-  { id: 'product_group', label: 'گروه محصول', en: 'Product Group', isSystem: true },
-  { id: 'sales_office', label: 'دفتر فروش', en: 'Sales Office', isSystem: true },
-  { id: 'price_zone', label: 'حوزه قیمت‌گذاری', en: 'Pricing Zone', isSystem: true },
-  { id: 'product', label: 'کالا/خدمات', en: 'Product/Service', isSystem: true },
-  { id: 'contract', label: 'قراردادها', en: 'Contracts', isSystem: false },
-  { id: 'vehicle', label: 'وسایل نقلیه', en: 'Vehicles', isSystem: false },
-  { id: 'loan', label: 'تسهیلات', en: 'Loans', isSystem: false },
-  { id: 'other1', label: 'سایر ۱', en: 'Other 1', isSystem: false },
-  { id: 'other2', label: 'سایر ۲', en: 'Other 2', isSystem: false },
-];
-
 const ACCOUNT_TYPES = [
   { id: 'permanent', labelFa: 'دائم (ترازنامه‌ای)', labelEn: 'Permanent (Balance Sheet)' },
   { id: 'temporary', labelFa: 'موقت (سود و زیانی)', labelEn: 'Temporary (P&L)' },
@@ -44,7 +22,6 @@ const ACCOUNT_NATURES = [
 ];
 
 // --- SHARED HELPERS & SUB-COMPONENTS ---
-
 const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
   <div 
     className={`flex items-center gap-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer group'} ${className}`} 
@@ -89,7 +66,7 @@ const Tabs = ({ tabs, activeTab, onChange }) => (
 
 const AccountForm = ({ 
   formData, setFormData, structure, selectedNode, isRtl, 
-  onOpenContraModal, contraAccountName 
+  onOpenContraModal, contraAccountName, currencies 
 }) => {
   const { InputField, SelectField, Button } = window.UI;
 
@@ -172,7 +149,8 @@ const AccountForm = ({
                  {formData.currencyFeature && (
                     <div className="mr-6 grid grid-cols-2 gap-2 animate-in slide-in-from-top-1">
                        <SelectField label={isRtl ? "ارز پیش‌فرض" : "Default Currency"} isRtl={isRtl} value={formData.defaultCurrency || ''} onChange={e => setFormData(prev => ({...prev, defaultCurrency: e.target.value}))}>
-                          <option value="">-</option><option value="IRR">IRR</option><option value="USD">USD</option><option value="EUR">EUR</option>
+                          <option value="">-</option>
+                          {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
                        </SelectField>
                        <div className="mt-6"><Checkbox label={isRtl ? "الزام ورود ارز" : "Mandatory Currency"} checked={!!formData.currencyMandatory} onChange={v => setFormData(prev => ({...prev, currencyMandatory: v}))} /></div>
                     </div>
@@ -225,7 +203,7 @@ const AccountForm = ({
   );
 };
 
-const TafsilSelector = ({ formData, setFormData, isRtl }) => {
+const TafsilSelector = ({ formData, setFormData, isRtl, detailTypes }) => {
   const { Callout } = window.UI;
   return (
      <div className="space-y-4">
@@ -233,25 +211,30 @@ const TafsilSelector = ({ formData, setFormData, isRtl }) => {
            {isRtl ? "انواع تفصیل‌های مجاز برای این حساب معین را انتخاب کنید." : "Select the detailed account types allowed for this subsidiary."}
         </Callout>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-           {ALL_TAFSIL_TYPES.map(t => (
-              <div 
-                 key={t.id}
-                 onClick={() => {
-                    const exists = formData.tafsils?.includes(t.id);
-                    const newTafsils = exists ? formData.tafsils.filter(x => x !== t.id) : [...(formData.tafsils || []), t.id];
-                    setFormData(prev => ({...prev, tafsils: newTafsils}));
-                 }}
-                 className={`
-                    relative cursor-pointer border rounded-lg p-3 text-center transition-all select-none
-                    ${formData.tafsils?.includes(t.id) 
-                       ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold shadow-sm ring-1 ring-indigo-200' 
-                       : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
-                 `}
-              >
-                 {!t.isSystem && <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}><User size={10} className="text-indigo-500" /></div>}
-                 <div className="text-[12px] flex items-center justify-center gap-1">{t.label}</div>
-              </div>
-           ))}
+           {detailTypes.map(t => {
+              const isSelected = formData.tafsils?.includes(String(t.id)) || formData.tafsils?.includes(t.id);
+              return (
+                 <div 
+                    key={t.id}
+                    onClick={() => {
+                       const exists = isSelected;
+                       const newTafsils = exists 
+                           ? (formData.tafsils || []).filter(x => String(x) !== String(t.id)) 
+                           : [...(formData.tafsils || []), t.id];
+                       setFormData(prev => ({...prev, tafsils: newTafsils}));
+                    }}
+                    className={`
+                       relative cursor-pointer border rounded-lg p-3 text-center transition-all select-none
+                       ${isSelected 
+                          ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold shadow-sm ring-1 ring-indigo-200' 
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}
+                    `}
+                 >
+                    {!t.is_system && <div className={`absolute top-1 left-1 ${isRtl ? 'right-auto' : 'right-1'} text-[8px] opacity-70`}><User size={10} className="text-indigo-500" /></div>}
+                    <div className="text-[12px] flex items-center justify-center gap-1">{t.title}</div>
+                 </div>
+              )
+           })}
         </div>
      </div>
   );
@@ -260,7 +243,6 @@ const TafsilSelector = ({ formData, setFormData, isRtl }) => {
 const StandardDesc = ({ formData, setFormData, isRtl }) => {
   const { InputField, Button } = window.UI;
   const [descText, setDescText] = useState('');
-  
   const list = formData.descriptions || [];
 
   const addDesc = () => {
@@ -289,10 +271,72 @@ const StandardDesc = ({ formData, setFormData, isRtl }) => {
   );
 };
 
+// --- CUSTOM TREE RENDERER ---
+const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onToggle, isRtl }) => {
+  const hasChildren = node.children && node.children.length > 0;
+  const isExpanded = expandedKeys.has(node.id);
+  const isSelected = selectedId === node.id;
+  const isGroup = node.level === 'group';
+  const isGeneral = node.level === 'general';
+  
+  const color = isGroup ? 'text-indigo-700' : isGeneral ? 'text-slate-700' : 'text-slate-500';
+  const icon = isGroup ? <Layers size={14}/> : isGeneral ? <Folder size={14}/> : <FileText size={14}/>;
+
+  return (
+    <div className="select-none">
+      <div 
+        className={`
+          flex items-center gap-2 py-1 px-2 my-0.5 cursor-pointer rounded-lg transition-all border border-transparent
+          ${isSelected 
+            ? 'bg-indigo-50 text-indigo-700 font-bold border-indigo-200 shadow-sm' 
+            : 'hover:bg-slate-50 text-slate-700 hover:border-slate-200'}
+        `}
+        style={{ paddingRight: isRtl ? `${level * 20 + 8}px` : '8px', paddingLeft: isRtl ? '8px' : `${level * 20 + 8}px` }}
+        onClick={() => onSelect(node)}
+      >
+        {hasChildren ? (
+          <div 
+            className="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors z-10 bg-white rounded border border-slate-200 shadow-sm shrink-0"
+            onClick={(e) => { e.stopPropagation(); onToggle(node.id); }}
+          >
+             <div className={`transition-transform duration-200 ${isExpanded ? '' : (isRtl ? 'rotate-90' : '-rotate-90')}`}>
+               <ChevronDown size={12} />
+             </div>
+          </div>
+        ) : (
+           <div className="w-5 h-5 flex items-center justify-center shrink-0">
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+           </div>
+        )}
+        
+        <div className={`flex items-center gap-2 truncate flex-1 ${color}`}>
+           {icon}
+           <span className="font-mono text-[11px] font-bold bg-white/60 border border-slate-200/50 px-1 rounded">{node.code}</span>
+           <span className="text-[12px] truncate">{node.title}</span>
+           {node.isActive === false && <span className="bg-red-100 text-red-600 text-[9px] px-1 rounded">{isRtl ? 'غیرفعال' : 'Inactive'}</span>}
+        </div>
+      </div>
+      {hasChildren && isExpanded && (
+        <div className="overflow-hidden relative">
+          <div className={`absolute top-0 bottom-2 w-px bg-slate-200 ${isRtl ? `right-[${level * 20 + 17}px]` : `left-[${level * 20 + 17}px]`}`}></div>
+          {node.children.map(child => (
+            <CustomTreeNode 
+              key={child.id} node={child} level={level + 1} 
+              selectedId={selectedId} onSelect={onSelect} 
+              expandedKeys={expandedKeys} onToggle={onToggle} isRtl={isRtl} 
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 // --- MAIN COMPONENT ---
 
 const ChartofAccounts = ({ t, isRtl }) => {
-  const { Button, InputField, DataGrid, Modal, Badge, TreeView, FilterSection } = window.UI;
+  const { Button, InputField, DataGrid, Modal, Badge, FilterSection } = window.UI;
   const supabase = window.supabase;
 
   // --- Resilient Permission Checks ---
@@ -317,10 +361,30 @@ const ChartofAccounts = ({ t, isRtl }) => {
   const [activeStructure, setActiveStructure] = useState(null);
   const [structures, setStructures] = useState([]);
   const [treeData, setTreeData] = useState([]);
+  const [currencies, setCurrencies] = useState([]);
+  const [detailTypes, setDetailTypes] = useState([]);
 
   useEffect(() => {
-    if (canView) fetchStructures();
+    if (canView) {
+        fetchStructures();
+        fetchCurrencies();
+        fetchDetailTypes();
+    }
   }, [canView]);
+
+  const fetchCurrencies = async () => {
+    try {
+       const { data, error } = await supabase.schema('gen').from('currencies').select('*').eq('is_active', true);
+       if(!error) setCurrencies(data || []);
+    } catch(err) { console.error(err); }
+  };
+
+  const fetchDetailTypes = async () => {
+    try {
+       const { data, error } = await supabase.schema('gl').from('detail_types').select('*').eq('is_active', true);
+       if(!error) setDetailTypes(data || []);
+    } catch(err) { console.error(err); }
+  };
 
   const fetchStructures = async () => {
     try {
@@ -341,7 +405,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
     }
   };
 
-  const fetchTreeData = async (structureId, retainNodeId = null) => {
+  const fetchTreeData = async (structureId) => {
      try {
         const { data, error } = await supabase.schema('gl').from('accounts').select('*').eq('structure_id', structureId);
         if (error) throw error;
@@ -354,8 +418,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
            fullCode: n.full_code,
            title: n.title,
            titleEn: n.title_en || '',
-           // فیکس مربوط به خطای TreeView: آبجکت label باید ساخته شود
-           label: { fa: n.title, en: n.title_en || n.title },
            level: n.level,
            type: n.type || 'permanent',
            nature: n.nature || 'debit',
@@ -375,7 +437,6 @@ const ChartofAccounts = ({ t, isRtl }) => {
            }
         });
 
-        // Ensure proper sorting inside TreeView based on code
         const sortTree = (nodes) => {
            nodes.sort((a,b) => a.code.localeCompare(b.code));
            nodes.forEach(n => { if(n.children) sortTree(n.children); });
@@ -517,7 +578,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
     const [mode, setMode] = useState('view'); 
     const [activeTab, setActiveTab] = useState('info'); 
     const [formData, setFormData] = useState({});
-    const [expandedIds, setExpandedIds] = useState([]);
+    const [expandedKeys, setExpandedKeys] = useState(new Set());
     const [showContraModal, setShowContraModal] = useState(false);
 
     const getParentCode = (node) => {
@@ -622,7 +683,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
           
           if(targetNodeId) {
              const ancestors = getAncestorIds(roots, targetNodeId) || [];
-             setExpandedIds(prev => [...new Set([...prev, ...ancestors])]);
+             setExpandedKeys(prev => new Set([...prev, ...ancestors]));
              if(map.has(targetNodeId)) setSelectedNode(map.get(targetNodeId));
           }
           
@@ -645,15 +706,28 @@ const ChartofAccounts = ({ t, isRtl }) => {
        } catch (err) { console.error(err); }
     };
 
-    const getAllParentIds = (nodes) => {
-        let ids = [];
-        nodes.forEach(node => {
-            if (node.children && node.children.length > 0) {
-                ids.push(node.id);
-                ids = ids.concat(getAllParentIds(node.children));
-            }
-        });
-        return ids;
+    // --- Custom Tree Handlers ---
+    const handleExpandAll = () => {
+       const allIds = new Set();
+       const traverse = (nodes) => {
+         nodes.forEach(n => {
+           if (n.children && n.children.length > 0) {
+             allIds.add(n.id);
+             traverse(n.children);
+           }
+         });
+       };
+       traverse(treeData);
+       setExpandedKeys(allIds);
+    };
+
+    const handleCollapseAll = () => setExpandedKeys(new Set());
+
+    const toggleExpand = (id) => {
+       const newSet = new Set(expandedKeys);
+       if (newSet.has(id)) newSet.delete(id);
+       else newSet.add(id);
+       setExpandedKeys(newSet);
     };
 
     const flattenSubsidiariesWithPaths = (nodes, parentPath = '') => {
@@ -676,24 +750,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
        return acc ? `${acc.fullCode} - ${acc.title}` : '';
     };
 
-    const renderTreeContent = (node) => {
-      const isGroup = node.level === 'group';
-      const isGeneral = node.level === 'general';
-      const color = isGroup ? 'text-indigo-700' : isGeneral ? 'text-slate-700' : 'text-slate-500';
-      const icon = isGroup ? <Layers size={14}/> : isGeneral ? <Folder size={14}/> : <FileText size={14}/>;
-      return (
-        <div className={`flex items-center gap-1.5 ${color}`}>
-          {icon}
-          <span className="font-mono text-[11px] font-bold bg-slate-100 px-1 rounded">{node.code}</span>
-          <span className="text-[11px]">{node.title}</span>
-        </div>
-      );
-    };
-
-    const handleNodeSelect = (nodeId) => {
-        const flattenTree = (nodes, list = []) => { nodes.forEach(node => { list.push(node); if (node.children) flattenTree(node.children, list); }); return list; };
-        const allNodes = flattenTree(treeData);
-        setSelectedNode(allNodes.find(n => n.id === nodeId));
+    const handleNodeSelect = (node) => {
+        setSelectedNode(node);
         setMode('view');
     };
 
@@ -724,20 +782,20 @@ const ChartofAccounts = ({ t, isRtl }) => {
                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                   <span className="text-[11px] font-bold text-slate-500 uppercase">{isRtl ? "ساختار درختی" : "Tree Structure"}</span>
                   <div className="flex gap-1">
-                     <Button size="iconSm" variant="ghost" onClick={() => setExpandedIds(getAllParentIds(treeData))} title={isRtl ? "باز کردن همه" : "Expand All"} icon={Maximize2} />
-                     <Button size="iconSm" variant="ghost" onClick={() => setExpandedIds([])} title={isRtl ? "بستن همه" : "Collapse All"} icon={Minimize2} />
+                     <Button size="iconSm" variant="ghost" onClick={handleExpandAll} title={isRtl ? "باز کردن همه" : "Expand All"} icon={Maximize2} />
+                     <Button size="iconSm" variant="ghost" onClick={handleCollapseAll} title={isRtl ? "بستن همه" : "Collapse All"} icon={Minimize2} />
                   </div>
                </div>
                <div className="flex-1 overflow-y-auto p-2">
-                  <TreeView 
-                     data={treeData} 
-                     onSelectNode={(node) => handleNodeSelect(node.id)}
-                     selectedNodeId={selectedNode?.id}
-                     renderNodeContent={renderTreeContent}
-                     isRtl={isRtl}
-                     expandedIds={expandedIds}
-                     onToggle={(ids) => setExpandedIds(ids)}
-                  />
+                  {treeData.length > 0 ? treeData.map(node => (
+                     <CustomTreeNode 
+                        key={node.id} node={node} level={0} 
+                        selectedId={selectedNode?.id} onSelect={handleNodeSelect} 
+                        expandedKeys={expandedKeys} onToggle={toggleExpand} isRtl={isRtl} 
+                     />
+                  )) : (
+                     <div className="text-center text-slate-400 text-xs italic mt-10">{isRtl ? "بدون ساختار" : "No Structure"}</div>
+                  )}
                </div>
             </div>
 
@@ -765,7 +823,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
                         </div>
                      </div>
                      
-                     <div className="p-6 space-y-6">
+                     <div className="p-6 space-y-6 flex-1">
                         <div className="grid grid-cols-2 gap-6">
                            <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "سطح" : "Level"}</label><span className="text-sm">{selectedNode.level}</span></div>
                            <div><label className="text-[10px] font-bold text-slate-400 block mb-1">{isRtl ? "ماهیت" : "Nature"}</label><Badge variant="info">{selectedNode.nature}</Badge></div>
@@ -783,35 +841,58 @@ const ChartofAccounts = ({ t, isRtl }) => {
                         </div>
 
                         {selectedNode.level === 'subsidiary' && (
-                           <div className="border-t border-slate-100 pt-4">
-                              <h4 className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1"><ShieldCheck size={12}/> {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}</h4>
-                              <div className="grid grid-cols-2 gap-3">
-                                 <div className={`p-2 rounded border text-xs ${selectedNode.currencyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                                    <div className="font-bold mb-1">{isRtl ? "ویژگی ارزی" : "Currency"}</div>
-                                    <div className="text-slate-500">{selectedNode.currencyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
-                                    {selectedNode.currencyFeature && selectedNode.currencyMandatory && <div className="mt-1 text-indigo-600 font-bold text-[10px]">{isRtl ? "الزام ورود ارز" : "Mandatory"}</div>}
-                                 </div>
-                                 <div className={`p-2 rounded border text-xs ${selectedNode.trackFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                                    <div className="font-bold mb-1">{isRtl ? "ویژگی پیگیری" : "Tracking"}</div>
-                                    <div className="text-slate-500">{selectedNode.trackFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
-                                    {selectedNode.trackFeature && (
-                                        <div className="mt-1 flex gap-2 text-[10px]">
-                                            {selectedNode.trackMandatory && <span className="text-indigo-600 font-bold">{isRtl ? "اجباری" : "Mandatory"}</span>}
-                                            {selectedNode.trackUnique && <span className="text-indigo-600 font-bold">{isRtl ? "یکتا" : "Unique"}</span>}
-                                        </div>
-                                    )}
-                                 </div>
-                                 <div className={`p-2 rounded border text-xs ${selectedNode.qtyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                                    <div className="font-bold mb-1">{isRtl ? "ویژگی مقداری" : "Quantity"}</div>
-                                    <div className="text-slate-500">{selectedNode.qtyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
-                                    {selectedNode.qtyFeature && selectedNode.qtyMandatory && <div className="mt-1 text-indigo-600 font-bold text-[10px]">{isRtl ? "اجباری" : "Mandatory"}</div>}
+                           <>
+                              <div className="border-t border-slate-100 pt-4">
+                                 <h4 className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1"><ShieldCheck size={12}/> {isRtl ? "ویژگی‌های کنترلی" : "Control Features"}</h4>
+                                 <div className="grid grid-cols-2 gap-3">
+                                    <div className={`p-2 rounded border text-xs ${selectedNode.currencyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                       <div className="font-bold mb-1">{isRtl ? "ویژگی ارزی" : "Currency"}</div>
+                                       <div className="text-slate-500">{selectedNode.currencyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                       {selectedNode.currencyFeature && selectedNode.currencyMandatory && <div className="mt-1 text-indigo-600 font-bold text-[10px]">{isRtl ? "الزام ورود ارز" : "Mandatory"}</div>}
+                                    </div>
+                                    <div className={`p-2 rounded border text-xs ${selectedNode.trackFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                       <div className="font-bold mb-1">{isRtl ? "ویژگی پیگیری" : "Tracking"}</div>
+                                       <div className="text-slate-500">{selectedNode.trackFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                       {selectedNode.trackFeature && (
+                                           <div className="mt-1 flex gap-2 text-[10px]">
+                                               {selectedNode.trackMandatory && <span className="text-indigo-600 font-bold">{isRtl ? "اجباری" : "Mandatory"}</span>}
+                                               {selectedNode.trackUnique && <span className="text-indigo-600 font-bold">{isRtl ? "یکتا" : "Unique"}</span>}
+                                           </div>
+                                       )}
+                                    </div>
+                                    <div className={`p-2 rounded border text-xs ${selectedNode.qtyFeature ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                       <div className="font-bold mb-1">{isRtl ? "ویژگی مقداری" : "Quantity"}</div>
+                                       <div className="text-slate-500">{selectedNode.qtyFeature ? (isRtl ? "فعال" : "Active") : (isRtl ? "غیرفعال" : "Inactive")}</div>
+                                       {selectedNode.qtyFeature && selectedNode.qtyMandatory && <div className="mt-1 text-indigo-600 font-bold text-[10px]">{isRtl ? "اجباری" : "Mandatory"}</div>}
+                                    </div>
                                  </div>
                               </div>
-                           </div>
+                              <div className="border-t border-slate-100 pt-4 grid grid-cols-2 gap-4">
+                                  <div>
+                                      <h4 className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1"><List size={12}/> {isRtl ? "تفصیل‌های مرتبط" : "Linked Tafsils"}</h4>
+                                      <div className="flex flex-wrap gap-1">
+                                          {(selectedNode.tafsils || []).map(tId => {
+                                              const tObj = detailTypes.find(x => String(x.id) === String(tId));
+                                              return <Badge key={tId} variant="neutral">{tObj ? tObj.title : tId}</Badge>;
+                                          })}
+                                          {(!selectedNode.tafsils || selectedNode.tafsils.length === 0) && <span className="text-xs text-slate-400 italic">{isRtl ? 'موردی یافت نشد' : 'None'}</span>}
+                                      </div>
+                                  </div>
+                                  <div>
+                                      <h4 className="text-xs font-bold text-slate-500 mb-3 flex items-center gap-1"><FileDigit size={12}/> {isRtl ? "شرح‌های استاندارد" : "Standard Descriptions"}</h4>
+                                      <ul className="list-disc list-inside text-xs text-slate-600 space-y-1 pl-4 rtl:pr-4">
+                                          {(selectedNode.descriptions || []).map(desc => (
+                                              <li key={desc.id}>{desc.text}</li>
+                                          ))}
+                                          {(!selectedNode.descriptions || selectedNode.descriptions.length === 0) && <span className="text-slate-400 italic list-none">{isRtl ? 'موردی یافت نشد' : 'None'}</span>}
+                                      </ul>
+                                  </div>
+                              </div>
+                           </>
                         )}
                      </div>
 
-                     <div className="mt-auto p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+                     <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2 shrink-0">
                         {selectedNode.level === 'group' && <Button variant="primary" size="sm" icon={Plus} onClick={() => handleCreate('general')}>{isRtl ? "حساب کل جدید" : "New General"}</Button>}
                         {selectedNode.level === 'general' && <Button variant="primary" size="sm" icon={Plus} onClick={() => handleCreate('subsidiary')}>{isRtl ? "حساب معین جدید" : "New Subsidiary"}</Button>}
                      </div>
@@ -828,8 +909,8 @@ const ChartofAccounts = ({ t, isRtl }) => {
                      
                      <div className="p-4 flex-1 overflow-y-auto">
                         <Tabs tabs={activeTabs} activeTab={activeTab} onChange={setActiveTab} />
-                        {activeTab === 'info' && <AccountForm formData={formData} setFormData={setFormData} structure={structure} selectedNode={selectedNode} isRtl={isRtl} onOpenContraModal={() => setShowContraModal(true)} contraAccountName={getContraAccountName(formData.contraAccountId)} />}
-                        {activeTab === 'tafsil' && <TafsilSelector formData={formData} setFormData={setFormData} isRtl={isRtl} />}
+                        {activeTab === 'info' && <AccountForm formData={formData} setFormData={setFormData} structure={structure} selectedNode={selectedNode} isRtl={isRtl} currencies={currencies} onOpenContraModal={() => setShowContraModal(true)} contraAccountName={getContraAccountName(formData.contraAccountId)} />}
+                        {activeTab === 'tafsil' && <TafsilSelector formData={formData} setFormData={setFormData} isRtl={isRtl} detailTypes={detailTypes} />}
                         {activeTab === 'desc' && <StandardDesc formData={formData} setFormData={setFormData} isRtl={isRtl} />}
                      </div>
                      <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2 rounded-b-xl">
