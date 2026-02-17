@@ -1,11 +1,11 @@
 /* Filename: financial/generalledger/ChartofAccounts.js */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Folder, FolderOpen, FileText, Plus, Save, Trash2, 
   Settings, Search, Check, 
   AlertCircle, Layout, List, Layers, FileDigit, ArrowRight, Edit,
   TreeDeciduous, ShieldCheck, X, User, Ban,
-  ChevronDown, Minimize2, Maximize2 
+  ChevronDown, Minimize2, Maximize2, UploadCloud, DownloadCloud, FileSpreadsheet
 } from 'lucide-react';
 
 // --- DATA CONSTANTS ---
@@ -20,6 +20,23 @@ const ACCOUNT_NATURES = [
   { id: 'credit', labelFa: 'بستانکار', labelEn: 'Credit' },
   { id: 'none', labelFa: 'مهم نیست', labelEn: 'None' },
 ];
+
+// --- CSV PARSER HELPER ---
+const csvToArray = (text) => {
+    let p = '', row = [''], ret = [row], i = 0, r = 0, s = !0, l;
+    for (l of text) {
+        if ('"' === l) {
+            if (s && l === p) row[i] += l;
+            s = !s;
+        } else if (',' === l && s) l = row[++i] = '';
+        else if ('\n' === l && s) {
+            if ('\r' === p) row[i] = row[i].slice(0, -1);
+            row = ret[++r] = [l = '']; i = 0;
+        } else row[i] += l;
+        p = l;
+    }
+    return ret.filter(r => r.length > 1 || r[0] !== '');
+};
 
 // --- SHARED HELPERS & SUB-COMPONENTS ---
 const Checkbox = ({ label, checked, onChange, disabled, className = '' }) => (
@@ -470,6 +487,8 @@ const AccountTreeView = ({
   const [formData, setFormData] = useState({});
   const [expandedKeys, setExpandedKeys] = useState(new Set());
   const [showContraModal, setShowContraModal] = useState(false);
+  
+  const fileInputRef = useRef(null);
 
   const getParentCode = (node) => {
     if (!node) return '';
@@ -488,8 +507,8 @@ const AccountTreeView = ({
 
     if (selectedNode && (level === 'general' || level === 'subsidiary')) {
       defaults.parentId = selectedNode.id;
-      defaults.type = selectedNode.type;
-      defaults.nature = selectedNode.nature;
+      defaults.type = selectedNode.type || 'permanent';
+      defaults.nature = selectedNode.nature || 'debit';
     }
     setFormData(defaults);
     setMode(`create_${level}`);
@@ -631,6 +650,142 @@ const AccountTreeView = ({
      setExpandedKeys(newSet);
   };
 
+  // --- CSV Import / Export Handlers ---
+  const handleDownloadTemplate = () => {
+     const header = isRtl 
+        ? "کد گروه,عنوان گروه,کد کل,عنوان کل,کد معین,عنوان معین,نوع حساب (دائم/موقت/انتظامی),ماهیت حساب (بدهکار/بستانکار/مهم نیست)\n"
+        : "Group Code,Group Title,General Code,General Title,Subsidiary Code,Subsidiary Title,Account Type,Account Nature\n";
+     const sample = isRtl
+        ? "1,دارایی ها,11,دارایی های جاری,1101,موجودی نقد و بانک,دائم,بدهکار\n"
+        : "1,Assets,11,Current Assets,1101,Cash and Bank,permanent,debit\n";
+     
+     const blob = new Blob(['\ufeff' + header + sample], { type: 'text/csv;charset=utf-8;' }); 
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a');
+     a.href = url;
+     a.download = `ChartOfAccounts_Template_${structure.code}.csv`;
+     a.click();
+     URL.revokeObjectURL(url);
+  };
+
+  const handleImportCSV = async (e) => {
+     const file = e.target.files[0];
+     if (!file) return;
+
+     const reader = new FileReader();
+     reader.onload = async (event) => {
+         const text = event.target.result;
+         const rows = csvToArray(text);
+         if (rows.length < 2) return alert(isRtl ? "فایل فاقد اطلاعات است." : "File is empty.");
+
+         const toInsertGroups = new Map();
+         const toInsertGenerals = new Map();
+         const toInsertSubs = new Map();
+
+         for (let i = 1; i < rows.length; i++) {
+             const row = rows[i];
+             if (!row[0] && !row[2] && !row[4]) continue; 
+
+             const grpFull = row[0] ? row[0].trim() : '';
+             const grpTitle = row[1] ? row[1].trim() : '';
+             const genFull = row[2] ? row[2].trim() : '';
+             const genTitle = row[3] ? row[3].trim() : '';
+             const subFull = row[4] ? row[4].trim() : '';
+             const subTitle = row[5] ? row[5].trim() : '';
+             const rawType = row[6] ? row[6].trim() : '';
+             const rawNature = row[7] ? row[7].trim() : '';
+
+             let type = 'permanent';
+             if (rawType.includes('موقت') || rawType.toLowerCase().includes('temp')) type = 'temporary';
+             if (rawType.includes('انتظامی') || rawType.toLowerCase().includes('disc')) type = 'disciplinary';
+
+             let nature = 'debit';
+             if (rawNature.includes('بستانکار') || rawNature.toLowerCase().includes('cred')) nature = 'credit';
+             if (rawNature.includes('مهم نیست') || rawNature.includes('فاقد') || rawNature.toLowerCase().includes('none')) nature = 'none';
+
+             if (grpFull && grpTitle) {
+                 if (!toInsertGroups.has(grpFull)) {
+                     const code = grpFull; 
+                     toInsertGroups.set(grpFull, { code, full_code: grpFull, title: grpTitle, level: 'group', type, nature });
+                 }
+             }
+
+             if (genFull && genTitle && grpFull) { 
+                 if (!toInsertGenerals.has(genFull)) {
+                     const code = genFull.slice(-structure.generalLen);
+                     toInsertGenerals.set(genFull, { parentFull: grpFull, code, full_code: genFull, title: genTitle, level: 'general', type, nature });
+                 }
+             }
+
+             if (subFull && subTitle && genFull) { 
+                 if (!toInsertSubs.has(subFull)) {
+                     const code = subFull.slice(-structure.subsidiaryLen);
+                     toInsertSubs.set(subFull, { parentFull: genFull, code, full_code: subFull, title: subTitle, level: 'subsidiary', type, nature });
+                 }
+             }
+         }
+
+         try {
+             const { data: existing, error } = await supabase.schema('gl').from('accounts').select('id, full_code, level').eq('structure_id', structure.id);
+             if (error) throw error;
+
+             const existingMap = new Map();
+             existing.forEach(acc => existingMap.set(acc.full_code, acc.id));
+
+             const groupPayloads = [];
+             for (const [full, data] of toInsertGroups.entries()) {
+                 if (!existingMap.has(full)) {
+                     groupPayloads.push({ structure_id: structure.id, code: data.code, full_code: data.full_code, title: data.title, level: data.level, type: data.type, nature: data.nature, is_active: true });
+                 }
+             }
+             if (groupPayloads.length > 0) {
+                 const { data: insertedGroups, error: grpErr } = await supabase.schema('gl').from('accounts').insert(groupPayloads).select();
+                 if (grpErr) throw grpErr;
+                 insertedGroups.forEach(g => existingMap.set(g.full_code, g.id));
+             }
+
+             const generalPayloads = [];
+             for (const [full, data] of toInsertGenerals.entries()) {
+                 if (!existingMap.has(full)) {
+                     const parentId = existingMap.get(data.parentFull);
+                     if (parentId) {
+                         generalPayloads.push({ structure_id: structure.id, parent_id: parentId, code: data.code, full_code: data.full_code, title: data.title, level: data.level, type: data.type, nature: data.nature, is_active: true });
+                     }
+                 }
+             }
+             if (generalPayloads.length > 0) {
+                 const { data: insertedGenerals, error: genErr } = await supabase.schema('gl').from('accounts').insert(generalPayloads).select();
+                 if (genErr) throw genErr;
+                 insertedGenerals.forEach(g => existingMap.set(g.full_code, g.id));
+             }
+
+             const subPayloads = [];
+             for (const [full, data] of toInsertSubs.entries()) {
+                 if (!existingMap.has(full)) {
+                     const parentId = existingMap.get(data.parentFull);
+                     if (parentId) {
+                         subPayloads.push({ structure_id: structure.id, parent_id: parentId, code: data.code, full_code: data.full_code, title: data.title, level: data.level, type: data.type, nature: data.nature, is_active: true });
+                     }
+                 }
+             }
+             if (subPayloads.length > 0) {
+                 const { error: subErr } = await supabase.schema('gl').from('accounts').insert(subPayloads);
+                 if (subErr) throw subErr;
+             }
+
+             alert(isRtl ? "ورود اطلاعات با موفقیت انجام شد." : "Import completed successfully.");
+             fetchTreeData(structure.id);
+
+         } catch (err) {
+             console.error(err);
+             alert(isRtl ? "خطا در پردازش و ورود اطلاعات." : "Error importing data.");
+         }
+     };
+     reader.readAsText(file, 'UTF-8');
+     e.target.value = ''; 
+  };
+
+
   const flattenSubsidiariesWithPaths = (nodes, parentPath = '') => {
      let result = [];
      nodes.forEach(node => {
@@ -680,6 +835,10 @@ const AccountTreeView = ({
              </div>
           </div>
           <div className="flex items-center gap-2">
+             <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleImportCSV} />
+             <Button variant="ghost" size="sm" icon={DownloadCloud} onClick={handleDownloadTemplate} title={isRtl ? "دانلود نمونه فایل اکسل (CSV)" : "Download CSV Template"} />
+             <Button variant="ghost" size="sm" icon={FileSpreadsheet} onClick={() => fileInputRef.current?.click()} title={isRtl ? "ورود اطلاعات از اکسل (CSV)" : "Import CSV"} className="text-emerald-600 hover:bg-emerald-50" />
+             <div className="h-4 w-px bg-slate-200 mx-1"></div>
              <Button variant="primary" size="sm" icon={Plus} onClick={() => handleCreate('group')}>{isRtl ? "گروه حساب جدید" : "New Group"}</Button>
           </div>
        </div>
