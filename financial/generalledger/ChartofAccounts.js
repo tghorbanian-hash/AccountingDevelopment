@@ -66,7 +66,7 @@ const Tabs = ({ tabs, activeTab, onChange }) => (
 
 const AccountForm = ({ 
   formData, setFormData, structure, selectedNode, isRtl, 
-  onOpenContraModal, contraAccountName, currencies 
+  onOpenContraModal, contraAccountName, currencies, treeData 
 }) => {
   const { InputField, SelectField, Button } = window.UI;
 
@@ -75,17 +75,19 @@ const AccountForm = ({
   const isGroup = formData.level === 'group';
 
   let prefix = '';
-  if (!isGroup && selectedNode) {
-     if (formData.id && selectedNode.fullCode) { 
-        const ownCodeLen = formData.code ? formData.code.length : 0;
-        if (ownCodeLen > 0 && formData.fullCode && formData.fullCode.length > ownCodeLen) {
-            prefix = formData.fullCode.substring(0, formData.fullCode.length - ownCodeLen);
+  if (!isGroup) {
+     const findNode = (nodes, id) => {
+        for (const n of nodes) {
+           if (n.id === id) return n;
+           if (n.children) {
+              const f = findNode(n.children, id);
+              if (f) return f;
+           }
         }
-     } else { 
-        prefix = isGeneral 
-          ? (selectedNode.level === 'group' ? selectedNode.code : '') 
-          : (selectedNode.level === 'general' ? selectedNode.fullCode : '');
-     }
+        return null;
+     };
+     const pNode = findNode(treeData, formData.parentId);
+     if (pNode) prefix = pNode.fullCode || pNode.code;
   }
 
   const maxLen = isGroup ? structure.groupLen : (isGeneral ? structure.generalLen : structure.subsidiaryLen);
@@ -212,7 +214,6 @@ const TafsilSelector = ({ formData, setFormData, isRtl, detailTypes }) => {
         </Callout>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
            {detailTypes.map(t => {
-              // Backward compatibility for old string IDs (like 'party', 'costcenter')
               const isSelected = formData.tafsils?.some(x => String(x) === String(t.id) || x === t.code);
               return (
                  <div 
@@ -220,10 +221,9 @@ const TafsilSelector = ({ formData, setFormData, isRtl, detailTypes }) => {
                     onClick={() => {
                        let current = formData.tafsils || [];
                        if (isSelected) {
-                          // Remove both the new int ID and any legacy string codes
                           current = current.filter(x => String(x) !== String(t.id) && x !== t.code);
                        } else {
-                          current = [...current, t.id]; // Save proper int ID
+                          current = [...current, t.id]; 
                        }
                        setFormData(prev => ({...prev, tafsils: current}));
                     }}
@@ -286,6 +286,9 @@ const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onTog
   const color = isGroup ? 'text-indigo-700' : isGeneral ? 'text-slate-700' : 'text-slate-500';
   const icon = isGroup ? <Layers size={14}/> : isGeneral ? <Folder size={14}/> : <FileText size={14}/>;
 
+  // Use fullCode instead of base code for display
+  const displayCode = node.fullCode || node.code;
+
   return (
     <div className="select-none">
       <div 
@@ -315,7 +318,7 @@ const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onTog
         
         <div className={`flex items-center gap-2 truncate flex-1 ${color}`}>
            {icon}
-           <span className="font-mono text-[11px] font-bold bg-white/60 border border-slate-200/50 px-1 rounded">{node.code}</span>
+           <span className="font-mono text-[11px] font-bold bg-white/60 border border-slate-200/50 px-1 rounded">{displayCode}</span>
            <span className="text-[12px] truncate">{node.title}</span>
            {node.isActive === false && <span className="bg-red-100 text-red-600 text-[9px] px-1 rounded">{isRtl ? 'غیرفعال' : 'Inactive'}</span>}
         </div>
@@ -336,7 +339,8 @@ const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onTog
   );
 };
 
-// --- EXTRACTED MAIN COMPONENTS ---
+
+// --- SUB-COMPONENT: STRUCTURE LIST VIEW ---
 
 const StructureList = ({ 
    structures, fetchStructures, isRtl, t, 
@@ -523,11 +527,23 @@ const AccountTreeView = ({
       return alert(isRtl ? `طول کد برای این سطح باید ${requiredLen} کاراکتر باشد.` : `Code length must be ${requiredLen}.`);
     }
 
-    let fullCode = formData.code;
+    let parentFullCode = '';
     if (formData.level !== 'group') {
-      const parentCode = getParentCode(selectedNode);
-      fullCode = parentCode + formData.code;
+       const findNode = (nodes, id) => {
+          for (const n of nodes) {
+             if (n.id === id) return n;
+             if (n.children) {
+                const f = findNode(n.children, id);
+                if (f) return f;
+             }
+          }
+          return null;
+       };
+       const pNode = findNode(treeData, formData.parentId);
+       if (pNode) parentFullCode = pNode.fullCode || pNode.code;
     }
+    
+    let fullCode = formData.level === 'group' ? formData.code : (parentFullCode + formData.code);
 
     const payload = {
        structure_id: structure.id,
@@ -698,7 +714,7 @@ const AccountTreeView = ({
                    <div className="p-6 border-b border-slate-100 flex justify-between items-start shrink-0">
                       <div>
                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="neutral" className="font-mono text-lg px-2">{selectedNode.code}</Badge>
+                            <Badge variant="neutral" className="font-mono text-lg px-2">{selectedNode.fullCode || selectedNode.code}</Badge>
                             <h2 className="text-lg font-bold text-slate-800">{selectedNode.title}</h2>
                          </div>
                          <div className="text-xs text-slate-500">{selectedNode.titleEn}</div>
@@ -796,7 +812,7 @@ const AccountTreeView = ({
                    
                    <div className="p-4 flex-1 overflow-y-auto">
                       <Tabs tabs={activeTabs} activeTab={activeTab} onChange={setActiveTab} />
-                      {activeTab === 'info' && <AccountForm formData={formData} setFormData={setFormData} structure={structure} selectedNode={selectedNode} isRtl={isRtl} currencies={currencies} onOpenContraModal={() => setShowContraModal(true)} contraAccountName={getContraAccountName(formData.contraAccountId)} />}
+                      {activeTab === 'info' && <AccountForm formData={formData} setFormData={setFormData} structure={structure} selectedNode={selectedNode} treeData={treeData} isRtl={isRtl} currencies={currencies} onOpenContraModal={() => setShowContraModal(true)} contraAccountName={getContraAccountName(formData.contraAccountId)} />}
                       {activeTab === 'tafsil' && <TafsilSelector formData={formData} setFormData={setFormData} isRtl={isRtl} detailTypes={detailTypes} />}
                       {activeTab === 'desc' && <StandardDesc formData={formData} setFormData={setFormData} isRtl={isRtl} />}
                    </div>
@@ -835,7 +851,10 @@ const AccountTreeView = ({
 const ChartofAccounts = ({ t, isRtl }) => {
   const checkAccess = (action = null) => {
     if (!window.hasAccess) return false;
-    const variations = ['chart_of_accounts', 'chartofaccounts', 'coa'];
+    const variations = [
+      'chart_of_accounts', 'chartofaccounts', 'coa', 'ChartofAccounts', 
+      'chart_of_account', 'account_structures', 'account_structure', 'accounts'
+    ];
     for (const res of variations) {
        if (window.hasAccess(res, action)) return true;
     }
