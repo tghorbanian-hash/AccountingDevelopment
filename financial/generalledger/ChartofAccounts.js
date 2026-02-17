@@ -488,6 +488,9 @@ const AccountTreeView = ({
   const [expandedKeys, setExpandedKeys] = useState(new Set());
   const [showContraModal, setShowContraModal] = useState(false);
   
+  // Search State
+  const [treeSearchTerm, setTreeSearchTerm] = useState('');
+
   const fileInputRef = useRef(null);
 
   const getParentCode = (node) => {
@@ -817,6 +820,50 @@ const AccountTreeView = ({
       setMode('view');
   };
 
+  // --- Search & Filter Tree Logic ---
+  const filteredTreeData = useMemo(() => {
+      if (!treeSearchTerm) return treeData;
+      const term = treeSearchTerm.toLowerCase();
+
+      const filterNodes = (nodes) => {
+          return nodes.reduce((acc, node) => {
+              const fullCd = node.dynamicFullCode || node.fullCode || node.code;
+              const match = 
+                  (node.code && node.code.toLowerCase().includes(term)) ||
+                  (node.title && node.title.toLowerCase().includes(term)) ||
+                  (fullCd && fullCd.toLowerCase().includes(term));
+
+              let filteredChildren = [];
+              if (node.children && node.children.length > 0) {
+                  filteredChildren = filterNodes(node.children);
+              }
+
+              if (match || filteredChildren.length > 0) {
+                  acc.push({ ...node, children: filteredChildren });
+              }
+              return acc;
+          }, []);
+      };
+
+      return filterNodes(treeData);
+  }, [treeData, treeSearchTerm]);
+
+  // Auto-expand nodes when searching
+  useEffect(() => {
+      if (treeSearchTerm) {
+          const ids = new Set();
+          const extractIds = (nodes) => {
+              nodes.forEach(n => {
+                  ids.add(n.id);
+                  if (n.children && n.children.length > 0) extractIds(n.children);
+              });
+          };
+          extractIds(filteredTreeData);
+          setExpandedKeys(ids);
+      }
+  }, [treeSearchTerm, filteredTreeData]);
+
+
   const activeTabs = formData.level === 'subsidiary' 
       ? [{ id: 'info', label: isRtl ? 'اطلاعات اصلی' : 'General Info', icon: FileText }, { id: 'tafsil', label: isRtl ? 'تفصیل‌ها' : 'Detailed Accts', icon: List }, { id: 'desc', label: isRtl ? 'شرح‌های استاندارد' : 'Descriptions', icon: FileDigit }] 
       : [{ id: 'info', label: isRtl ? 'اطلاعات اصلی' : 'General Info', icon: FileText }];
@@ -845,22 +892,40 @@ const AccountTreeView = ({
 
        <div className="flex-1 flex gap-4 p-4 overflow-hidden bg-slate-100">
           <div className="w-1/3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-             <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                <span className="text-[11px] font-bold text-slate-500 uppercase">{isRtl ? "ساختار درختی" : "Tree Structure"}</span>
-                <div className="flex gap-1">
-                   <Button size="iconSm" variant="ghost" onClick={handleExpandAll} title={isRtl ? "باز کردن همه" : "Expand All"} icon={Maximize2} />
-                   <Button size="iconSm" variant="ghost" onClick={handleCollapseAll} title={isRtl ? "بستن همه" : "Collapse All"} icon={Minimize2} />
-                </div>
+             
+             {/* Tree Header and Search */}
+             <div className="flex flex-col border-b border-slate-100 bg-slate-50/50">
+                 <div className="p-3 flex justify-between items-center">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase">{isRtl ? "ساختار درختی" : "Tree Structure"}</span>
+                    <div className="flex gap-1">
+                       <Button size="iconSm" variant="ghost" onClick={handleExpandAll} title={isRtl ? "باز کردن همه" : "Expand All"} icon={Maximize2} />
+                       <Button size="iconSm" variant="ghost" onClick={handleCollapseAll} title={isRtl ? "بستن همه" : "Collapse All"} icon={Minimize2} />
+                    </div>
+                 </div>
+                 <div className="px-3 pb-3 relative">
+                     <input 
+                         className={`w-full h-8 bg-white border border-slate-200 rounded text-xs outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition-all ${isRtl ? 'pr-8 pl-2' : 'pl-8 pr-2'}`}
+                         placeholder={isRtl ? "جستجو در درخت (کد یا عنوان)..." : "Search in tree..."}
+                         value={treeSearchTerm}
+                         onChange={(e) => setTreeSearchTerm(e.target.value)}
+                     />
+                     <Search size={14} className={`absolute top-2 text-slate-400 ${isRtl ? 'right-5' : 'left-5'}`} />
+                     {treeSearchTerm && <X size={14} className={`absolute top-2 text-slate-400 cursor-pointer hover:text-red-500 ${isRtl ? 'left-5' : 'right-5'}`} onClick={() => setTreeSearchTerm('')} />}
+                 </div>
              </div>
+
+             {/* Tree Content */}
              <div className="flex-1 overflow-y-auto p-2">
-                {treeData.length > 0 ? treeData.map(node => (
+                {filteredTreeData.length > 0 ? filteredTreeData.map(node => (
                    <CustomTreeNode 
                       key={node.id} node={node} level={0} 
                       selectedId={selectedNode?.id} onSelect={handleNodeSelect} 
                       expandedKeys={expandedKeys} onToggle={toggleExpand} isRtl={isRtl} 
                    />
                 )) : (
-                   <div className="text-center text-slate-400 text-xs italic mt-10">{isRtl ? "بدون ساختار" : "No Structure"}</div>
+                   <div className="text-center text-slate-400 text-xs italic mt-10">
+                       {treeSearchTerm ? (isRtl ? "موردی یافت نشد" : "No matches found") : (isRtl ? "بدون ساختار" : "No Structure")}
+                   </div>
                 )}
              </div>
           </div>
