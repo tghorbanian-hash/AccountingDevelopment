@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { 
   BarChart3, Languages, Bell, Search, 
   ChevronRight, LogOut, LayoutGrid, ChevronRightSquare,
-  Menu, Circle
+  Menu, Circle, Book, Code
 } from 'lucide-react';
 
 // --- Pure JS SHA-256 Fallback ---
@@ -119,6 +119,7 @@ const App = () => {
   const translations = window.translations || { en: {}, fa: {} };
   const UI = window.UI || {};
   const { TreeMenu } = UI;
+  const PageDocumentation = window.PageDocumentation; // Load from window
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -134,6 +135,10 @@ const App = () => {
   const [loginData, setLoginData] = useState({ identifier: '', password: '' });
   const [recoveryData, setRecoveryData] = useState({ otp: '', newPass: '', confirmPass: '' });
   const [error, setError] = useState('');
+
+  // Documentation States
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [docType, setDocType] = useState('user'); // 'user' or 'dev'
 
   const t = translations[lang] || {};
   const isRtl = lang === 'fa';
@@ -441,14 +446,21 @@ const App = () => {
     );
   }
 
+  // Handle Documentation Modal
+  const openDocs = (type) => {
+    setDocType(type);
+    setIsDocModalOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-40 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative overflow-x-hidden`}>
+      {/* Sidebar: overflow-visible allowed to show tooltips */}
+      <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-50 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative`}>
         <div className="bg-indigo-700 w-10 h-10 rounded-xl text-white mb-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
           <BarChart3 size={20} strokeWidth={2.5} />
         </div>
         
-        <div className="flex-1 flex flex-col gap-3 items-center w-full px-2 overflow-y-auto no-scrollbar">
+        <div className="flex-1 flex flex-col gap-3 items-center w-full px-2 overflow-y-auto no-scrollbar overflow-x-visible">
           {menuData.map(mod => {
              const isActive = activeModuleId === mod.id;
              const IconComponent = mod.icon || Circle;
@@ -468,10 +480,11 @@ const App = () => {
                   <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>
                 )}
 
+                {/* Tooltip: Positioned with high z-index and absolute positioning outside the container */}
                 <div className={`
                   absolute ${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 
                   bg-slate-900 text-white text-[11px] py-1.5 px-3 rounded-md opacity-0 invisible 
-                  group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-50 shadow-xl font-medium
+                  group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-[100] shadow-xl font-medium pointer-events-none
                 `}>
                   {mod.label ? mod.label[lang] : mod.id}
                   <div className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-[-4px]' : 'left-[-4px]'} w-2 h-2 bg-slate-900 rotate-45`}></div>
@@ -550,6 +563,27 @@ const App = () => {
            </div>
 
            <div className="flex items-center gap-3">
+              {/* Documentation Buttons */}
+              <button 
+                onClick={() => openDocs('user')} 
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors"
+                title={isRtl ? 'راهنمای کاربری' : 'User Guide'}
+              >
+                <Book size={18} />
+              </button>
+              
+              {window.IS_ADMIN && (
+                <button 
+                  onClick={() => openDocs('dev')} 
+                  className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
+                  title={isRtl ? 'مستندات توسعه (فنی)' : 'Developer Docs'}
+                >
+                  <Code size={18} />
+                </button>
+              )}
+              
+              <div className="h-5 w-px bg-slate-200 mx-1"></div>
+
               <div className="relative hidden md:block">
                  <Search size={16} className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} text-slate-400`} />
                  <input 
@@ -571,6 +605,19 @@ const App = () => {
            {renderContent()}
         </div>
       </main>
+
+      {/* Documentation Modal: Loaded from window if available */}
+      {PageDocumentation && (
+        <PageDocumentation 
+          isOpen={isDocModalOpen}
+          onClose={() => setIsDocModalOpen(false)}
+          pageKey={activeId}
+          docType={docType}
+          isAdmin={window.IS_ADMIN}
+          t={t}
+          isRtl={isRtl}
+        />
+      )}
     </div>
   );
 };
