@@ -572,15 +572,14 @@ const App = () => {
                 <Book size={18} />
               </button>
               
-              {window.IS_ADMIN && (
-                <button 
-                  onClick={() => openDocs('dev')} 
-                  className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
-                  title={isRtl ? 'مستندات توسعه (فنی)' : 'Developer Docs'}
-                >
-                  <Code size={18} />
-                </button>
-              )}
+              {/* CHANGE: Always visible now */}
+              <button 
+                onClick={() => openDocs('dev')} 
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
+                title={isRtl ? 'مستندات توسعه (فنی)' : 'Developer Docs'}
+              >
+                <Code size={18} />
+              </button>
               
               <div className="h-5 w-px bg-slate-200 mx-1"></div>
 
