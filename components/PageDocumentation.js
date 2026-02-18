@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Book, FileText, UploadCloud, Trash2, Download, 
-  File, X, AlertCircle 
+  File, AlertCircle, FileSpreadsheet, X
 } from 'lucide-react';
 
 const PageDocumentation = ({ 
   isOpen, onClose, pageKey, docType, 
-  isAdmin, t, isRtl 
+  isAdmin, t, isRtl, userId 
 }) => {
   // دسترسی ایمن به آبجکت UI سراسری
   const UI = window.UI || {};
@@ -95,6 +95,7 @@ const PageDocumentation = ({
         file_path: fileNameInStorage,
         file_name: file.name,
         content_type: file.type,
+        updated_by: userId || null, // ثبت شناسه کاربر آپلود کننده
         updated_at: new Date().toISOString() // استفاده از فرمت استاندارد زمان
       };
 
@@ -172,6 +173,19 @@ const PageDocumentation = ({
     return data.publicUrl;
   };
 
+  // تابع کمکی برای تشخیص آیکون
+  const getFileIcon = (fileName) => {
+      if (!fileName) return <File size={24} />;
+      const ext = fileName.split('.').pop().toLowerCase();
+      
+      if (['xls', 'xlsx', 'csv'].includes(ext)) {
+          // اگر آیکون اکسل موجود بود استفاده کن، وگرنه آیکون فایل معمولی
+          return FileSpreadsheet ? <FileSpreadsheet size={24} /> : <File size={24} />;
+      }
+      if (['pdf'].includes(ext)) return <FileText size={24} />;
+      return <File size={24} />;
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -203,7 +217,7 @@ const PageDocumentation = ({
                 <div className="w-full animate-in fade-in duration-300">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 bg-white rounded-lg border border-slate-200 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
-                       <File size={24} />
+                       {getFileIcon(currentDoc.file_name)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-bold text-slate-800 truncate dir-ltr text-right" title={currentDoc.file_name}>
@@ -220,7 +234,7 @@ const PageDocumentation = ({
                       href={getDownloadUrl(currentDoc.file_path)} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className={`flex-1 flex items-center justify-center gap-2 h-9 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors shadow-sm shadow-indigo-200`}
+                      className="flex-1 flex items-center justify-center gap-2 h-9 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors shadow-sm shadow-indigo-200"
                     >
                       <Download size={14} />
                       {isRtl ? 'دانلود / مشاهده' : 'Download / View'}
@@ -274,7 +288,7 @@ const PageDocumentation = ({
                         file:cursor-pointer hover:file:bg-indigo-100
                         cursor-pointer
                       "
-                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.txt"
                       disabled={uploading}
                    />
                    <Button 
@@ -289,7 +303,7 @@ const PageDocumentation = ({
                 </div>
                 <div className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
                   <AlertCircle size={10} />
-                  {isRtl ? 'فرمت‌های مجاز: PDF, Word, تصویر (حداکثر ۱۰ مگابایت)' : 'Allowed: PDF, Word, Images (Max 10MB)'}
+                  {isRtl ? 'فرمت‌های مجاز: PDF, Word, Excel, تصویر (حداکثر ۱۰ مگابایت)' : 'Allowed: PDF, Word, Excel, Images (Max 10MB)'}
                 </div>
               </div>
             )}
@@ -307,5 +321,8 @@ const PageDocumentation = ({
     </Modal>
   );
 };
+
+// اتصال به آبجکت window جهت دسترسی در app.js
+window.PageDocumentation = PageDocumentation;
 
 export default PageDocumentation;

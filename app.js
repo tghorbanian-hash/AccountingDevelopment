@@ -1,4 +1,7 @@
-/* Filename: app.js */
+{
+type: "file_content",
+fileName: "app.js",
+fullContent: `/* Filename: app.js */
 import React, { useState, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { 
@@ -101,7 +104,7 @@ window.hasAccess = (resource, action = null) => {
   if (!action) {
     if (permissions.has(resStr)) return true;
     for (const p of permissions) {
-      if (p.startsWith(`${resStr}.`)) return true;
+      if (p.startsWith(\`\${resStr}.\`)) return true;
     }
     return false;
   }
@@ -109,8 +112,8 @@ window.hasAccess = (resource, action = null) => {
   // Level 2: Specific Action Check
   const actStr = String(action).trim().toLowerCase();
   
-  if (permissions.has(`${resStr}.${actStr}`)) return true;
-  if (permissions.has(`${resStr}.*`)) return true;
+  if (permissions.has(\`\${resStr}.\${actStr}\`)) return true;
+  if (permissions.has(\`\${resStr}.*\`)) return true;
 
   return false;
 };
@@ -324,7 +327,7 @@ const App = () => {
                 if (Array.isArray(actionsArray)) {
                   actionsArray.forEach(act => {
                     const cleanAct = String(act).trim().toLowerCase();
-                    allowedCodes.add(`${resCode}.${cleanAct}`);
+                    allowedCodes.add(\`\${resCode}.\${cleanAct}\`);
                   });
                 }
               }
@@ -455,7 +458,7 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar: overflow-visible allowed to show tooltips */}
-      <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-50 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative`}>
+      <aside className={\`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-50 border-\${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative\`}>
         <div className="bg-indigo-700 w-10 h-10 rounded-xl text-white mb-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
           <BarChart3 size={20} strokeWidth={2.5} />
         </div>
@@ -467,27 +470,27 @@ const App = () => {
              return (
               <button 
                 key={mod.id} onClick={() => setActiveModuleId(mod.id)}
-                className={`
+                className={\`
                   relative w-10 h-10 rounded-xl transition-all flex items-center justify-center shrink-0 group
-                  ${isActive 
+                  \${isActive 
                     ? 'bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200' 
                     : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}
-                `}
+                \`}
               >
                 <IconComponent size={20} strokeWidth={isActive ? 2 : 1.5} />
                 
                 {isActive && (
-                  <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>
+                  <span className={\`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 \${isRtl ? 'right-1' : 'left-1'}\`}></span>
                 )}
 
                 {/* Tooltip: Positioned with high z-index and absolute positioning outside the container */}
-                <div className={`
-                  absolute ${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 
+                <div className={\`
+                  absolute \${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 
                   bg-slate-900 text-white text-[11px] py-1.5 px-3 rounded-md opacity-0 invisible 
                   group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-[100] shadow-xl font-medium pointer-events-none
-                `}>
+                \`}>
                   {mod.label ? mod.label[lang] : mod.id}
-                  <div className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-[-4px]' : 'left-[-4px]'} w-2 h-2 bg-slate-900 rotate-45`}></div>
+                  <div className={\`absolute top-1/2 -translate-y-1/2 \${isRtl ? 'right-[-4px]' : 'left-[-4px]'} w-2 h-2 bg-slate-900 rotate-45\`}></div>
                 </div>
               </button>
             );
@@ -505,11 +508,11 @@ const App = () => {
         </div>
       </aside>
 
-      <aside className={`
-        bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 
+      <aside className={\`
+        bg-white border-\${isRtl ? 'l' : 'r'} border-slate-200 
         flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)]
-        ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}
-      `}>
+        \${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}
+      \`}>
         <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 bg-slate-50/30">
            <h2 className="text-sm font-black text-slate-800 truncate leading-tight">
              {currentModule.label ? currentModule.label[lang] : 'Menu'}
@@ -557,7 +560,7 @@ const App = () => {
              
              <div className="flex items-center gap-2 text-sm">
                 <span className="text-slate-400 font-medium hidden sm:inline">{currentModule.label ? currentModule.label[lang] : ''}</span>
-                <ChevronRight size={14} className={`text-slate-300 hidden sm:inline ${isRtl ? 'rotate-180' : ''}`} />
+                <ChevronRight size={14} className={\`text-slate-300 hidden sm:inline \${isRtl ? 'rotate-180' : ''}\`} />
                 <span className="text-slate-800 font-bold">{activeId === 'user_profile' ? (t.profileTitle || 'User Profile') : activeId}</span>
              </div>
            </div>
@@ -585,13 +588,13 @@ const App = () => {
               <div className="h-5 w-px bg-slate-200 mx-1"></div>
 
               <div className="relative hidden md:block">
-                 <Search size={16} className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} text-slate-400`} />
+                 <Search size={16} className={\`absolute top-1/2 -translate-y-1/2 \${isRtl ? 'right-3' : 'left-3'} text-slate-400\`} />
                  <input 
                     placeholder={t.searchMenu || 'Search...'}
-                    className={`
+                    className={\`
                        h-9 bg-slate-100 border-none rounded-full text-xs w-56 focus:w-72 transition-all
-                       ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} focus:ring-2 focus:ring-indigo-100 outline-none
-                    `}
+                       \${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} focus:ring-2 focus:ring-indigo-100 outline-none
+                    \`}
                  />
               </div>
               <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors relative">
@@ -616,6 +619,7 @@ const App = () => {
           isAdmin={window.IS_ADMIN}
           t={t}
           isRtl={isRtl}
+          userId={currentUser?.id}
         />
       )}
     </div>
@@ -624,3 +628,5 @@ const App = () => {
 
 const root = createRoot(document.getElementById('root'));
 root.render(<App />);
+`
+}
