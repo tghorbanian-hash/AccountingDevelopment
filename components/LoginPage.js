@@ -40,7 +40,6 @@ const LoginPage = ({
          return;
       }
       
-      // Fix: Use chain .schema().rpc() instead of options
       const { error: resetErr } = await supabase.schema('gen').rpc('reset_user_password', {
          p_user_id: userData.id,
          p_new_password: resetData.newPassword
@@ -64,8 +63,8 @@ const LoginPage = ({
   const getHeaderTitle = () => {
     switch (authView) {
       case 'login': return t.loginTitle || (isRtl ? 'ورود به سیستم' : 'System Login');
-      case 'forgot-identify': return t.forgotPassword || (isRtl ? 'فراموشی کلمه عبور' : 'Forgot Password');
       case 'forgot-choice': return t.recoveryMethod || (isRtl ? 'روش بازیابی' : 'Recovery Method');
+      case 'forgot-identify': return t.forgotPassword || (isRtl ? 'فراموشی کلمه عبور' : 'Forgot Password');
       case 'otp': return t.enterOtp || (isRtl ? 'تایید کد' : 'Verify OTP');
       case 'email-sent': return t.emailSent || (isRtl ? 'ایمیل ارسال شد' : 'Email Sent');
       case 'reset': return t.resetPassword || (isRtl ? 'تغییر کلمه عبور' : 'Reset Password');
@@ -165,18 +164,12 @@ const LoginPage = ({
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5 px-1">
-                    <label className="block text-xs font-bold text-slate-700">
-                      {t.password || (isRtl ? 'کلمه عبور' : 'Password')}
-                    </label>
-                    <button 
-                      type="button" 
-                      onClick={() => setAuthView('forgot-identify')}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-                    >
-                      {t.forgotPasswordLink || (isRtl ? 'رمز عبور را فراموش کرده‌اید؟' : 'Forgot password?')}
-                    </button>
-                  </div>
+                  {/* لیبل پسورد - بدون دکمه فراموشی */}
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 ml-1">
+                    {t.password || (isRtl ? 'کلمه عبور' : 'Password')}
+                  </label>
+                  
+                  {/* فیلد ورودی پسورد */}
                   <div className="relative">
                     <input
                       type="password"
@@ -187,6 +180,17 @@ const LoginPage = ({
                       placeholder="••••••••"
                     />
                     <Lock size={18} className="absolute top-3.5 left-3.5 text-slate-400" />
+                  </div>
+
+                  {/* دکمه فراموشی رمز عبور - منتقل شده به زیر فیلد پسورد */}
+                  <div className="flex justify-end mt-2 px-1">
+                    <button 
+                      type="button" 
+                      onClick={() => setAuthView('forgot-identify')}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                    >
+                      {t.forgotPasswordLink || (isRtl ? 'رمز عبور را فراموش کرده‌اید؟' : 'Forgot password?')}
+                    </button>
                   </div>
                 </div>
               </div>
