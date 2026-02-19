@@ -118,11 +118,6 @@ const AccountForm = ({
   }
 
   const maxLen = isGroup ? structure.groupLen : (isGeneral ? structure.generalLen : structure.subsidiaryLen);
-  
-  // Checking if mode is auto to disable manual input if needed (optional UX improvement)
-  const isModeAuto = (isGroup && structure.groupMode === 'auto') || 
-                     (isGeneral && structure.generalMode === 'auto') || 
-                     (isSubsidiary && structure.subsidiaryMode === 'auto');
 
   return (
     <div className="flex flex-col h-full">
@@ -141,19 +136,17 @@ const AccountForm = ({
                   const val = e.target.value;
                   if (val.length <= maxLen) setFormData(prev => ({...prev, code: val}));
                 }}
-                disabled={isModeAuto && !formData.id} // Disable input if auto-generated and new
                 className={`
                   flex-1 ${window.UI.THEME.colors.surface} border ${window.UI.THEME.colors.border}
                   ${prefix ? 'rounded-r border-l-0' : 'rounded'} h-8 px-2 outline-none
                   focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
-                  text-sm font-mono ${isModeAuto && !formData.id ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}
+                  text-sm font-mono
                 `}
-                placeholder={isModeAuto && !formData.id ? (isRtl ? "تولید خودکار..." : "Auto-generated...") : "0".repeat(maxLen)}
+                placeholder={"0".repeat(maxLen)}
              />
            </div>
-           <div className="text-[10px] text-slate-400 mt-1 flex justify-between flex-row-reverse">
-             <span>{isRtl ? `تعداد ارقام مجاز: ${maxLen}` : `Max digits: ${maxLen}`}</span>
-             {isModeAuto && !formData.id && <span className="text-indigo-500 font-bold">{isRtl ? "تولید خودکار فعال است" : "Auto-generation active"}</span>}
+           <div className="text-[10px] text-slate-400 mt-1 text-right">
+             {isRtl ? `تعداد ارقام مجاز: ${maxLen}` : `Max digits: ${maxLen}`}
            </div>
         </div>
 
@@ -385,16 +378,13 @@ const StructureList = ({
    canCreate, canEdit, canDelete, canDesign, 
    supabase, onOpenTree 
 }) => {
-  const { InputField, SelectField, Button, DataGrid, Modal, Badge, FilterSection } = window.UI;
+  const { InputField, Button, DataGrid, Modal, Badge, FilterSection } = window.UI;
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({ 
       code: '', title: '', status: true, 
-      groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false,
-      groupMode: 'manual', groupLastCode: '',
-      generalMode: 'auto', generalLastCode: '',
-      subsidiaryMode: 'auto', subsidiaryLastCode: ''
+      groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false
   });
 
   const handleEdit = (row) => {
@@ -409,10 +399,7 @@ const StructureList = ({
     setEditingItem(null);
     setFormData({ 
         code: '', title: '', status: true, 
-        groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false,
-        groupMode: 'manual', groupLastCode: '',
-        generalMode: 'auto', generalLastCode: '',
-        subsidiaryMode: 'auto', subsidiaryLastCode: ''
+        groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false
     });
     setShowModal(true);
   };
@@ -422,10 +409,7 @@ const StructureList = ({
     try {
        const payload = {
           code: formData.code, title: formData.title, status: formData.status,
-          group_len: formData.groupLen, general_len: formData.generalLen, subsidiary_len: formData.subsidiaryLen, use_char: formData.useChar,
-          group_mode: formData.groupMode, group_last_code: formData.groupLastCode,
-          general_mode: formData.generalMode, general_last_code: formData.generalLastCode,
-          subsidiary_mode: formData.subsidiaryMode, subsidiary_last_code: formData.subsidiaryLastCode
+          group_len: formData.groupLen, general_len: formData.generalLen, subsidiary_len: formData.subsidiaryLen, use_char: formData.useChar
        };
 
        if (editingItem) {
@@ -492,53 +476,13 @@ const StructureList = ({
             
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-4">
                <h4 className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2">
-                 <Layers size={14}/> {isRtl ? "تنظیمات طول و کدگذاری حساب‌ها" : "Length and Numbering Settings"}
+                 <Layers size={14}/> {isRtl ? "تنظیمات طول کدگذاری حساب‌ها" : "Length Settings"}
                </h4>
 
-               <div className="grid grid-cols-4 gap-4 text-[10px] font-bold text-slate-500 border-b border-slate-200 pb-2">
-                  <div>{isRtl ? "سطح حساب" : "Account Level"}</div>
-                  <div>{isRtl ? "طول کد" : "Length"}</div>
-                  <div>{isRtl ? "نحوه تولید" : "Generation Mode"}</div>
-                  <div>{isRtl ? "آخرین کد ایجاد شده" : "Last Generated Code"}</div>
-               </div>
-
-               {/* Group Level */}
-               <div className="grid grid-cols-4 gap-4 items-center">
-                  <div className="text-sm font-medium text-slate-700">{isRtl ? "گروه" : "Group"}</div>
-                  <InputField type="number" min="1" max="10" value={formData.groupLen} onChange={e => setFormData({...formData, groupLen: parseInt(e.target.value)})} isRtl={isRtl} />
-                  <SelectField value={formData.groupMode} onChange={e => setFormData({...formData, groupMode: e.target.value})} isRtl={isRtl}>
-                     <option value="auto">{t.an_mode_auto || (isRtl ? "اتوماتیک" : "Automatic")}</option>
-                     <option value="manual">{t.an_mode_manual || (isRtl ? "دستی" : "Manual")}</option>
-                  </SelectField>
-                  <div className="bg-white px-3 py-2 border border-slate-200 rounded-md font-mono text-sm shadow-inner text-slate-600 h-[38px] flex items-center">
-                     {formData.groupLastCode || '-'}
-                  </div>
-               </div>
-
-               {/* General Level */}
-               <div className="grid grid-cols-4 gap-4 items-center">
-                  <div className="text-sm font-medium text-slate-700">{isRtl ? "کل" : "General"}</div>
-                  <InputField type="number" min="1" max="10" value={formData.generalLen} onChange={e => setFormData({...formData, generalLen: parseInt(e.target.value)})} isRtl={isRtl} />
-                  <SelectField value={formData.generalMode} onChange={e => setFormData({...formData, generalMode: e.target.value})} isRtl={isRtl}>
-                     <option value="auto">{t.an_mode_auto || (isRtl ? "اتوماتیک" : "Automatic")}</option>
-                     <option value="manual">{t.an_mode_manual || (isRtl ? "دستی" : "Manual")}</option>
-                  </SelectField>
-                  <div className="bg-white px-3 py-2 border border-slate-200 rounded-md font-mono text-sm shadow-inner text-slate-600 h-[38px] flex items-center">
-                     {formData.generalLastCode || '-'}
-                  </div>
-               </div>
-
-               {/* Subsidiary Level */}
-               <div className="grid grid-cols-4 gap-4 items-center">
-                  <div className="text-sm font-medium text-slate-700">{isRtl ? "معین" : "Subsidiary"}</div>
-                  <InputField type="number" min="1" max="10" value={formData.subsidiaryLen} onChange={e => setFormData({...formData, subsidiaryLen: parseInt(e.target.value)})} isRtl={isRtl} />
-                  <SelectField value={formData.subsidiaryMode} onChange={e => setFormData({...formData, subsidiaryMode: e.target.value})} isRtl={isRtl}>
-                     <option value="auto">{t.an_mode_auto || (isRtl ? "اتوماتیک" : "Automatic")}</option>
-                     <option value="manual">{t.an_mode_manual || (isRtl ? "دستی" : "Manual")}</option>
-                  </SelectField>
-                  <div className="bg-white px-3 py-2 border border-slate-200 rounded-md font-mono text-sm shadow-inner text-slate-600 h-[38px] flex items-center">
-                     {formData.subsidiaryLastCode || '-'}
-                  </div>
+               <div className="grid grid-cols-3 gap-4">
+                  <InputField type="number" min="1" max="10" label={isRtl ? "طول کد گروه" : "Group Length"} value={formData.groupLen} onChange={e => setFormData({...formData, groupLen: parseInt(e.target.value)})} isRtl={isRtl} />
+                  <InputField type="number" min="1" max="10" label={isRtl ? "طول کد کل" : "General Length"} value={formData.generalLen} onChange={e => setFormData({...formData, generalLen: parseInt(e.target.value)})} isRtl={isRtl} />
+                  <InputField type="number" min="1" max="10" label={isRtl ? "طول کد معین" : "Sub Length"} value={formData.subsidiaryLen} onChange={e => setFormData({...formData, subsidiaryLen: parseInt(e.target.value)})} isRtl={isRtl} />
                </div>
 
                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
@@ -583,15 +527,6 @@ const AccountTreeView = ({
     return '';
   };
 
-  // --- AUTO GENERATION LOGIC HELPER ---
-  const generateNextCode = (lastCode, length) => {
-      if (!lastCode || isNaN(parseInt(lastCode, 10))) {
-          return "1".padStart(length, "0");
-      }
-      const nextNum = parseInt(lastCode, 10) + 1;
-      return nextNum.toString().padStart(length, "0");
-  };
-
   const handleCreate = (level) => {
     if (level !== 'group' && !selectedNode) return;
     
@@ -604,15 +539,6 @@ const AccountTreeView = ({
       defaults.parentId = selectedNode.id;
       defaults.type = selectedNode.type || 'permanent';
       defaults.nature = selectedNode.nature || 'debit';
-    }
-
-    // Assign automatically generated code based on Structure Settings
-    if (level === 'group' && structure.groupMode === 'auto') {
-        defaults.code = generateNextCode(structure.groupLastCode, structure.groupLen);
-    } else if (level === 'general' && structure.generalMode === 'auto') {
-        defaults.code = generateNextCode(structure.generalLastCode, structure.generalLen);
-    } else if (level === 'subsidiary' && structure.subsidiaryMode === 'auto') {
-        defaults.code = generateNextCode(structure.subsidiaryLastCode, structure.subsidiaryLen);
     }
 
     setFormData(defaults);
@@ -697,7 +623,6 @@ const AccountTreeView = ({
 
     try {
         let targetNodeId = formData.id;
-        let isNewRecord = false;
 
         if (mode === 'edit') {
             await supabase.schema('gl').from('accounts').update(payload).eq('id', formData.id);
@@ -706,28 +631,6 @@ const AccountTreeView = ({
             if(error) throw error;
             if(data && data.length > 0) {
                 targetNodeId = data[0].id;
-                isNewRecord = true;
-            }
-        }
-
-        // --- UPDATE STRUCTURE'S LAST CODE IN DB ---
-        if (isNewRecord) {
-            const updates = {};
-            if (formData.level === 'group' && structure.groupMode === 'auto') {
-                updates.group_last_code = formData.code;
-                structure.groupLastCode = formData.code; 
-            }
-            if (formData.level === 'general' && structure.generalMode === 'auto') {
-                updates.general_last_code = formData.code;
-                structure.generalLastCode = formData.code;
-            }
-            if (formData.level === 'subsidiary' && structure.subsidiaryMode === 'auto') {
-                updates.subsidiary_last_code = formData.code;
-                structure.subsidiaryLastCode = formData.code;
-            }
-
-            if (Object.keys(updates).length > 0) {
-                await supabase.schema('gl').from('account_structures').update(updates).eq('id', structure.id);
             }
         }
 
@@ -1269,13 +1172,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
          groupLen: item.group_len,
          generalLen: item.general_len,
          subsidiaryLen: item.subsidiary_len,
-         useChar: item.use_char,
-         groupMode: item.group_mode || 'manual',
-         groupLastCode: item.group_last_code || '',
-         generalMode: item.general_mode || 'auto',
-         generalLastCode: item.general_last_code || '',
-         subsidiaryMode: item.subsidiary_mode || 'auto',
-         subsidiaryLastCode: item.subsidiary_last_code || ''
+         useChar: item.use_char
       })));
     } catch (err) {
       console.error('Error fetching structures:', err);
