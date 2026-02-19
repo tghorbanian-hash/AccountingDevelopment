@@ -9,7 +9,7 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  MapPin, Search, Plus, Edit, Trash2, Save, CheckCircle2, Ban 
+  MapPin, Search, Plus, Edit, Trash2, Save, CheckCircle2, Ban, Link2
 } from 'lucide-react';
 
 const Branches = ({ t, isRtl }) => {
@@ -33,6 +33,9 @@ const Branches = ({ t, isRtl }) => {
   const canCreate = checkAccess('create') || checkAccess('new') || checkAccess('add') || checkAccess('insert');
   const canEdit   = checkAccess('edit') || checkAccess('update') || checkAccess('modify');
   const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
+  
+  // Custom Action Permission
+  const canAssignDetail = checkAccess('assign_detail') || checkAccess('assigndetail');
 
   // --- States ---
   const [data, setData] = useState([]);
@@ -41,6 +44,11 @@ const Branches = ({ t, isRtl }) => {
   const [currentRecord, setCurrentRecord] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [formData, setFormData] = useState({});
+
+  // Detail Code Assignment Modal States
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [targetForDetail, setTargetForDetail] = useState(null);
+  const [detailCodeInput, setDetailCodeInput] = useState('');
 
   // --- Effects ---
   useEffect(() => {
@@ -62,14 +70,28 @@ const Branches = ({ t, isRtl }) => {
 
       if (error) throw error;
 
-      const mappedData = (branchesData || []).map(item => ({
-        id: item.id,
-        code: item.code,
-        title: item.title,
-        address: item.address || '',
-        active: item.is_active,
-        isDefault: item.is_default
-      }));
+      // Fetch detail instances for branches to map detail codes
+      const { data: detailsData, error: dErr } = await supabase
+        .schema('gl')
+        .from('detail_instances')
+        .select('*')
+        .eq('ref_entity_name', 'gen.branches');
+
+      if (dErr) throw dErr;
+
+      const mappedData = (branchesData || []).map(item => {
+        const detailInst = (detailsData || []).find(d => d.entity_code === item.code);
+        return {
+          id: item.id,
+          code: item.code,
+          title: item.title,
+          address: item.address || '',
+          active: item.is_active,
+          isDefault: item.is_default,
+          detailCode: detailInst ? detailInst.detail_code : null,
+          detailInstanceId: detailInst ? detailInst.id : null
+        };
+      });
       
       setData(mappedData);
     } catch (err) {
@@ -94,7 +116,6 @@ const Branches = ({ t, isRtl }) => {
     }
 
     try {
-      // Safely update default statuses if this one is set to default
       if (formData.isDefault) {
         const { error: defErr } = await supabase
           .schema('gen')
@@ -203,6 +224,90 @@ const Branches = ({ t, isRtl }) => {
     }
   };
 
+  // --- Detail Code Handlers ---
+  const handleOpenDetailModal = async (row) => {
+    if (!canAssignDetail) {
+       alert(isRtl ? 'دسترسی غیرمجاز برای تخصیص کد تفصیل' : 'Access Denied for Detail Code Assignment');
+       return;
+    }
+    setTargetForDetail(row);
+    
+    if (row.detailCode) {
+      setDetailCodeInput(row.detailCode);
+    } else {
+      try {
+         const { data, error } = await supabase.schema('gl').from('detail_types').select('*').eq('code', 'sys_branch').single();
+         if (data) {
+             const lastCode = data.last_code;
+             const startCode = data.start_code;
+             const length = data.numbering_length || 3;
+             
+             let nextNum;
+             if (lastCode && !isNaN(parseInt(lastCode, 10))) {
+                 nextNum = parseInt(lastCode, 10) + 1;
+             } else if (startCode && !isNaN(parseInt(startCode, 10))) {
+                 nextNum = parseInt(startCode, 10);
+             } else {
+                 nextNum = 1;
+             }
+             
+             setDetailCodeInput(nextNum.toString().padStart(length, '0'));
+         } else {
+             setDetailCodeInput('');
+         }
+      } catch (err) {
+         console.error('Error fetching detail type numbering:', err);
+         setDetailCodeInput('');
+      }
+    }
+    setIsDetailModalOpen(true);
+  };
+
+  const handleSaveDetailCode = async () => {
+    if (!canAssignDetail) {
+       alert(isRtl ? 'دسترسی غیرمجاز' : 'Access Denied');
+       return;
+    }
+    if (!targetForDetail) return;
+
+    const codeValue = detailCodeInput || null;
+
+    try {
+      if (targetForDetail.detailInstanceId) {
+        const { error } = await supabase
+          .schema('gl')
+          .from('detail_instances')
+          .update({ detail_code: codeValue, title: targetForDetail.title })
+          .eq('id', targetForDetail.detailInstanceId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .schema('gl')
+          .from('detail_instances')
+          .insert([{
+            detail_type_code: 'sys_branch',
+            entity_code: targetForDetail.code,
+            title: targetForDetail.title,
+            detail_code: codeValue,
+            ref_entity_name: 'gen.branches'
+          }]);
+
+        if (error) throw error;
+      }
+
+      if (codeValue && !targetForDetail.detailCode) {
+          await supabase.schema('gl').from('detail_types').update({ last_code: codeValue }).eq('code', 'sys_branch');
+      }
+
+      setIsDetailModalOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error('Error assigning detail code:', err);
+      alert(isRtl ? 'خطا در تخصیص کد تفصیل' : 'Error assigning detail code');
+    }
+  };
+
   // --- Filter Data ---
   const filteredData = useMemo(() => {
     return data.filter(item => {
@@ -249,6 +354,33 @@ const Branches = ({ t, isRtl }) => {
     { field: 'code', header: t.br_code || (isRtl ? 'کد' : 'Code'), width: 'w-24', sortable: true },
     { field: 'title', header: t.br_title_field || (isRtl ? 'عنوان شعبه' : 'Branch Title'), width: 'w-48', sortable: true },
     { field: 'address', header: t.br_addr || (isRtl ? 'آدرس' : 'Address'), width: 'w-64' },
+    { 
+      field: 'detailCode', 
+      header: t.detail_code || (isRtl ? 'کد تفصیل' : 'Detail Code'), 
+      width: 'w-40',
+      render: (row) => row.detailCode ? (
+        <button 
+           onClick={() => canAssignDetail ? handleOpenDetailModal(row) : alert(isRtl ? 'عدم دسترسی به تخصیص تفصیل' : 'Access Denied')} 
+           className={`flex items-center gap-2 ${canAssignDetail ? 'group cursor-pointer' : 'cursor-default opacity-80'}`}
+           title={canAssignDetail ? (isRtl ? 'ویرایش کد تفصیل' : 'Edit Detail Code') : ''}
+        >
+           <Badge variant="success" className="font-mono transition-colors group-hover:bg-emerald-100">{row.detailCode}</Badge>
+           {canAssignDetail && <Edit size={12} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"/>}
+        </button>
+      ) : (
+        <button 
+           onClick={() => canAssignDetail ? handleOpenDetailModal(row) : alert(isRtl ? 'عدم دسترسی به تخصیص تفصیل' : 'Access Denied')} 
+           className={`flex items-center gap-2 ${canAssignDetail ? 'cursor-pointer' : 'cursor-default opacity-60'}`}
+        >
+           <Badge variant="danger">{t.detail_not_assigned || (isRtl ? 'تخصیص نیافته' : 'Not Assigned')}</Badge>
+           {canAssignDetail && (
+             <span className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                <Link2 size={12}/> {t.detail_assign_btn || (isRtl ? 'تخصیص' : 'Assign')}
+             </span>
+           )}
+        </button>
+      )
+    },
     { 
        field: 'isDefault', 
        header: t.br_default || (isRtl ? 'پیش‌فرض' : 'Default'), 
@@ -369,6 +501,36 @@ const Branches = ({ t, isRtl }) => {
               </div>
            </div>
         </div>
+      </Modal>
+
+      {/* Detail Code Assignment Modal */}
+      <Modal 
+        isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)}
+        title={t.detail_assign_btn || (isRtl ? 'تخصیص کد تفصیل' : 'Assign Detail Code')}
+        size="sm"
+        footer={
+           <>
+             <Button variant="ghost" onClick={() => setIsDetailModalOpen(false)}>{t.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button>
+             <Button variant="primary" onClick={handleSaveDetailCode}>{t.btn_save || (isRtl ? 'ذخیره' : 'Save')}</Button>
+           </>
+        }
+      >
+         <div className="p-2 space-y-3">
+            <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg leading-relaxed font-medium">
+               {isRtl 
+                 ? `در حال تخصیص کد تفصیلی به: ${targetForDetail?.title}` 
+                 : `Assigning detail code for: ${targetForDetail?.title}`}
+            </div>
+            <InputField 
+               label={t.detail_code || (isRtl ? 'کد تفصیل' : 'Detail Code')} 
+               value={detailCodeInput} 
+               onChange={(e) => setDetailCodeInput(e.target.value)} 
+               isRtl={isRtl}
+               className="dir-ltr text-center font-bold text-lg tracking-wider"
+               placeholder="Example: 101"
+               autoFocus
+            />
+         </div>
       </Modal>
     </div>
   );
