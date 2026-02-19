@@ -29,14 +29,7 @@ const AutoNumbering = ({ t, isRtl }) => {
     { id: 'sys_item', title: t.sys_item, length: 8, startCode: '10000001', endCode: '99999999', lastCode: '10004500' },
   ];
 
-  // 2. Account Settings
-  const INITIAL_ACCOUNTS = {
-    group: { length: 1, mode: 'manual', startCode: '1', endCode: '9', lastCode: '4' },
-    general: { length: 2, mode: 'auto', startCode: '01', endCode: '99', lastCode: '12' },
-    subsidiary: { length: 4, mode: 'auto', startCode: '0001', endCode: '9999', lastCode: '0150' },
-  };
-
-  // 3. Document Settings
+  // 2. Document Settings
   const INITIAL_DOCS = [
     { id: 101, title: isRtl ? 'دفتر کل مرکزی' : 'Main General Ledger', resetYear: true, uniquenessScope: 'ledger' },
     { id: 102, title: isRtl ? 'دفتر کل ارزی' : 'Currency Ledger', resetYear: false, uniquenessScope: 'branch' },
@@ -51,9 +44,6 @@ const AutoNumbering = ({ t, isRtl }) => {
   const [editingDetail, setEditingDetail] = useState(null);
   const [detailFormData, setDetailFormData] = useState({});
   const [showDetailModal, setShowDetailModal] = useState(false);
-
-  // Accounts State
-  const [accSettings, setAccSettings] = useState(INITIAL_ACCOUNTS);
 
   // Docs State
   const [docSettings, setDocSettings] = useState(INITIAL_DOCS);
@@ -96,13 +86,6 @@ const AutoNumbering = ({ t, isRtl }) => {
     setShowDetailModal(false);
   };
 
-  // --- Handlers: Accounts ---
-  const updateAccSetting = (level, field, value) => {
-    setAccSettings(prev => ({
-      ...prev,
-      [level]: { ...prev[level], [field]: value }
-    }));
-  };
 
   // --- Handlers: Docs ---
   const openDocModal = (item) => {
@@ -172,52 +155,6 @@ const AutoNumbering = ({ t, isRtl }) => {
        </Modal>
     </div>
   );
-
-  const renderAccountsTab = () => {
-    const Card = ({ title, data, level, icon: Icon }) => (
-       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
-          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-             <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <Icon size={16} />
-             </div>
-             <div className="font-bold text-sm text-slate-700">{title}</div>
-          </div>
-          <div className="space-y-4">
-             <div className="grid grid-cols-2 gap-2">
-                <InputField label={t.an_acc_len} type="number" size="sm" value={data.length} onChange={e => updateAccSetting(level, 'length', e.target.value)} isRtl={isRtl} />
-                <SelectField label={t.an_mode} size="sm" value={data.mode} onChange={e => updateAccSetting(level, 'mode', e.target.value)} isRtl={isRtl}>
-                   <option value="auto">{t.an_mode_auto}</option>
-                   <option value="manual">{t.an_mode_manual}</option>
-                </SelectField>
-             </div>
-             <div className="grid grid-cols-2 gap-2">
-                <InputField label={t.an_dt_start} size="sm" value={data.startCode} onChange={e => updateAccSetting(level, 'startCode', e.target.value)} isRtl={isRtl} />
-                <InputField label={t.an_dt_end} size="sm" value={data.endCode} onChange={e => updateAccSetting(level, 'endCode', e.target.value)} isRtl={isRtl} />
-             </div>
-             <div className="bg-slate-50 p-2 rounded text-[11px] text-slate-500 flex justify-between items-center border border-slate-100">
-                <span>{t.an_dt_last}:</span>
-                <span className="font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded shadow-sm border">{data.lastCode}</span>
-             </div>
-          </div>
-       </div>
-    );
-
-    return (
-       <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500">
-           <div className="flex-1 overflow-auto">
-             {/* All 3 cards in one row */}
-             <div className="grid grid-cols-3 gap-4 pb-6">
-                <Card title={t.an_acc_group} data={accSettings.group} level="group" icon={Layers} />
-                <Card title={t.an_acc_general} data={accSettings.general} level="general" icon={Box} />
-                <Card title={t.an_acc_subsidiary} data={accSettings.subsidiary} level="subsidiary" icon={FileDigit} />
-             </div>
-             <div className="flex justify-end pt-4 border-t border-slate-200">
-                 <Button variant="primary" size="lg" icon={Save} onClick={() => alert(t.save_success)}>{t.btn_save}</Button>
-             </div>
-           </div>
-       </div>
-    );
-  };
 
   const renderDocsTab = () => (
     <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -300,7 +237,6 @@ const AutoNumbering = ({ t, isRtl }) => {
 
   const tabs = [
     { id: 'details', icon: Hash, label: t.an_tab_details },
-    { id: 'accounts', icon: FileDigit, label: t.an_tab_accounts },
     { id: 'docs', icon: Settings, label: t.an_tab_docs },
   ];
 
@@ -328,7 +264,6 @@ const AutoNumbering = ({ t, isRtl }) => {
         {/* Content Area */}
         <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 overflow-hidden flex flex-col">
           {activeTab === 'details' && renderDetailsTab()}
-          {activeTab === 'accounts' && renderAccountsTab()}
           {activeTab === 'docs' && renderDocsTab()}
         </div>
       </div>
