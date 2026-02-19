@@ -74,19 +74,24 @@ const Details = ({ t, isRtl }) => {
           detailCode: d.detail_code 
         })));
       } else {
-        // System Types Mapping
+        // System Types Mapping - هوشمندسازی شده
         let tableName, schemaName = 'gen', titleField = 'title', codeField = 'code', statusField = 'is_active', hasDetailCodeCol = false;
         
-        switch (typeObj.code) {
-          case 'sys_cost_center': tableName = 'cost_centers'; hasDetailCodeCol = true; break;
-          case 'sys_project': tableName = 'projects'; titleField = 'name'; hasDetailCodeCol = true; break;
-          case 'sys_partner': tableName = 'parties'; titleField = 'name'; break;
-          case 'sys_branch': tableName = 'branches'; break;
-          default: 
-            // Fallback for unknown system types
-            const { data: fbData } = await supabase.schema('gl').from('detail_instances').select('*').eq('detail_type_code', typeObj.code);
-            setCurrentInstances((fbData || []).map(d => ({ id: d.id, entityCode: d.entity_code || '-', title: d.title, status: d.status !== false, detailCode: d.detail_code })));
-            return;
+        const tCode = (typeObj.code || '').toLowerCase();
+        
+        if (tCode.includes('cost_center') || tCode.includes('costcenter')) {
+          tableName = 'cost_centers'; hasDetailCodeCol = true; 
+        } else if (tCode.includes('project')) {
+          tableName = 'projects'; titleField = 'name'; hasDetailCodeCol = true; 
+        } else if (tCode.includes('partner') || tCode.includes('person') || tCode.includes('part')) {
+          tableName = 'parties'; titleField = 'name'; 
+        } else if (tCode.includes('branch')) {
+          tableName = 'branches'; 
+        } else {
+          // Fallback for unknown system types
+          const { data: fbData } = await supabase.schema('gl').from('detail_instances').select('*').eq('detail_type_code', typeObj.code);
+          setCurrentInstances((fbData || []).map(d => ({ id: d.id, entityCode: d.entity_code || '-', title: d.title, status: d.status !== false, detailCode: d.detail_code })));
+          return;
         }
 
         const { data: entityData, error: eErr } = await supabase.schema(schemaName).from(tableName).select('*');
@@ -115,7 +120,7 @@ const Details = ({ t, isRtl }) => {
           return {
             id: item.id, 
             entityCode: item[codeField],
-            title: item[titleField] || item.name,
+            title: item[titleField] || item.name || 'بدون عنوان',
             status: item[statusField] !== false,
             detailCode: dCode,
             detailInstanceId: instId, 
@@ -219,7 +224,6 @@ const Details = ({ t, isRtl }) => {
       // Update AutoNumbering last_code
       if (newDetailCode && (!assigningItem || !assigningItem.detailCode)) {
         await supabase.schema('gl').from('detail_types').update({ last_code: newDetailCode }).eq('code', selectedDetailType.code);
-        // Refresh details type state silently to get updated last_code
         fetchDetailTypes();
       }
 
@@ -464,12 +468,12 @@ const Details = ({ t, isRtl }) => {
         isOpen={showInstanceModal}
         onClose={() => setShowInstanceModal(false)}
         title={selectedDetailType ? `${t.dt_instance_list || (isRtl ? 'آیتم‌های تفصیل:' : 'Instances for')} ${selectedDetailType.title}` : (t.dt_instances || 'Instances')}
-        size="2xl"
+        size="lg"
         footer={
           <Button variant="outline" onClick={() => setShowInstanceModal(false)}>{t.btn_close || (isRtl ? 'بستن' : 'Close')}</Button>
         }
       >
-        <div className="flex flex-col h-[500px]">
+        <div className="flex flex-col h-[400px]">
           <div className="mb-4 flex justify-between items-center bg-slate-50 p-3 rounded border border-slate-100">
              <div className="text-sm text-slate-600 font-medium">
                {isRtl ? 'کدهای تفصیلی برای برقراری ارتباط موجودیت‌ها با ماژول حسابداری استفاده می‌شوند.' : 'Detail codes are used to link entities with accounting records.'}
