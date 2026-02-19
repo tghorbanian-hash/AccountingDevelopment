@@ -153,6 +153,11 @@ const Details = ({ t, isRtl }) => {
       return;
     }
 
+    // Update last_code in detail_types if we are assigning a newly generated code
+    if (newDetailCode && !assigningItem.detailCode) {
+        await supabase.schema('gl').from('detail_types').update({ last_code: newDetailCode }).eq('code', assigningItem.detailTypeCode);
+    }
+
     setShowAssignModal(false);
     setAssigningItem(null);
     fetchInstances();
@@ -191,9 +196,39 @@ const Details = ({ t, isRtl }) => {
     setShowInstanceModal(true);
   };
 
-  const handleOpenAssign = (instance) => {
+  const handleOpenAssign = async (instance) => {
     setAssigningItem(instance);
-    setNewDetailCode('');
+    
+    if (instance.detailCode) {
+      setNewDetailCode(instance.detailCode);
+    } else {
+      // Auto-generate code based on settings for this detail type
+      try {
+         const { data, error } = await supabase.schema('gl').from('detail_types').select('*').eq('code', instance.detailTypeCode).single();
+         if (data) {
+             const lastCode = data.last_code;
+             const startCode = data.start_code;
+             const length = data.numbering_length || 4; // Default fallback
+             
+             let nextNum;
+             if (lastCode && !isNaN(parseInt(lastCode, 10))) {
+                 nextNum = parseInt(lastCode, 10) + 1;
+             } else if (startCode && !isNaN(parseInt(startCode, 10))) {
+                 nextNum = parseInt(startCode, 10);
+             } else {
+                 nextNum = 1;
+             }
+             
+             setNewDetailCode(nextNum.toString().padStart(length, '0'));
+         } else {
+             setNewDetailCode('');
+         }
+      } catch (err) {
+         console.error('Error fetching detail type numbering:', err);
+         setNewDetailCode('');
+      }
+    }
+    
     setShowAssignModal(true);
   };
 
@@ -396,17 +431,19 @@ const Details = ({ t, isRtl }) => {
         }
       >
          <div className="flex flex-col gap-4">
-            <div className="text-sm text-slate-600 mb-2">
-               {t.dt_enter_code || 'Enter code for:'}
-               <div className="font-bold text-slate-800 mt-1">{assigningItem?.title}</div>
+            <div className="bg-blue-50 text-blue-800 text-xs p-3 rounded-lg leading-relaxed font-medium">
+               {isRtl 
+                 ? `در حال تخصیص کد تفصیلی به: ${assigningItem?.title}` 
+                 : `Assigning detail code for: ${assigningItem?.title}`}
             </div>
             <InputField 
+               label={t.detail_code || (isRtl ? 'کد تفصیل' : 'Detail Code')}
                value={newDetailCode}
                onChange={(e) => setNewDetailCode(e.target.value)}
                placeholder="e.g. 201005"
                isRtl={isRtl}
                autoFocus
-               className="dir-ltr"
+               className="dir-ltr text-center font-bold text-lg tracking-wider"
             />
          </div>
       </Modal>
