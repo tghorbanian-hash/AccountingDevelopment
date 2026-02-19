@@ -118,6 +118,11 @@ const AccountForm = ({
   }
 
   const maxLen = isGroup ? structure.groupLen : (isGeneral ? structure.generalLen : structure.subsidiaryLen);
+  
+  // Checking if mode is auto to disable manual input if needed (optional UX improvement)
+  const isModeAuto = (isGroup && structure.groupMode === 'auto') || 
+                     (isGeneral && structure.generalMode === 'auto') || 
+                     (isSubsidiary && structure.subsidiaryMode === 'auto');
 
   return (
     <div className="flex flex-col h-full">
@@ -136,17 +141,19 @@ const AccountForm = ({
                   const val = e.target.value;
                   if (val.length <= maxLen) setFormData(prev => ({...prev, code: val}));
                 }}
+                disabled={isModeAuto && !formData.id} // Disable input if auto-generated and new
                 className={`
                   flex-1 ${window.UI.THEME.colors.surface} border ${window.UI.THEME.colors.border}
                   ${prefix ? 'rounded-r border-l-0' : 'rounded'} h-8 px-2 outline-none
                   focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
-                  text-sm font-mono
+                  text-sm font-mono ${isModeAuto && !formData.id ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''}
                 `}
-                placeholder={"0".repeat(maxLen)}
+                placeholder={isModeAuto && !formData.id ? (isRtl ? "تولید خودکار..." : "Auto-generated...") : "0".repeat(maxLen)}
              />
            </div>
-           <div className="text-[10px] text-slate-400 mt-1 text-right">
-             {isRtl ? `تعداد ارقام مجاز: ${maxLen}` : `Max digits: ${maxLen}`}
+           <div className="text-[10px] text-slate-400 mt-1 flex justify-between flex-row-reverse">
+             <span>{isRtl ? `تعداد ارقام مجاز: ${maxLen}` : `Max digits: ${maxLen}`}</span>
+             {isModeAuto && !formData.id && <span className="text-indigo-500 font-bold">{isRtl ? "تولید خودکار فعال است" : "Auto-generation active"}</span>}
            </div>
         </div>
 
@@ -576,12 +583,21 @@ const AccountTreeView = ({
     return '';
   };
 
+  // --- AUTO GENERATION LOGIC HELPER ---
+  const generateNextCode = (lastCode, length) => {
+      if (!lastCode || isNaN(parseInt(lastCode, 10))) {
+          return "1".padStart(length, "0");
+      }
+      const nextNum = parseInt(lastCode, 10) + 1;
+      return nextNum.toString().padStart(length, "0");
+  };
+
   const handleCreate = (level) => {
     if (level !== 'group' && !selectedNode) return;
     
     let defaults = {
       level: level, isActive: true, type: 'permanent', nature: 'debit',
-      tafsils: [], descriptions: []
+      tafsils: [], descriptions: [], code: ''
     };
 
     if (selectedNode && (level === 'general' || level === 'subsidiary')) {
@@ -589,6 +605,16 @@ const AccountTreeView = ({
       defaults.type = selectedNode.type || 'permanent';
       defaults.nature = selectedNode.nature || 'debit';
     }
+
+    // Assign automatically generated code based on Structure Settings
+    if (level === 'group' && structure.groupMode === 'auto') {
+        defaults.code = generateNextCode(structure.groupLastCode, structure.groupLen);
+    } else if (level === 'general' && structure.generalMode === 'auto') {
+        defaults.code = generateNextCode(structure.generalLastCode, structure.generalLen);
+    } else if (level === 'subsidiary' && structure.subsidiaryMode === 'auto') {
+        defaults.code = generateNextCode(structure.subsidiaryLastCode, structure.subsidiaryLen);
+    }
+
     setFormData(defaults);
     setMode(`create_${level}`);
     setActiveTab('info');
@@ -671,12 +697,38 @@ const AccountTreeView = ({
 
     try {
         let targetNodeId = formData.id;
+        let isNewRecord = false;
+
         if (mode === 'edit') {
             await supabase.schema('gl').from('accounts').update(payload).eq('id', formData.id);
         } else {
             const { data, error } = await supabase.schema('gl').from('accounts').insert([payload]).select();
             if(error) throw error;
-            if(data && data.length > 0) targetNodeId = data[0].id;
+            if(data && data.length > 0) {
+                targetNodeId = data[0].id;
+                isNewRecord = true;
+            }
+        }
+
+        // --- UPDATE STRUCTURE'S LAST CODE IN DB ---
+        if (isNewRecord) {
+            const updates = {};
+            if (formData.level === 'group' && structure.groupMode === 'auto') {
+                updates.group_last_code = formData.code;
+                structure.groupLastCode = formData.code; 
+            }
+            if (formData.level === 'general' && structure.generalMode === 'auto') {
+                updates.general_last_code = formData.code;
+                structure.generalLastCode = formData.code;
+            }
+            if (formData.level === 'subsidiary' && structure.subsidiaryMode === 'auto') {
+                updates.subsidiary_last_code = formData.code;
+                structure.subsidiaryLastCode = formData.code;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await supabase.schema('gl').from('account_structures').update(updates).eq('id', structure.id);
+            }
         }
 
         const { roots, map } = await fetchTreeData(structure.id);
