@@ -564,6 +564,16 @@ const AccountTreeView = ({
     return null;
   };
 
+  // بررسی تکراری بودن کد کامل حساب در فرانت‌اند
+  const checkDuplicateCode = (nodes, fullCd, excludeId) => {
+      for (const n of nodes) {
+          const nFull = n.dynamicFullCode || n.fullCode || n.code;
+          if (n.id !== excludeId && nFull === fullCd) return true;
+          if (n.children && checkDuplicateCode(n.children, fullCd, excludeId)) return true;
+      }
+      return false;
+  };
+
   const handleSaveForm = async () => {
     if (!formData.code || !formData.title) return alert(isRtl ? "کد و عنوان الزامی است" : "Code and Title Required");
     
@@ -573,7 +583,7 @@ const AccountTreeView = ({
     else if (formData.level === 'subsidiary') requiredLen = structure.subsidiaryLen;
 
     if (formData.code.length !== requiredLen) {
-      return alert(isRtl ? `طول کد برای این سطح باید ${requiredLen} کاراکتر باشد.` : `Code length must be ${requiredLen}.`);
+      return alert(isRtl ? `طول کد برای این سطح باید دقیقاً ${requiredLen} کاراکتر باشد.` : `Code length must be exactly ${requiredLen}.`);
     }
 
     let parentFullCode = '';
@@ -593,6 +603,11 @@ const AccountTreeView = ({
     }
     
     let fullCode = formData.level === 'group' ? formData.code : (parentFullCode + formData.code);
+
+    // بررسی تکراری نبودن کد قبل از ارسال به بک‌اند
+    if (checkDuplicateCode(treeData, fullCode, formData.id)) {
+        return alert(isRtl ? "این کد حساب قبلاً ثبت شده و تکراری است." : "This account code already exists and is duplicate.");
+    }
 
     const payload = {
        structure_id: structure.id,
@@ -645,7 +660,11 @@ const AccountTreeView = ({
         setMode('view');
     } catch (err) {
         console.error(err);
-        alert(isRtl ? "خطا در ثبت اطلاعات" : "Save Error");
+        if (err.code === '23505') {
+            alert(isRtl ? "کد وارد شده تکراری است." : "Duplicate code error.");
+        } else {
+            alert(isRtl ? "خطا در ثبت اطلاعات" : "Save Error");
+        }
     }
   };
 

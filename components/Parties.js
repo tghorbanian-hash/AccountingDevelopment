@@ -334,6 +334,11 @@ const Parties = ({ t, isRtl }) => {
         if (error) throw error;
       }
 
+      // Update last_code in detail_types if we are assigning a newly generated code
+      if (codeValue && !targetForDetail.detailCode) {
+          await supabase.schema('gl').from('detail_types').update({ last_code: codeValue }).eq('code', 'sys_partner');
+      }
+
       setIsDetailModalOpen(false);
       fetchData();
     } catch (err) {
@@ -378,13 +383,41 @@ const Parties = ({ t, isRtl }) => {
     setIsModalOpen(true);
   };
 
-  const handleOpenDetailModal = (row) => {
+  const handleOpenDetailModal = async (row) => {
     if (!canAssignDetail) {
       alert(isRtl ? 'دسترسی غیرمجاز برای تخصیص تفصیل' : 'Access Denied for Detail Code Assignment');
       return;
     }
     setTargetForDetail(row);
-    setDetailCodeInput(row.detailCode || '');
+    
+    if (row.detailCode) {
+      setDetailCodeInput(row.detailCode);
+    } else {
+      try {
+         const { data, error } = await supabase.schema('gl').from('detail_types').select('*').eq('code', 'sys_partner').single();
+         if (data) {
+             const lastCode = data.last_code;
+             const startCode = data.start_code;
+             const length = data.numbering_length || 6;
+             
+             let nextNum;
+             if (lastCode && !isNaN(parseInt(lastCode, 10))) {
+                 nextNum = parseInt(lastCode, 10) + 1;
+             } else if (startCode && !isNaN(parseInt(startCode, 10))) {
+                 nextNum = parseInt(startCode, 10);
+             } else {
+                 nextNum = 1;
+             }
+             
+             setDetailCodeInput(nextNum.toString().padStart(length, '0'));
+         } else {
+             setDetailCodeInput('');
+         }
+      } catch (err) {
+         console.error('Error fetching detail type numbering:', err);
+         setDetailCodeInput('');
+      }
+    }
     setIsDetailModalOpen(true);
   };
 
