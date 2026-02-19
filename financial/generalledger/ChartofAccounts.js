@@ -378,11 +378,17 @@ const StructureList = ({
    canCreate, canEdit, canDelete, canDesign, 
    supabase, onOpenTree 
 }) => {
-  const { InputField, Button, DataGrid, Modal, Badge, FilterSection } = window.UI;
+  const { InputField, SelectField, Button, DataGrid, Modal, Badge, FilterSection } = window.UI;
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState({ code: '', title: '', status: true, groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false });
+  const [formData, setFormData] = useState({ 
+      code: '', title: '', status: true, 
+      groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false,
+      groupMode: 'manual', groupLastCode: '',
+      generalMode: 'auto', generalLastCode: '',
+      subsidiaryMode: 'auto', subsidiaryLastCode: ''
+  });
 
   const handleEdit = (row) => {
     if(!canEdit) return alert(isRtl ? "دسترسی ندارید" : "Access Denied");
@@ -394,7 +400,13 @@ const StructureList = ({
   const handleCreate = () => {
     if(!canCreate) return alert(isRtl ? "دسترسی ندارید" : "Access Denied");
     setEditingItem(null);
-    setFormData({ code: '', title: '', status: true, groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false });
+    setFormData({ 
+        code: '', title: '', status: true, 
+        groupLen: 1, generalLen: 2, subsidiaryLen: 2, useChar: false,
+        groupMode: 'manual', groupLastCode: '',
+        generalMode: 'auto', generalLastCode: '',
+        subsidiaryMode: 'auto', subsidiaryLastCode: ''
+    });
     setShowModal(true);
   };
 
@@ -403,7 +415,10 @@ const StructureList = ({
     try {
        const payload = {
           code: formData.code, title: formData.title, status: formData.status,
-          group_len: formData.groupLen, general_len: formData.generalLen, subsidiary_len: formData.subsidiaryLen, use_char: formData.useChar
+          group_len: formData.groupLen, general_len: formData.generalLen, subsidiary_len: formData.subsidiaryLen, use_char: formData.useChar,
+          group_mode: formData.groupMode, group_last_code: formData.groupLastCode,
+          general_mode: formData.generalMode, general_last_code: formData.generalLastCode,
+          subsidiary_mode: formData.subsidiaryMode, subsidiary_last_code: formData.subsidiaryLastCode
        };
 
        if (editingItem) {
@@ -467,18 +482,64 @@ const StructureList = ({
                <InputField label={isRtl ? "کد ساختار" : "Code"} value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} isRtl={isRtl} />
                <InputField label={isRtl ? "عنوان ساختار" : "Title"} value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} isRtl={isRtl} />
             </div>
+            
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-4">
-               <h4 className="text-[11px] font-bold text-slate-500 uppercase">{isRtl ? "تنظیمات طول کدینگ" : "Coding Length Settings"}</h4>
-               <div className="grid grid-cols-3 gap-4">
-                  <InputField type="number" min="1" max="10" label={isRtl ? "طول کد گروه" : "Group Length"} value={formData.groupLen} onChange={e => setFormData({...formData, groupLen: parseInt(e.target.value)})} isRtl={isRtl} />
-                  <InputField type="number" min="1" max="10" label={isRtl ? "طول کد کل" : "General Length"} value={formData.generalLen} onChange={e => setFormData({...formData, generalLen: parseInt(e.target.value)})} isRtl={isRtl} />
-                  <InputField type="number" min="1" max="10" label={isRtl ? "طول کد معین" : "Sub Length"} value={formData.subsidiaryLen} onChange={e => setFormData({...formData, subsidiaryLen: parseInt(e.target.value)})} isRtl={isRtl} />
+               <h4 className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2">
+                 <Layers size={14}/> {isRtl ? "تنظیمات طول و کدگذاری حساب‌ها" : "Length and Numbering Settings"}
+               </h4>
+
+               <div className="grid grid-cols-4 gap-4 text-[10px] font-bold text-slate-500 border-b border-slate-200 pb-2">
+                  <div>{isRtl ? "سطح حساب" : "Account Level"}</div>
+                  <div>{isRtl ? "طول کد" : "Length"}</div>
+                  <div>{isRtl ? "نحوه تولید" : "Generation Mode"}</div>
+                  <div>{isRtl ? "آخرین کد ایجاد شده" : "Last Generated Code"}</div>
                </div>
+
+               {/* Group Level */}
+               <div className="grid grid-cols-4 gap-4 items-center">
+                  <div className="text-sm font-medium text-slate-700">{isRtl ? "گروه" : "Group"}</div>
+                  <InputField type="number" min="1" max="10" value={formData.groupLen} onChange={e => setFormData({...formData, groupLen: parseInt(e.target.value)})} isRtl={isRtl} />
+                  <SelectField value={formData.groupMode} onChange={e => setFormData({...formData, groupMode: e.target.value})} isRtl={isRtl}>
+                     <option value="auto">{t.an_mode_auto || (isRtl ? "اتوماتیک" : "Automatic")}</option>
+                     <option value="manual">{t.an_mode_manual || (isRtl ? "دستی" : "Manual")}</option>
+                  </SelectField>
+                  <div className="bg-white px-3 py-2 border border-slate-200 rounded-md font-mono text-sm shadow-inner text-slate-600 h-[38px] flex items-center">
+                     {formData.groupLastCode || '-'}
+                  </div>
+               </div>
+
+               {/* General Level */}
+               <div className="grid grid-cols-4 gap-4 items-center">
+                  <div className="text-sm font-medium text-slate-700">{isRtl ? "کل" : "General"}</div>
+                  <InputField type="number" min="1" max="10" value={formData.generalLen} onChange={e => setFormData({...formData, generalLen: parseInt(e.target.value)})} isRtl={isRtl} />
+                  <SelectField value={formData.generalMode} onChange={e => setFormData({...formData, generalMode: e.target.value})} isRtl={isRtl}>
+                     <option value="auto">{t.an_mode_auto || (isRtl ? "اتوماتیک" : "Automatic")}</option>
+                     <option value="manual">{t.an_mode_manual || (isRtl ? "دستی" : "Manual")}</option>
+                  </SelectField>
+                  <div className="bg-white px-3 py-2 border border-slate-200 rounded-md font-mono text-sm shadow-inner text-slate-600 h-[38px] flex items-center">
+                     {formData.generalLastCode || '-'}
+                  </div>
+               </div>
+
+               {/* Subsidiary Level */}
+               <div className="grid grid-cols-4 gap-4 items-center">
+                  <div className="text-sm font-medium text-slate-700">{isRtl ? "معین" : "Subsidiary"}</div>
+                  <InputField type="number" min="1" max="10" value={formData.subsidiaryLen} onChange={e => setFormData({...formData, subsidiaryLen: parseInt(e.target.value)})} isRtl={isRtl} />
+                  <SelectField value={formData.subsidiaryMode} onChange={e => setFormData({...formData, subsidiaryMode: e.target.value})} isRtl={isRtl}>
+                     <option value="auto">{t.an_mode_auto || (isRtl ? "اتوماتیک" : "Automatic")}</option>
+                     <option value="manual">{t.an_mode_manual || (isRtl ? "دستی" : "Manual")}</option>
+                  </SelectField>
+                  <div className="bg-white px-3 py-2 border border-slate-200 rounded-md font-mono text-sm shadow-inner text-slate-600 h-[38px] flex items-center">
+                     {formData.subsidiaryLastCode || '-'}
+                  </div>
+               </div>
+
                <div className="flex items-center justify-between pt-2 border-t border-slate-200">
                   <span className="text-[11px] text-slate-500">{isRtl ? "مجموع طول کد حساب:" : "Total Length:"}</span>
                   <span className="font-black text-indigo-700 text-lg">{(formData.groupLen || 0) + (formData.generalLen || 0) + (formData.subsidiaryLen || 0)}</span>
                </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
                <Checkbox label={isRtl ? "استفاده از حروف در کد" : "Use Characters"} checked={formData.useChar} onChange={v => setFormData({...formData, useChar: v})} />
                <Checkbox label={isRtl ? "فعال" : "Active"} checked={formData.status} onChange={v => setFormData({...formData, status: v})} />
@@ -1156,7 +1217,13 @@ const ChartofAccounts = ({ t, isRtl }) => {
          groupLen: item.group_len,
          generalLen: item.general_len,
          subsidiaryLen: item.subsidiary_len,
-         useChar: item.use_char
+         useChar: item.use_char,
+         groupMode: item.group_mode || 'manual',
+         groupLastCode: item.group_last_code || '',
+         generalMode: item.general_mode || 'auto',
+         generalLastCode: item.general_last_code || '',
+         subsidiaryMode: item.subsidiary_mode || 'auto',
+         subsidiaryLastCode: item.subsidiary_last_code || ''
       })));
     } catch (err) {
       console.error('Error fetching structures:', err);
