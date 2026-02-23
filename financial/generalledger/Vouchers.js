@@ -1,4 +1,3 @@
-```javascript
 /* Filename: financial/generalledger/Vouchers.js */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
@@ -123,7 +122,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   const wrapperRef = useRef(null);
 
   const selectedAcc = accounts.find(a => String(a.id) === String(value));
-  const displaySelected = selectedAcc ? `${selectedAcc.full_code} - ${selectedAcc.title}` : '';
+  const displaySelected = selectedAcc ? (selectedAcc.full_code + ' - ' + selectedAcc.title) : '';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -175,14 +174,13 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   );
 };
 
-
 const SearchableDetailSelect = ({ details, value, onChange, disabled, placeholder }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
 
   const selectedDetail = details.find(d => String(d.id) === String(value));
-  const displaySelected = selectedDetail ? `${selectedDetail.detail_code || ''} - ${selectedDetail.title}` : '';
+  const displaySelected = selectedDetail ? ((selectedDetail.detail_code ? selectedDetail.detail_code + ' - ' : '') + selectedDetail.title) : '';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -226,7 +224,7 @@ const SearchableDetailSelect = ({ details, value, onChange, disabled, placeholde
               className="px-3 py-1.5 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0"
               onMouseDown={(e) => { e.preventDefault(); onChange(d.id); setIsOpen(false); }}
             >
-              <div className="font-bold text-slate-800">{d.detail_code ? `${d.detail_code} - ` : ''}{d.title}</div>
+              <div className="font-bold text-slate-800">{d.detail_code ? d.detail_code + ' - ' : ''}{d.title}</div>
             </div>
           ))}
           {filtered.length === 0 && (
@@ -237,7 +235,6 @@ const SearchableDetailSelect = ({ details, value, onChange, disabled, placeholde
     </div>
   );
 };
-
 
 const formatNum = (num) => {
   if (num === null || num === undefined || num === '') return '';
@@ -340,9 +337,9 @@ const Vouchers = ({ language = 'fa' }) => {
           let curr = a;
           while (curr.parent_id && accMap.has(curr.parent_id)) {
             curr = accMap.get(curr.parent_id);
-            path = `${curr.title} / ${path}`;
+            path = curr.title + ' / ' + path;
           }
-          return { ...a, path, displayPath: `${a.full_code} - ${path}` };
+          return { ...a, path, displayPath: a.full_code + ' - ' + path };
         });
         setAccounts(processedAccounts);
       }
@@ -431,7 +428,7 @@ const Vouchers = ({ language = 'fa' }) => {
         branch_id: contextVals.branch_id
       });
       setVoucherItems([{
-        id: `temp_${Date.now()}`,
+        id: 'temp_' + Date.now(),
         row_number: 1,
         account_id: '',
         detail_id: '',
@@ -462,7 +459,7 @@ const Vouchers = ({ language = 'fa' }) => {
             const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
             if (meta.trackFeature && meta.trackMandatory) {
                 if (!item.tracking_number || !item.tracking_date) {
-                    alert(`${t.trackingReqError} ${i + 1} (${account.title})`);
+                    alert(t.trackingReqError + ' ' + (i + 1) + ' (' + account.title + ')');
                     return;
                 }
             }
@@ -568,7 +565,7 @@ const Vouchers = ({ language = 'fa' }) => {
     const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
     const lastDescription = voucherItems.length > 0 ? voucherItems[voucherItems.length - 1].description : '';
 
-    const newId = `temp_${Date.now()}`;
+    const newId = 'temp_' + Date.now();
     setVoucherItems([...voucherItems, { 
       id: newId, 
       row_number: voucherItems.length + 1, 
@@ -594,7 +591,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
     const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
 
-    const newId = `temp_${Date.now()}`;
+    const newId = 'temp_' + Date.now();
     setVoucherItems([...voucherItems, { 
       id: newId, 
       row_number: voucherItems.length + 1, 
@@ -646,7 +643,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const getStatusBadge = (status) => {
     const variant = status === 'final' ? 'success' : status === 'reviewed' ? 'info' : status === 'temporary' ? 'warning' : 'neutral';
-    return <Badge variant={variant}>{t[`status${status.charAt(0).toUpperCase() + status.slice(1)}`]}</Badge>;
+    return <Badge variant={variant}>{t['status' + status.charAt(0).toUpperCase() + status.slice(1)]}</Badge>;
   };
 
   const getValidDetailInstances = (accountId) => {
@@ -665,7 +662,6 @@ const Vouchers = ({ language = 'fa' }) => {
 
      return allDetailInstances.filter(di => allowedTypeCodes.includes(di.detail_type_code));
   };
-
 
   const columns = [
     { field: 'voucher_number', header: t.voucherNumber, width: 'w-24', sortable: true },
@@ -698,7 +694,7 @@ const Vouchers = ({ language = 'fa' }) => {
     });
 
     return (
-      <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+      <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
         <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => { setView('list'); setCurrentVoucher(null); setVoucherItems([]); }} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
@@ -865,7 +861,7 @@ const Vouchers = ({ language = 'fa' }) => {
   }
 
   return (
-    <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+    <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
       <div className="mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-2 text-indigo-800 font-bold text-sm">
           <Filter size={18} className="text-indigo-500"/>
@@ -934,5 +930,3 @@ const Vouchers = ({ language = 'fa' }) => {
 
 window.Vouchers = Vouchers;
 export default Vouchers;
-
-```
