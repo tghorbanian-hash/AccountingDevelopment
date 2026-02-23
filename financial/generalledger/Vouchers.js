@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../../supabaseConfig';
-import { 
-  Card, Button, Input, Select, Table, Modal, Checkbox 
-} from '../../components/UIComponents';
+
+const { supabase } = window;
+const { Card, Button, Input, Select, Table, Modal, Checkbox } = window.UI || {};
 
 const translations = {
   en: {
@@ -129,36 +128,30 @@ const translations = {
   }
 };
 
-export default function Vouchers({ language = 'fa' }) {
+window.Vouchers = function Vouchers({ language = 'fa' }) {
   const t = translations[language];
   const isRtl = language === 'fa';
   
-  // Views: 'list' | 'form'
   const [view, setView] = useState('list');
   const [loading, setLoading] = useState(false);
   
-  // Data State
   const [vouchers, setVouchers] = useState([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [accounts, setAccounts] = useState([]);
   const [branches, setBranches] = useState([]);
   
-  // Pagination & Sorting State
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [sortField, setSortField] = useState('voucher_date');
   const [sortAsc, setSortAsc] = useState(false);
 
-  // Filter State
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [filters, setFilters] = useState([]);
   const [currentFilter, setCurrentFilter] = useState({ field: 'voucher_number', operator: 'eq', value: '' });
 
-  // Form State
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [voucherItems, setVoucherItems] = useState([]);
   
-  // Modals
   const [isDeleting, setIsDeleting] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
 
@@ -190,7 +183,6 @@ export default function Vouchers({ language = 'fa' }) {
     try {
       let query = supabase.schema('gl').from('vouchers').select('*', { count: 'exact' });
 
-      // Apply Filters
       filters.forEach(f => {
         if (f.operator === 'eq') query = query.eq(f.field, f.value);
         if (f.operator === 'ilike') query = query.ilike(f.field, `%${f.value}%`);
@@ -198,7 +190,6 @@ export default function Vouchers({ language = 'fa' }) {
         if (f.operator === 'lt') query = query.lt(f.field, f.value);
       });
 
-      // Apply Sorting & Pagination
       query = query.order(sortField, { ascending: sortAsc });
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
@@ -824,4 +815,4 @@ export default function Vouchers({ language = 'fa' }) {
       )}
     </div>
   );
-}
+};
