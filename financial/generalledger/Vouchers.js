@@ -146,10 +146,11 @@ const Vouchers = ({ language = 'fa' }) => {
   const fetchLookups = async () => {
     if (!supabase) return;
     try {
+      // NOTE: Fixed schema typo from 'gk' to 'gl' to resolve the 406 Not Acceptable error
       const [accRes, brRes, fyRes, ledRes] = await Promise.all([
         supabase.schema('gl').from('accounts').select('id, code, title').eq('is_active', true).order('code'),
         supabase.schema('gen').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
-        supabase.schema('gk').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
+        supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
         supabase.schema('gl').from('ledgers').select('id, code, title').eq('is_active', true).order('title')
       ]);
       
@@ -179,10 +180,11 @@ const Vouchers = ({ language = 'fa' }) => {
     if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id || !contextVals.branch_id) return;
     setLoading(true);
     try {
+      // Fetch matching vouchers using fiscal_period_id as the column name to match the DB table schema
       const { data, error } = await supabase.schema('gl')
         .from('vouchers')
         .select('*')
-        .eq('fiscal_year_id', contextVals.fiscal_year_id)
+        .eq('fiscal_period_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
         .eq('branch_id', contextVals.branch_id)
         .order('voucher_date', { ascending: false })
@@ -234,7 +236,7 @@ const Vouchers = ({ language = 'fa' }) => {
         status: 'draft',
         description: '',
         subsidiary_number: '',
-        fiscal_year_id: contextVals.fiscal_year_id,
+        fiscal_period_id: contextVals.fiscal_year_id,
         ledger_id: contextVals.ledger_id,
         branch_id: contextVals.branch_id
       });
@@ -441,7 +443,7 @@ const Vouchers = ({ language = 'fa' }) => {
         <div className="flex-1 overflow-auto flex flex-col gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
             <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <SelectField label={t.fiscalYear} value={currentVoucher.fiscal_year_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
+              <SelectField label={t.fiscalYear} value={currentVoucher.fiscal_period_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
                 {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.code} - {f.title}</option>)}
               </SelectField>
               <SelectField label={t.ledger} value={currentVoucher.ledger_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
