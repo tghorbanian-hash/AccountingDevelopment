@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search
+  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy
 } from 'lucide-react';
 
 const localTranslations = {
@@ -32,7 +32,7 @@ const localTranslations = {
     debit: 'Debit',
     credit: 'Credit',
     currency: 'Currency',
-    balance: 'Balance',
+    balance: 'Balance Voucher',
     saveDraft: 'Save Draft',
     saveTemp: 'Save Temporary',
     backToList: 'Back to List',
@@ -42,16 +42,15 @@ const localTranslations = {
     statusReviewed: 'Reviewed',
     statusFinal: 'Final',
     general: 'General',
-    opening: 'Opening',
     trackingNumber: 'Tracking No.',
-    trackingDate: 'Tracking Date',
     quantity: 'Quantity',
     unbalancedError: 'Voucher is not balanced. Can only save as draft.',
-    alreadyBalanced: 'Voucher is already balanced.',
-    cannotDelete: 'Reviewed or Final vouchers cannot be deleted.',
+    zeroAmountError: 'Total amount cannot be zero. Please enter debit or credit values.',
+    dualEntryError: 'A single row cannot have both debit and credit values.',
     reqFields: 'Description and Account are required for all items.',
     globalFiltersTitle: 'Global System Context',
-    searchAccount: 'Search account code or title...'
+    searchAccount: 'Search account code or title...',
+    copyFromAbove: 'Copy from above'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -79,7 +78,7 @@ const localTranslations = {
     debit: 'بدهکار',
     credit: 'بستانکار',
     currency: 'ارز',
-    balance: 'موازنه مبلغ',
+    balance: 'تراز کردن سند',
     saveDraft: 'ذخیره یادداشت',
     saveTemp: 'ذخیره موقت',
     backToList: 'بازگشت به فهرست',
@@ -89,16 +88,15 @@ const localTranslations = {
     statusReviewed: 'بررسی شده',
     statusFinal: 'قطعی شده',
     general: 'عمومی',
-    opening: 'افتتاحیه',
     trackingNumber: 'شماره پیگیری',
-    trackingDate: 'تاریخ پیگیری',
     quantity: 'مقدار',
     unbalancedError: 'سند بالانس نیست و فقط به عنوان یادداشت قابل ذخیره است.',
-    alreadyBalanced: 'سند بالانس است.',
-    cannotDelete: 'اسناد بررسی شده یا قطعی قابل حذف نیستند.',
+    zeroAmountError: 'مبلغ کل سند نمی‌تواند صفر باشد. لطفاً مقادیر بدهکار یا بستانکار را وارد کنید.',
+    dualEntryError: 'یک ردیف نمی‌تواند همزمان هم بدهکار و هم بستانکار باشد.',
     reqFields: 'شرح و حساب معین برای تمامی اقلام اجباری است.',
     globalFiltersTitle: 'فیلترهای عمومی سیستم',
-    searchAccount: 'جستجوی کد یا عنوان معین...'
+    searchAccount: 'جستجوی کد یا عنوان معین...',
+    copyFromAbove: 'کپی از ردیف بالا'
   }
 };
 
@@ -272,7 +270,6 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const fetchVouchers = async () => {
     if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id || !contextVals.branch_id) return;
-    
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(contextVals.fiscal_year_id)) return;
 
@@ -295,18 +292,6 @@ const Vouchers = ({ language = 'fa' }) => {
       setLoading(false);
     }
   };
-
-  const handleClearSearch = () => {
-    setSearchParams({ voucher_number: '', description: '' });
-  };
-
-  const filteredVouchers = useMemo(() => {
-    return vouchers.filter(v => {
-      const matchNo = !searchParams.voucher_number || String(v.voucher_number).includes(searchParams.voucher_number);
-      const matchDesc = !searchParams.description || (v.description && v.description.includes(searchParams.description));
-      return matchNo && matchDesc;
-    });
-  }, [vouchers, searchParams]);
 
   const handleOpenForm = async (voucher = null) => {
     if (voucher) {
@@ -355,24 +340,16 @@ const Vouchers = ({ language = 'fa' }) => {
         currency_code: defaultCurrency,
         description: '',
         tracking_number: '',
-        tracking_date: '',
         quantity: 0
       }]);
     }
     setView('form');
   };
 
-  const handleCloseForm = () => {
-    setView('list');
-    setCurrentVoucher(null);
-    setVoucherItems([]);
-  };
-
   const handleSaveVoucher = async (status) => {
     if (!supabase) return;
     
-    const missingReqs = voucherItems.some(item => !item.description || !item.account_id);
-    if (missingReqs) {
+    if (voucherItems.some(item => !item.description || !item.account_id)) {
       alert(t.reqFields);
       return;
     }
@@ -380,6 +357,11 @@ const Vouchers = ({ language = 'fa' }) => {
     const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
     const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
     
+    if (totalDebit === 0 && totalCredit === 0) {
+      alert(t.zeroAmountError);
+      return;
+    }
+
     if (status === 'temporary' && totalDebit !== totalCredit) {
       alert(t.unbalancedError);
       return;
@@ -407,9 +389,6 @@ const Vouchers = ({ language = 'fa' }) => {
       }
 
       const itemsToSave = voucherItems.map((item, index) => {
-        const existingDetails = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
-        const updatedDetails = { ...existingDetails, currency_code: item.currency_code };
-        
         return {
           voucher_id: savedVoucherId,
           row_number: index + 1,
@@ -418,9 +397,8 @@ const Vouchers = ({ language = 'fa' }) => {
           credit: parseNum(item.credit),
           description: item.description,
           tracking_number: item.tracking_number || null,
-          tracking_date: item.tracking_date || null,
           quantity: parseNum(item.quantity),
-          details: updatedDetails
+          details: { currency_code: item.currency_code }
         };
       });
 
@@ -429,7 +407,10 @@ const Vouchers = ({ language = 'fa' }) => {
         if (itemsError) throw itemsError;
       }
 
-      handleCloseForm();
+      setView('list');
+      setCurrentVoucher(null);
+      setVoucherItems([]);
+      fetchVouchers();
     } catch (error) {
       console.error('Error saving voucher:', error);
       alert('Error saving voucher: ' + error.message);
@@ -438,13 +419,85 @@ const Vouchers = ({ language = 'fa' }) => {
     }
   };
 
-  const promptDelete = (voucher) => {
-    if (voucher.status === 'reviewed' || voucher.status === 'final') {
-      alert(t.cannotDelete);
-      return;
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...voucherItems];
+    
+    if (field === 'debit' || field === 'credit') {
+      const otherField = field === 'debit' ? 'credit' : 'debit';
+      if (parseNum(value) > 0) {
+        newItems[index][otherField] = 0;
+      }
     }
-    setVoucherToDelete(voucher);
-    setShowDeleteModal(true);
+
+    newItems[index][field] = value;
+    
+    if (field === 'account_id') {
+      const selectedAcc = accounts.find(a => String(a.id) === String(value));
+      const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
+      let newCurrency = currentLedger?.currency || '';
+
+      if (selectedAcc && selectedAcc.metadata) {
+        const meta = typeof selectedAcc.metadata === 'string' ? JSON.parse(selectedAcc.metadata) : selectedAcc.metadata;
+        if (meta.currency_code) newCurrency = meta.currency_code;
+      }
+      newItems[index]['currency_code'] = newCurrency;
+    }
+
+    setVoucherItems(newItems);
+  };
+
+  const addItemRow = () => {
+    const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
+    const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
+    const lastDescription = voucherItems.length > 0 ? voucherItems[voucherItems.length - 1].description : '';
+
+    setVoucherItems([...voucherItems, { 
+      id: `temp_${Date.now()}`, 
+      row_number: voucherItems.length + 1, 
+      account_id: '', 
+      debit: 0, 
+      credit: 0, 
+      currency_code: currentLedger?.currency || '',
+      description: lastDescription, 
+      tracking_number: '', 
+      quantity: 0 
+    }]);
+  };
+
+  const globalBalance = () => {
+    const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
+    const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
+    const diff = totalDebit - totalCredit;
+    
+    if (diff === 0) return;
+
+    const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
+
+    setVoucherItems([...voucherItems, { 
+      id: `temp_${Date.now()}`, 
+      row_number: voucherItems.length + 1, 
+      account_id: '', 
+      debit: diff < 0 ? Math.abs(diff) : 0, 
+      credit: diff > 0 ? diff : 0, 
+      currency_code: currentLedger?.currency || '',
+      description: '', 
+      tracking_number: '', 
+      quantity: 0 
+    }]);
+  };
+
+  const copyDescription = (index) => {
+    if (index > 0) {
+      const newItems = [...voucherItems];
+      newItems[index].description = newItems[index - 1].description;
+      setVoucherItems(newItems);
+    }
+  };
+
+  const removeRow = (index) => {
+    if (voucherItems.length > 1) {
+      setVoucherItems(voucherItems.filter((_, i) => i !== index));
+    }
   };
 
   const confirmDelete = async () => {
@@ -460,108 +513,21 @@ const Vouchers = ({ language = 'fa' }) => {
     }
   };
 
-  const handleItemChange = (index, field, value) => {
-    const newItems = [...voucherItems];
-    newItems[index][field] = value;
-    
-    if (field === 'debit' && parseNum(value) > 0) newItems[index]['credit'] = 0;
-    if (field === 'credit' && parseNum(value) > 0) newItems[index]['debit'] = 0;
-    
-    if (field === 'account_id') {
-      const selectedAcc = accounts.find(a => String(a.id) === String(value));
-      const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
-      const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
-      
-      let newCurrency = currentLedger?.currency || '';
-
-      if (selectedAcc && selectedAcc.metadata) {
-        const meta = typeof selectedAcc.metadata === 'string' ? JSON.parse(selectedAcc.metadata) : selectedAcc.metadata;
-        if ((meta.has_currency || meta.is_foreign_currency || meta.is_currency) && meta.currency_code) {
-          newCurrency = meta.currency_code;
-        }
-      }
-      newItems[index]['currency_code'] = newCurrency;
-    }
-
-    setVoucherItems(newItems);
-  };
-
-  const addItemRow = () => {
-    const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
-    const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
-    const defaultCurrency = currentLedger?.currency || '';
-
-    setVoucherItems([...voucherItems, { 
-      id: `temp_${Date.now()}`, 
-      row_number: voucherItems.length + 1, 
-      account_id: '', 
-      debit: 0, 
-      credit: 0, 
-      currency_code: defaultCurrency,
-      description: '', 
-      tracking_number: '', 
-      tracking_date: '', 
-      quantity: 0 
-    }]);
-  };
-
-  const copyRowDescription = (index) => {
-    if (index > 0) {
-      const newItems = [...voucherItems];
-      newItems[index].description = newItems[index - 1].description;
-      setVoucherItems(newItems);
-    }
-  };
-
-  const removeItemRow = (index) => {
-    const newItems = [...voucherItems];
-    newItems.splice(index, 1);
-    setVoucherItems(newItems);
-  };
-
-  const balanceVoucher = (index) => {
-    let totalD = 0;
-    let totalC = 0;
-    voucherItems.forEach((item, i) => {
-      if (i !== index) {
-        totalD += parseNum(item.debit);
-        totalC += parseNum(item.credit);
-      }
-    });
-    const diff = totalD - totalC;
-    const newItems = [...voucherItems];
-    if (diff > 0) { 
-      newItems[index].credit = diff; 
-      newItems[index].debit = 0; 
-    } else if (diff < 0) { 
-      newItems[index].debit = Math.abs(diff); 
-      newItems[index].credit = 0; 
-    } else { 
-      alert(t.alreadyBalanced); 
-      return; 
-    }
-    setVoucherItems(newItems);
+  const promptDelete = (voucher) => {
+    if (voucher.status === 'reviewed' || voucher.status === 'final') return;
+    setVoucherToDelete(voucher);
+    setShowDeleteModal(true);
   };
 
   const getStatusBadge = (status) => {
-    switch(status) {
-      case 'draft': return <Badge variant="neutral">{t.statusDraft}</Badge>;
-      case 'temporary': return <Badge variant="warning">{t.statusTemp}</Badge>;
-      case 'reviewed': return <Badge variant="info">{t.statusReviewed}</Badge>;
-      case 'final': return <Badge variant="success">{t.statusFinal}</Badge>;
-      default: return <Badge variant="neutral">{status}</Badge>;
-    }
-  };
-
-  const getDocTypeDisplay = (code) => {
-    const dt = docTypes.find(d => d.code === code || d.id === code);
-    return dt ? dt.title : code;
+    const variant = status === 'final' ? 'success' : status === 'reviewed' ? 'info' : status === 'temporary' ? 'warning' : 'neutral';
+    return <Badge variant={variant}>{t[`status${status.charAt(0).toUpperCase() + status.slice(1)}`]}</Badge>;
   };
 
   const columns = [
     { field: 'voucher_number', header: t.voucherNumber, width: 'w-24', sortable: true },
     { field: 'voucher_date', header: t.date, width: 'w-24', sortable: true },
-    { field: 'voucher_type', header: t.type, width: 'w-32', render: (row) => getDocTypeDisplay(row.voucher_type) },
+    { field: 'voucher_type', header: t.type, width: 'w-32', render: (row) => docTypes.find(d => d.code === row.voucher_type)?.title || row.voucher_type },
     { field: 'status', header: t.status, width: 'w-32', render: (row) => getStatusBadge(row.status) },
     { field: 'description', header: t.description, width: 'w-64' },
     { field: 'total_debit', header: t.totalDebit, width: 'w-32', render: (row) => formatNum(row.total_debit) },
@@ -574,18 +540,11 @@ const Vouchers = ({ language = 'fa' }) => {
     const isBalanced = totalDebit === totalCredit;
     const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final';
 
-    const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
-    const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
-    
-    // Core Logic: 
-    // 1. Get the structure code (e.g., '1') from the ledger
+    const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
     const ledgerStructureCode = String(currentLedger?.structure || '').trim();
-    
-    // 2. Find the actual structure record to get its BigInt ID
     const targetStructure = accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
     const structureId = targetStructure ? String(targetStructure.id) : null;
 
-    // 3. Filter accounts by that BigInt ID and ensure it's a subsidiary level
     const validAccountsForLedger = accounts.filter(a => {
         const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
         return String(a.structure_id) === structureId && isSubsidiary;
@@ -595,13 +554,10 @@ const Vouchers = ({ language = 'fa' }) => {
       <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
         <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={handleCloseForm} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
-            <div className="h-6 w-px bg-slate-300 mx-2"></div>
-            <h2 className="text-lg font-bold text-slate-800">
-              {currentVoucher.id ? t.edit : t.newVoucher}
-              {currentVoucher.voucher_number && <span className="text-indigo-600 mx-2">#{currentVoucher.voucher_number}</span>}
-            </h2>
-            <div className="mx-2">{getStatusBadge(currentVoucher.status)}</div>
+            <Button variant="ghost" onClick={() => { setView('list'); setCurrentVoucher(null); setVoucherItems([]); }} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
+            <div className="h-6 w-px bg-slate-200 mx-1"></div>
+            <h2 className="text-lg font-bold text-slate-800">{currentVoucher.id ? t.edit : t.newVoucher}</h2>
+            {currentVoucher.id && getStatusBadge(currentVoucher.status)}
           </div>
           <div className="flex items-center gap-2">
             {!isReadonly && (
@@ -614,116 +570,85 @@ const Vouchers = ({ language = 'fa' }) => {
         </div>
 
         <div className="flex-1 overflow-auto flex flex-col gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
-            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <SelectField label={t.fiscalYear} value={currentVoucher.fiscal_period_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
-                {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.code} - {f.title}</option>)}
-              </SelectField>
-              <SelectField label={t.ledger} value={currentVoucher.ledger_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
-                {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-              </SelectField>
-              <SelectField label={t.branch} value={currentVoucher.branch_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
-                {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
-              </SelectField>
-
-              <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2" />
-              <SelectField label={t.type} value={currentVoucher.voucher_type || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2">
-                {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
-                {docTypes.length === 0 && <option value="general">{t.general}</option>}
-              </SelectField>
-              <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2" />
-              
-              <div className="md:col-span-4 lg:col-span-6">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2" />
+            <SelectField label={t.type} value={currentVoucher.voucher_type || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2">
+              {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
+            </SelectField>
+            <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2" />
+            <div className="md:col-span-4 lg:col-span-6">
                 <InputField label={t.description} value={currentVoucher.description || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
-              </div>
             </div>
           </div>
 
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[300px]">
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
             <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
               <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
-              {!isReadonly && <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>}
+              {!isReadonly && (
+                <div className="flex gap-2">
+                   <Button variant="outline" size="sm" onClick={globalBalance} icon={Scale}>{t.balance}</Button>
+                   <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>
+                </div>
+              )}
             </div>
             
-            <div className="flex-1 overflow-x-auto custom-scrollbar pb-24">
+            <div className="flex-1 overflow-auto custom-scrollbar">
               <table className="w-full text-[12px] text-left rtl:text-right border-collapse">
                 <thead className="bg-slate-100 text-slate-700 sticky top-0 z-10 shadow-sm">
                   <tr>
                     <th className="px-3 py-2 text-center w-12 border-b border-slate-200">{t.row}</th>
                     <th className="px-3 py-2 min-w-[250px] border-b border-slate-200">{t.account}</th>
-                    <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.debit}</th>
-                    <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.credit}</th>
+                    <th className="px-3 py-2 min-w-[140px] border-b border-slate-200">{t.debit}</th>
+                    <th className="px-3 py-2 min-w-[140px] border-b border-slate-200">{t.credit}</th>
                     <th className="px-3 py-2 min-w-[100px] border-b border-slate-200">{t.currency}</th>
-                    <th className="px-3 py-2 min-w-[250px] border-b border-slate-200">{t.description}</th>
+                    <th className="px-3 py-2 min-w-[300px] border-b border-slate-200">{t.description}</th>
                     <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.trackingNumber}</th>
-                    <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.trackingDate}</th>
                     <th className="px-3 py-2 w-24 border-b border-slate-200">{t.quantity}</th>
-                    <th className="px-3 py-2 text-center w-24 border-b border-slate-200 sticky left-0 bg-slate-100 shadow-[-2px_0_5_rgba(0,0,0,0.05)]">{t.actions}</th>
+                    <th className="px-3 py-2 text-center w-20 border-b border-slate-200 sticky left-0 bg-slate-100 shadow-[-2px_0_5_rgba(0,0,0,0.05)]">{t.actions}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {voucherItems.map((item, index) => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="px-3 py-1.5 text-center font-bold text-slate-500">{index + 1}</td>
-                      <td className="px-3 py-1.5 align-top">
-                        <SearchableAccountSelect 
-                           accounts={validAccountsForLedger} 
-                           value={item.account_id} 
-                           onChange={(val) => handleItemChange(index, 'account_id', val)} 
-                           disabled={isReadonly}
-                           placeholder={t.searchAccount}
-                        />
+                    <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
+                      <td className="px-3 py-2 text-center font-bold text-slate-400">{index + 1}</td>
+                      <td className="px-3 py-2">
+                        <SearchableAccountSelect accounts={validAccountsForLedger} value={item.account_id} onChange={(v) => handleItemChange(index, 'account_id', v)} disabled={isReadonly} placeholder={t.searchAccount} />
                       </td>
-                      <td className="px-3 py-1.5 align-top">
-                         <input 
-                           type="text" 
-                           className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr font-mono text-right" 
-                           value={formatNum(item.debit)} 
-                           onChange={(e) => {
+                      <td className="px-3 py-2">
+                         <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] dir-ltr text-right font-mono focus:bg-white focus:border-indigo-400 outline-none" value={formatNum(item.debit)} onChange={(e) => {
                              const raw = e.target.value.replace(/,/g, '');
                              if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
-                           }} 
-                           disabled={isReadonly} 
-                         />
+                         }} disabled={isReadonly} />
                       </td>
-                      <td className="px-3 py-1.5 align-top">
-                         <input 
-                           type="text" 
-                           className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr font-mono text-right" 
-                           value={formatNum(item.credit)} 
-                           onChange={(e) => {
+                      <td className="px-3 py-2">
+                         <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] dir-ltr text-right font-mono focus:bg-white focus:border-indigo-400 outline-none" value={formatNum(item.credit)} onChange={(e) => {
                              const raw = e.target.value.replace(/,/g, '');
                              if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
-                           }} 
-                           disabled={isReadonly} 
-                         />
+                         }} disabled={isReadonly} />
                       </td>
-                      <td className="px-3 py-1.5 align-top">
-                        <select 
-                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800" 
-                          value={item.currency_code || ''} 
-                          onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)} 
-                          disabled={isReadonly}
-                        >
+                      <td className="px-3 py-2">
+                        <select className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] outline-none" value={item.currency_code || ''} onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)} disabled={isReadonly}>
                           <option value="">--</option>
                           {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
                         </select>
                       </td>
-                      <td className="px-3 py-1.5 align-top">
-                        <div className="flex gap-1 relative">
-                          <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800" value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} />
-                          {!isReadonly && index > 0 && (<button className="bg-slate-200 hover:bg-slate-300 text-slate-600 px-2 rounded transition-colors h-8 text-[10px] absolute left-0" onClick={() => copyRowDescription(index)} title="Copy from above">↑</button>)}
+                      <td className="px-3 py-2">
+                        <div className="flex gap-1 items-center">
+                          <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] focus:bg-white focus:border-indigo-400 outline-none" value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} />
+                          {!isReadonly && index > 0 && (
+                            <button onClick={() => copyDescription(index)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title={t.copyFromAbove}><Copy size={14} /></button>
+                          )}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5 align-top"><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800" value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly} /></td>
-                      <td className="px-3 py-1.5 align-top"><input type="date" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr" value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly} /></td>
-                      <td className="px-3 py-1.5 align-top"><input type="number" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} disabled={isReadonly} /></td>
-                      <td className="px-3 py-1.5 text-center align-top sticky left-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 z-10">
+                      <td className="px-3 py-2">
+                        <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] outline-none" value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] dir-ltr outline-none" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} disabled={isReadonly} />
+                      </td>
+                      <td className="px-3 py-2 text-center sticky left-0 bg-white group-hover:bg-indigo-50/30">
                         {!isReadonly && (
-                          <div className="flex gap-1 justify-center">
-                            <button className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 h-7 px-2 rounded text-[11px] font-bold transition-colors" onClick={() => balanceVoucher(index)} title={t.balance}>=</button>
-                            <button className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 h-7 px-2 rounded text-[11px] font-bold transition-colors" onClick={() => removeItemRow(index)}>X</button>
-                          </div>
+                          <button className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-all" onClick={() => removeRow(index)}><Trash2 size={14} /></button>
                         )}
                       </td>
                     </tr>
@@ -732,15 +657,19 @@ const Vouchers = ({ language = 'fa' }) => {
               </table>
             </div>
 
-            <div className="bg-slate-50 border-t border-slate-200 p-3 shrink-0">
-              <div className="flex items-center gap-6 font-mono text-[13px] font-bold">
-                <div className="flex items-center gap-2"><span className="text-slate-500 font-sans">{t.totalDebit}:</span><span className="text-indigo-700">{formatNum(totalDebit)}</span></div>
-                <div className="flex items-center gap-2"><span className="text-slate-500 font-sans">{t.totalCredit}:</span><span className="text-indigo-700">{formatNum(totalCredit)}</span></div>
-                <div className="h-4 w-px bg-slate-300"></div>
-                <div className={`flex items-center gap-2 ${isBalanced ? 'text-emerald-600' : 'text-red-500'}`}>
-                   {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
-                   <span>{isBalanced ? t.alreadyBalanced : `${formatNum(Math.abs(totalDebit - totalCredit))}`}</span>
-                </div>
+            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap gap-8 font-mono text-[14px] font-bold shrink-0">
+              <div className="flex items-center gap-2.5">
+                <span className="text-slate-500 font-sans text-xs uppercase tracking-wider">{t.totalDebit}</span>
+                <span className="text-indigo-700 bg-indigo-50 px-3 py-1 rounded-md border border-indigo-100">{formatNum(totalDebit)}</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span className="text-slate-500 font-sans text-xs uppercase tracking-wider">{t.totalCredit}</span>
+                <span className="text-indigo-700 bg-indigo-50 px-3 py-1 rounded-md border border-indigo-100">{formatNum(totalCredit)}</span>
+              </div>
+              <div className="flex-1"></div>
+              <div className={`flex items-center gap-2 px-4 py-1 rounded-full border ${isBalanced ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-red-700 bg-red-50 border-red-100'}`}>
+                 {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
+                 <span className="font-sans text-xs">{isBalanced ? t.alreadyBalanced : formatNum(Math.abs(totalDebit - totalCredit))}</span>
               </div>
             </div>
           </div>
@@ -751,48 +680,21 @@ const Vouchers = ({ language = 'fa' }) => {
 
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
-      
-      <div className="mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-2 text-indigo-800 font-bold text-sm">
           <Filter size={18} className="text-indigo-500"/>
           <span>{t.globalFiltersTitle}:</span>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative group">
-            <select 
-              value={contextVals.fiscal_year_id || ''} 
-              onChange={e => setContextVals(p => ({...p, fiscal_year_id: e.target.value}))}
-              className={`appearance-none bg-indigo-50 border border-indigo-200 hover:border-indigo-300 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer transition-colors shadow-sm ${isRtl ? 'pl-8 pr-3' : 'pr-8 pl-3'}`}
-            >
-              <option value="" disabled>{t.fiscalYear}</option>
-              {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.code} - {f.title}</option>)}
-            </select>
-            <ChevronDown size={14} className={`absolute top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500 ${isRtl ? 'left-2' : 'right-2'}`} />
-          </div>
-          
-          <div className="relative group">
-            <select 
-              value={contextVals.ledger_id || ''} 
-              onChange={e => setContextVals(p => ({...p, ledger_id: e.target.value}))}
-              className={`appearance-none bg-indigo-50 border border-indigo-200 hover:border-indigo-300 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer transition-colors shadow-sm ${isRtl ? 'pl-8 pr-3' : 'pr-8 pl-3'}`}
-            >
-              <option value="" disabled>{t.ledger}</option>
-              {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-            </select>
-            <ChevronDown size={14} className={`absolute top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500 ${isRtl ? 'left-2' : 'right-2'}`} />
-          </div>
-
-          <div className="relative group">
-            <select 
-              value={contextVals.branch_id || ''} 
-              onChange={e => setContextVals(p => ({...p, branch_id: e.target.value}))}
-              className={`appearance-none bg-indigo-50 border border-indigo-200 hover:border-indigo-300 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer transition-colors shadow-sm ${isRtl ? 'pl-8 pr-3' : 'pr-8 pl-3'}`}
-            >
-              <option value="" disabled>{t.branch}</option>
-              {branches.map(b => <option key={b.id} value={b.id}>{b.code ? `${b.code} - ` : ''}{b.title}</option>)}
-            </select>
-            <ChevronDown size={14} className={`absolute top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500 ${isRtl ? 'left-2' : 'right-2'}`} />
-          </div>
+        <div className="flex gap-3">
+          <select value={contextVals.fiscal_year_id} onChange={e => setContextVals({...contextVals, fiscal_year_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
+            {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+          </select>
+          <select value={contextVals.ledger_id} onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
+            {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+          </select>
+          <select value={contextVals.branch_id} onChange={e => setContextVals({...contextVals, branch_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
+            {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+          </select>
         </div>
       </div>
 
@@ -808,34 +710,36 @@ const Vouchers = ({ language = 'fa' }) => {
         </div>
       </div>
 
-      <FilterSection onSearch={() => {}} onClear={handleClearSearch} isRtl={isRtl} title={t.search}>
-        <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} className="dir-ltr" />
+      <FilterSection onSearch={() => {}} onClear={() => setSearchParams({ voucher_number: '', description: '' })} isRtl={isRtl} title={t.search}>
+        <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} />
         <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
       </FilterSection>
 
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <DataGrid 
           columns={columns} 
-          data={filteredVouchers} 
-          selectedIds={selectedIds}
-          onSelectRow={(id, checked) => setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id))}
-          onSelectAll={(checked) => setSelectedIds(checked ? filteredVouchers.map(i => i.id) : [])}
+          data={vouchers.filter(v => 
+            (!searchParams.voucher_number || String(v.voucher_number).includes(searchParams.voucher_number)) && 
+            (!searchParams.description || v.description?.includes(searchParams.description))
+          )} 
+          selectedIds={selectedIds} 
+          onSelectRow={(id, c) => setSelectedIds(c ? [...selectedIds, id] : selectedIds.filter(i => i !== id))} 
+          onSelectAll={(c) => setSelectedIds(c ? vouchers.map(v => v.id) : [])} 
           onCreate={() => handleOpenForm()} 
-          onDelete={(ids) => promptDelete(filteredVouchers.find(v => v.id === ids[0]))} 
-          onDoubleClick={(row) => handleOpenForm(row)}
-          isRtl={isRtl}
-          isLoading={loading}
-          actions={(row) => (
-            <>
-              <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(row)} title={t.edit} />
-              <Button variant="ghost" size="iconSm" icon={Trash2} onClick={() => promptDelete(row)} title={t.delete} className="text-red-500 hover:text-red-700 hover:bg-red-50" />
-            </>
+          onDelete={(ids) => { setVoucherToDelete(vouchers.find(v => v.id === ids[0])); setShowDeleteModal(true); }} 
+          onDoubleClick={(r) => handleOpenForm(r)} 
+          isRtl={isRtl} 
+          isLoading={loading} 
+          actions={(r) => (
+            <div className="flex gap-1 justify-center">
+              <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r)} />
+              <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} />
+            </div>
           )}
         />
       </div>
 
-      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title={t.delete}
-        footer={<><Button variant="ghost" onClick={() => setShowDeleteModal(false)}>{t.backToList}</Button><Button variant="danger" onClick={confirmDelete}>{t.delete}</Button></>}>
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title={t.delete} footer={<><Button variant="ghost" onClick={() => setShowDeleteModal(false)}>{t.backToList}</Button><Button variant="danger" onClick={confirmDelete}>{t.delete}</Button></>}>
         <div className="p-4"><p className="text-slate-700 font-medium">{t.confirmDelete}</p></div>
       </Modal>
     </div>
