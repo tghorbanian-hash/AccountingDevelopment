@@ -272,6 +272,14 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const fetchVouchers = async () => {
     if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id || !contextVals.branch_id) return;
+    
+    // Validate UUID format before fetching to prevent 400 Bad Request
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(contextVals.fiscal_year_id)) {
+       console.warn('fiscal_year_id is not a valid UUID. Skipping voucher fetch.');
+       return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.schema('gl')
@@ -572,8 +580,10 @@ const Vouchers = ({ language = 'fa' }) => {
 
     const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
     const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
-    const ledgerStructure = currentLedger?.structure || '';
-    const validAccountsForLedger = accounts.filter(a => String(a.structure_id) === String(ledgerStructure));
+    
+    // Core Logic: Filter accounts based on the Ledger's 'structure' field matching account's 'structure_id'
+    const ledgerStructureCode = currentLedger?.structure || '';
+    const validAccountsForLedger = accounts.filter(a => String(a.structure_id) === String(ledgerStructureCode));
 
     return (
       <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
