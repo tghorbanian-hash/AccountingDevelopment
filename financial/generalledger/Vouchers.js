@@ -1,3 +1,4 @@
+```javascript
 /* Filename: financial/generalledger/Vouchers.js */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
@@ -272,7 +273,6 @@ const Vouchers = ({ language = 'fa' }) => {
   const [docTypes, setDocTypes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   
-  // States for Detail Management
   const [detailTypes, setDetailTypes] = useState([]);
   const [allDetailInstances, setAllDetailInstances] = useState([]);
   
@@ -730,13 +730,13 @@ const Vouchers = ({ language = 'fa' }) => {
               <InputField label={t.ledger} value={currentLedgerTitle} disabled isRtl={isRtl} />
               <InputField label={t.branch} value={currentBranchTitle} disabled isRtl={isRtl} />
               
-              <InputField label={t.voucherNumber} value={currentVoucher.voucher_number || '-'} disabled isRtl={isRtl} dir="ltr" className="font-mono text-center bg-slate-50" />
-              <InputField label={t.dailyNumber} value={currentVoucher.daily_number || '-'} disabled isRtl={isRtl} dir="ltr" className="font-mono text-center bg-slate-50" />
+              <InputField label={t.voucherNumber} value={currentVoucher.voucher_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
+              <InputField label={t.dailyNumber} value={currentVoucher.daily_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
+              <InputField label={t.crossReference} value={currentVoucher.cross_reference || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
+              
+              <InputField label={t.referenceNumber} value={currentVoucher.reference_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
+              <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} dir="ltr" className="text-center" />
               <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
-
-              <InputField label={t.crossReference} value={currentVoucher.cross_reference || '-'} disabled isRtl={isRtl} dir="ltr" className="font-mono text-center bg-slate-50" />
-              <InputField label={t.referenceNumber} value={currentVoucher.reference_number || '-'} disabled isRtl={isRtl} dir="ltr" className="font-mono text-center bg-slate-50" />
-              <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} dir="ltr" />
               
               <SelectField label={t.type} value={currentVoucher.voucher_type || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} disabled={isReadonly} isRtl={isRtl} >
                 {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
@@ -778,7 +778,6 @@ const Vouchers = ({ language = 'fa' }) => {
                         onClick={() => setFocusedRowId(item.id)}
                      >
                         <div className="flex flex-col md:flex-row gap-0">
-                           {/* Row Number & Basic Actions */}
                            <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg">
                               <span className="text-xs font-bold text-slate-400 mb-2">{index + 1}</span>
                               {!isReadonly && (
@@ -786,9 +785,7 @@ const Vouchers = ({ language = 'fa' }) => {
                               )}
                            </div>
                            
-                           {/* Main Content Area */}
                            <div className="flex-1 p-2 grid grid-cols-12 gap-x-3 gap-y-2">
-                              {/* Account and Detail */}
                               <div className="col-span-12 md:col-span-6 lg:col-span-4 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
                                  <div className={`border rounded ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
@@ -802,23 +799,21 @@ const Vouchers = ({ language = 'fa' }) => {
                                  </div>
                               </div>
 
-                              {/* Amount */}
                               <div className="col-span-6 md:col-span-3 lg:col-span-2 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
-                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right font-mono outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
+                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
                                      const raw = e.target.value.replace(/,/g, '');
                                      if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
                                  }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                               </div>
                               <div className="col-span-6 md:col-span-3 lg:col-span-2 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
-                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right font-mono outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
+                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
                                      const raw = e.target.value.replace(/,/g, '');
                                      if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
                                  }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                               </div>
 
-                              {/* Description - Full width mostly */}
                               <div className="col-span-12 lg:col-span-8 flex flex-col gap-1 mt-1">
                                  <div className="flex justify-between items-center">
                                      <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
@@ -829,7 +824,6 @@ const Vouchers = ({ language = 'fa' }) => {
                                  <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                               </div>
 
-                              {/* Extra fields shown when focused or has data */}
                               {(isFocused || hasTracking || item.tracking_number || item.quantity) && (
                                   <div className="col-span-12 lg:col-span-4 flex gap-2 mt-1">
                                       <div className={`flex-1 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
@@ -838,7 +832,7 @@ const Vouchers = ({ language = 'fa' }) => {
                                       </div>
                                       <div className={`flex-1 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
                                          <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
-                                         <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} font-mono uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => setFocusedRowId(item.id)} />
+                                         <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => setFocusedRowId(item.id)} />
                                       </div>
                                   </div>
                               )}
@@ -849,7 +843,7 @@ const Vouchers = ({ language = 'fa' }) => {
                })}
             </div>
 
-            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap gap-8 font-mono text-[14px] font-bold shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap gap-8 text-[14px] font-bold shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
               <div className="flex items-center gap-2.5">
                 <span className="text-slate-500 font-sans text-xs uppercase tracking-wider">{t.totalDebit}</span>
                 <span className="text-indigo-700 bg-indigo-50 px-3 py-1 rounded-md border border-indigo-100">{formatNum(totalDebit)}</span>
@@ -940,3 +934,5 @@ const Vouchers = ({ language = 'fa' }) => {
 
 window.Vouchers = Vouchers;
 export default Vouchers;
+
+```
