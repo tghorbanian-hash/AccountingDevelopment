@@ -148,8 +148,8 @@ const Vouchers = ({ language = 'fa' }) => {
     try {
       const [accRes, brRes, fyRes, ledRes] = await Promise.all([
         supabase.schema('gl').from('accounts').select('id, code, title').eq('is_active', true).order('code'),
-        supabase.schema('base').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
-        supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('status', true).order('code', { ascending: false }),
+        supabase.schema('gen').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
+        supabase.schema('gk').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
         supabase.schema('gl').from('ledgers').select('id, code, title').eq('is_active', true).order('title')
       ]);
       
