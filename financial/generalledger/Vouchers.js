@@ -1,71 +1,17 @@
+/* Filename: financial/generalledger/Vouchers.js */
 import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
+  Save, FileText, CheckCircle, FileWarning, Search 
+} from 'lucide-react';
 
-const { supabase } = window;
-
-// Safe UI Components Extraction / Fallback (Prevents React Error #130)
-const UI = window.UI || {};
-
-const Card = UI.Card || (({ children, className = '', ...props }) => (
-  <div className={`bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl rounded-xl ${className}`} {...props}>
-    {children}
-  </div>
-));
-
-const Button = UI.Button || (({ children, variant = 'primary', className = '', ...props }) => {
-  const bg = variant === 'primary' ? 'bg-blue-600 hover:bg-blue-500 text-white' : 
-             variant === 'danger' ? 'bg-red-600 hover:bg-red-500 text-white' : 
-             variant === 'warning' ? 'bg-yellow-600 hover:bg-yellow-500 text-white' : 
-             'bg-slate-700 hover:bg-slate-600 text-white';
-  return (
-    <button className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${bg} disabled:opacity-50 ${className}`} {...props}>
-      {children}
-    </button>
-  );
-});
-
-const Input = UI.Input || (({ label, className = '', ...props }) => (
-  <div className={`w-full ${className}`}>
-    {label && <label className="block text-xs mb-1.5 text-gray-300 font-bold">{label}</label>}
-    <input className="w-full bg-black/30 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-blue-500 transition-colors" {...props} />
-  </div>
-));
-
-const Select = UI.Select || (({ label, options = [], className = '', ...props }) => (
-  <div className={`w-full ${className}`}>
-    {label && <label className="block text-xs mb-1.5 text-gray-300 font-bold">{label}</label>}
-    <select className="w-full bg-black/30 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-blue-500 transition-colors" {...props}>
-      <option value="">--</option>
-      {options.map((o, idx) => (
-        <option key={o.value || idx} value={o.value} className="bg-slate-800">{o.label}</option>
-      ))}
-    </select>
-  </div>
-));
-
-const Modal = UI.Modal || (({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-white/10 bg-slate-900/50">
-          <h3 className="font-bold text-lg text-white">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors text-xl font-bold">✕</button>
-        </div>
-        <div className="p-0">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-});
-
-const translations = {
+const localTranslations = {
   en: {
     title: 'Journal Vouchers',
+    subtitle: 'Manage accounting vouchers and documents',
     newVoucher: 'New Voucher',
     search: 'Advanced Search',
     voucherNumber: 'Voucher No.',
-    dailyNumber: 'Daily No.',
     date: 'Date',
     type: 'Type',
     status: 'Status',
@@ -75,22 +21,17 @@ const translations = {
     actions: 'Actions',
     edit: 'Edit',
     delete: 'Delete',
-    copy: 'Copy',
-    print: 'Print',
-    numbering: 'Numbering',
     branch: 'Branch',
     subsidiaryNumber: 'Subsidiary No.',
-    referenceNumber: 'Ref No.',
-    crossReference: 'Cross Ref.',
     items: 'Voucher Items',
     addRow: 'Add Item',
     row: 'Row',
     account: 'Account',
     debit: 'Debit',
     credit: 'Credit',
-    balance: 'Balance Voucher',
-    saveDraft: 'Save as Draft',
-    saveTemp: 'Save as Temporary',
+    balance: 'Balance',
+    saveDraft: 'Save Draft',
+    saveTemp: 'Save Temporary',
     backToList: 'Back to List',
     confirmDelete: 'Are you sure you want to delete this voucher?',
     statusDraft: 'Draft',
@@ -102,31 +43,18 @@ const translations = {
     trackingNumber: 'Tracking No.',
     trackingDate: 'Tracking Date',
     quantity: 'Quantity',
-    itemsCount: 'Items Count',
-    page: 'Page',
-    of: 'of',
-    rowsPerPage: 'Rows per page',
-    noData: 'No records found to display',
     unbalancedError: 'Voucher is not balanced. Can only save as draft.',
     alreadyBalanced: 'Voucher is already balanced.',
     cannotDelete: 'Reviewed or Final vouchers cannot be deleted.',
-    advancedFilters: 'Advanced Filters',
-    field: 'Field',
-    operator: 'Operator',
-    value: 'Value',
-    applyFilter: 'Apply',
-    clearFilters: 'Clear',
-    equals: 'Equals',
-    contains: 'Contains',
-    greaterThan: 'Greater Than',
-    lessThan: 'Less Than'
+    reqFields: 'Description and Account are required for all items.',
+    emptyData: 'No records found.'
   },
   fa: {
     title: 'اسناد حسابداری',
+    subtitle: 'مدیریت و صدور اسناد حسابداری دفتر کل',
     newVoucher: 'سند جدید',
     search: 'جستجوی پیشرفته',
     voucherNumber: 'شماره سند',
-    dailyNumber: 'شماره روزانه',
     date: 'تاریخ',
     type: 'نوع سند',
     status: 'وضعیت',
@@ -136,20 +64,15 @@ const translations = {
     actions: 'عملیات',
     edit: 'ویرایش',
     delete: 'حذف',
-    copy: 'کپی',
-    print: 'چاپ',
-    numbering: 'شماره گذاری',
     branch: 'شعبه',
     subsidiaryNumber: 'شماره فرعی',
-    referenceNumber: 'شماره عطف',
-    crossReference: 'شماره ارجاع',
     items: 'اقلام سند',
     addRow: 'ردیف جدید',
     row: 'ردیف',
     account: 'معین',
     debit: 'بدهکار',
     credit: 'بستانکار',
-    balance: 'موازنه مبلغ',
+    balance: 'موازنه',
     saveDraft: 'ذخیره یادداشت',
     saveTemp: 'ذخیره موقت',
     backToList: 'بازگشت به فهرست',
@@ -163,53 +86,40 @@ const translations = {
     trackingNumber: 'شماره پیگیری',
     trackingDate: 'تاریخ پیگیری',
     quantity: 'مقدار',
-    itemsCount: 'تعداد کل',
-    page: 'صفحه',
-    of: 'از',
-    rowsPerPage: 'تعداد در صفحه',
-    noData: 'اطلاعاتی برای نمایش وجود ندارد',
     unbalancedError: 'سند بالانس نیست و فقط به عنوان یادداشت قابل ذخیره است.',
     alreadyBalanced: 'سند بالانس است.',
     cannotDelete: 'اسناد بررسی شده یا قطعی قابل حذف نیستند.',
-    advancedFilters: 'فیلترهای پیشرفته',
-    field: 'فیلد',
-    operator: 'عملگر',
-    value: 'مقدار',
-    applyFilter: 'اعمال',
-    clearFilters: 'حذف فیلترها',
-    equals: 'برابر باشد با',
-    contains: 'شامل باشد',
-    greaterThan: 'بزرگتر از',
-    lessThan: 'کوچکتر از'
+    reqFields: 'شرح و حساب معین برای تمامی اقلام اجباری است.',
+    emptyData: 'اطلاعاتی یافت نشد.'
   }
 };
 
-window.Vouchers = function Vouchers({ language = 'fa' }) {
-  const t = translations[language];
+const Vouchers = ({ language = 'fa' }) => {
+  const t = localTranslations[language];
   const isRtl = language === 'fa';
   
-  const [view, setView] = useState('list');
+  const UI = window.UI || {};
+  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, Callout } = UI;
+  const supabase = window.supabase;
+
+  // Views & UI State
+  const [view, setView] = useState('list'); // 'list' or 'form'
   const [loading, setLoading] = useState(false);
-  
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [voucherToDelete, setVoucherToDelete] = useState(null);
+
+  // Data State
   const [vouchers, setVouchers] = useState([]);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [accounts, setAccounts] = useState([]);
   const [branches, setBranches] = useState([]);
   
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [sortField, setSortField] = useState('voucher_date');
-  const [sortAsc, setSortAsc] = useState(false);
+  // List State
+  const [searchParams, setSearchParams] = useState({ voucher_number: '', description: '' });
+  const [selectedIds, setSelectedIds] = useState([]);
 
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
-  const [filters, setFilters] = useState([]);
-  const [currentFilter, setCurrentFilter] = useState({ field: 'voucher_number', operator: 'eq', value: '' });
-
+  // Form State
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [voucherItems, setVoucherItems] = useState([]);
-  
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [voucherToDelete, setVoucherToDelete] = useState(null);
 
   useEffect(() => {
     fetchLookups();
@@ -219,13 +129,14 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
     if (view === 'list') {
       fetchVouchers();
     }
-  }, [page, pageSize, sortField, sortAsc, filters, view]);
+  }, [view]);
 
   const fetchLookups = async () => {
+    if (!supabase) return;
     try {
       const [accRes, brRes] = await Promise.all([
-        supabase.from('accounts').select('id, code, title, is_active').eq('is_active', true),
-        supabase.from('branches').select('id, code, title, is_active').eq('is_active', true)
+        supabase.schema('gl').from('accounts').select('id, code, title').eq('is_active', true).order('code'),
+        supabase.schema('gen').from('branches').select('id, code, title').eq('is_active', true)
       ]);
       if (accRes.data) setAccounts(accRes.data);
       if (brRes.data) setBranches(brRes.data);
@@ -235,27 +146,17 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
   };
 
   const fetchVouchers = async () => {
+    if (!supabase) return;
     setLoading(true);
     try {
-      let query = supabase.schema('gl').from('vouchers').select('*', { count: 'exact' });
-
-      filters.forEach(f => {
-        if (f.operator === 'eq') query = query.eq(f.field, f.value);
-        if (f.operator === 'ilike') query = query.ilike(f.field, `%${f.value}%`);
-        if (f.operator === 'gt') query = query.gt(f.field, f.value);
-        if (f.operator === 'lt') query = query.lt(f.field, f.value);
-      });
-
-      query = query.order(sortField, { ascending: sortAsc });
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-      query = query.range(from, to);
-
-      const { data, error, count } = await query;
+      const { data, error } = await supabase.schema('gl')
+        .from('vouchers')
+        .select('*')
+        .order('voucher_date', { ascending: false })
+        .order('voucher_number', { ascending: false });
       
       if (error) throw error;
       setVouchers(data || []);
-      setTotalRecords(count || 0);
     } catch (error) {
       console.error('Error fetching vouchers:', error);
     } finally {
@@ -263,28 +164,17 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
     }
   };
 
-  const addFilter = () => {
-    if (!currentFilter.value) return;
-    setFilters([...filters, { ...currentFilter }]);
-    setCurrentFilter({ ...currentFilter, value: '' });
-    setPage(1);
+  const handleClearSearch = () => {
+    setSearchParams({ voucher_number: '', description: '' });
   };
 
-  const removeFilter = (index) => {
-    const newFilters = [...filters];
-    newFilters.splice(index, 1);
-    setFilters(newFilters);
-    setPage(1);
-  };
-
-  const handleSort = (field) => {
-    if (sortField === field) {
-      setSortAsc(!sortAsc);
-    } else {
-      setSortField(field);
-      setSortAsc(true);
-    }
-  };
+  const filteredVouchers = useMemo(() => {
+    return vouchers.filter(v => {
+      const matchNo = !searchParams.voucher_number || String(v.voucher_number).includes(searchParams.voucher_number);
+      const matchDesc = !searchParams.description || (v.description && v.description.includes(searchParams.description));
+      return matchNo && matchDesc;
+    });
+  }, [vouchers, searchParams]);
 
   const handleOpenForm = async (voucher = null) => {
     if (voucher) {
@@ -335,36 +225,37 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
   };
 
   const handleSaveVoucher = async (status) => {
+    if (!supabase) return;
+    
+    // Validation
+    const missingReqs = voucherItems.some(item => !item.description || !item.account_id);
+    if (missingReqs) {
+      alert(t.reqFields);
+      return;
+    }
+
+    const totalDebit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.debit) || 0), 0);
+    const totalCredit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.credit) || 0), 0);
+    
+    if (status === 'temporary' && totalDebit !== totalCredit) {
+      alert(t.unbalancedError);
+      return;
+    }
+
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      const missingDescriptions = voucherItems.some(item => !item.description || item.description.trim() === '');
-      if (missingDescriptions) {
-        alert(language === 'fa' ? 'شرح تمامی اقلام اجباری است.' : 'Description is required for all items.');
-        setLoading(false);
-        return;
-      }
-
-      const voucherData = { ...currentVoucher, status };
-      
-      const totalDebit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.debit) || 0), 0);
-      const totalCredit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.credit) || 0), 0);
-      
-      if (status === 'temporary' && totalDebit !== totalCredit) {
-        alert(t.unbalancedError);
-        setLoading(false);
-        return;
-      }
-
-      voucherData.total_debit = totalDebit;
-      voucherData.total_credit = totalCredit;
+      const voucherData = { 
+        ...currentVoucher, 
+        status,
+        total_debit: totalDebit,
+        total_credit: totalCredit
+      };
 
       let savedVoucherId = currentVoucher.id;
 
       if (savedVoucherId) {
         const { error } = await supabase.schema('gl').from('vouchers').update(voucherData).eq('id', savedVoucherId);
         if (error) throw error;
-        
         await supabase.schema('gl').from('voucher_items').delete().eq('voucher_id', savedVoucherId);
       } else {
         const { data, error } = await supabase.schema('gl').from('vouchers').insert([voucherData]).select().single();
@@ -392,27 +283,27 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
       handleCloseForm();
     } catch (error) {
       console.error('Error saving voucher:', error);
-      alert('Error saving voucher.');
+      alert('Error saving voucher: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteClick = (voucher) => {
+  const promptDelete = (voucher) => {
     if (voucher.status === 'reviewed' || voucher.status === 'final') {
       alert(t.cannotDelete);
       return;
     }
     setVoucherToDelete(voucher);
-    setIsDeleting(true);
+    setShowDeleteModal(true);
   };
 
   const confirmDelete = async () => {
-    if (!voucherToDelete) return;
+    if (!voucherToDelete || !supabase) return;
     try {
       const { error } = await supabase.schema('gl').from('vouchers').delete().eq('id', voucherToDelete.id);
       if (error) throw error;
-      setIsDeleting(false);
+      setShowDeleteModal(false);
       setVoucherToDelete(null);
       fetchVouchers();
     } catch (error) {
@@ -420,6 +311,7 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
     }
   };
 
+  // Item Table Methods
   const handleItemChange = (index, field, value) => {
     const newItems = [...voucherItems];
     newItems[index][field] = value;
@@ -484,21 +376,27 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
     setVoucherItems(newItems);
   };
 
-  const formatNumber = (num) => {
-    return Number(num || 0).toLocaleString();
-  };
+  const formatNumber = (num) => Number(num || 0).toLocaleString();
 
-  const getStatusLabel = (status) => {
+  const getStatusBadge = (status) => {
     switch(status) {
-      case 'draft': return t.statusDraft;
-      case 'temporary': return t.statusTemp;
-      case 'reviewed': return t.statusReviewed;
-      case 'final': return t.statusFinal;
-      default: return status;
+      case 'draft': return <Badge variant="neutral">{t.statusDraft}</Badge>;
+      case 'temporary': return <Badge variant="warning">{t.statusTemp}</Badge>;
+      case 'reviewed': return <Badge variant="info">{t.statusReviewed}</Badge>;
+      case 'final': return <Badge variant="success">{t.statusFinal}</Badge>;
+      default: return <Badge variant="neutral">{status}</Badge>;
     }
   };
 
-  const totalPages = Math.ceil(totalRecords / pageSize);
+  const columns = [
+    { field: 'voucher_number', header: t.voucherNumber, width: 'w-24', sortable: true },
+    { field: 'voucher_date', header: t.date, width: 'w-24', sortable: true },
+    { field: 'voucher_type', header: t.type, width: 'w-32', render: (row) => row.voucher_type === 'opening' ? t.opening : t.general },
+    { field: 'status', header: t.status, width: 'w-32', render: (row) => getStatusBadge(row.status) },
+    { field: 'description', header: t.description, width: 'w-64' },
+    { field: 'total_debit', header: t.totalDebit, width: 'w-32', render: (row) => formatNumber(row.total_debit) },
+    { field: 'total_credit', header: t.totalCredit, width: 'w-32', render: (row) => formatNumber(row.total_credit) }
+  ];
 
   if (view === 'form' && currentVoucher) {
     const totalDebit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.debit) || 0), 0);
@@ -507,365 +405,275 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
     const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final';
 
     return (
-      <div className="w-full space-y-4 p-4 text-white" dir={isRtl ? 'rtl' : 'ltr'}>
-        <div className="flex justify-between items-center mb-4 bg-white/5 p-4 rounded-lg backdrop-blur-md border border-white/10 shadow-xl">
-          <h2 className="text-2xl font-bold">{currentVoucher.id ? t.edit : t.newVoucher}</h2>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleCloseForm}>{t.backToList}</Button>
+      <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+        {/* Header Actions */}
+        <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 shadow-sm shrink-0">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={handleCloseForm} icon={isRtl ? ArrowRight : ArrowLeft}>
+              {t.backToList}
+            </Button>
+            <div className="h-6 w-px bg-slate-300 mx-2"></div>
+            <h2 className="text-lg font-bold text-slate-800">
+              {currentVoucher.id ? t.edit : t.newVoucher}
+              {currentVoucher.voucher_number && <span className="text-indigo-600 mx-2">#{currentVoucher.voucher_number}</span>}
+            </h2>
+            <div className="mx-2">{getStatusBadge(currentVoucher.status)}</div>
+          </div>
+          <div className="flex items-center gap-2">
             {!isReadonly && (
               <>
-                <Button variant="warning" onClick={() => handleSaveVoucher('draft')}>{t.saveDraft}</Button>
-                <Button variant="primary" onClick={() => handleSaveVoucher('temporary')}>{t.saveTemp}</Button>
+                <Button variant="outline" onClick={() => handleSaveVoucher('draft')} icon={Save}>{t.saveDraft}</Button>
+                <Button variant="primary" onClick={() => handleSaveVoucher('temporary')} icon={CheckCircle}>{t.saveTemp}</Button>
               </>
             )}
           </div>
         </div>
 
-        <Card className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl rounded-xl">
-          <Select 
-            label={t.branch} 
-            value={currentVoucher.branch_id || ''} 
-            onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})}
-            disabled={isReadonly}
-            options={branches.map(b => ({ value: b.id, label: b.title }))}
-          />
-          <Input 
-            type="date" 
-            label={t.date} 
-            value={currentVoucher.voucher_date || ''} 
-            onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})}
-            disabled={isReadonly}
-          />
-          <Select 
-            label={t.type} 
-            value={currentVoucher.voucher_type || 'general'} 
-            onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})}
-            disabled={isReadonly}
-            options={[
-              { value: 'general', label: t.general },
-              { value: 'opening', label: t.opening }
-            ]}
-          />
-          <Input 
-            label={t.subsidiaryNumber} 
-            value={currentVoucher.subsidiary_number || ''} 
-            onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})}
-            disabled={isReadonly}
-          />
-          <div className="md:col-span-4">
-            <Input 
-              label={t.description} 
-              value={currentVoucher.description || ''} 
-              onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})}
-              disabled={isReadonly}
-            />
-          </div>
-        </Card>
-
-        <Card className="p-0 bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl rounded-xl overflow-hidden mt-6">
-          <div className="flex justify-between items-center p-4 bg-black/20 border-b border-white/10">
-            <h3 className="text-xl font-bold">{t.items}</h3>
-            {!isReadonly && <Button variant="primary" onClick={addItemRow}>{t.addRow}</Button>}
-          </div>
-          
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-sm text-left rtl:text-right whitespace-nowrap">
-              <thead className="text-xs uppercase bg-white/10 text-gray-200">
-                <tr>
-                  <th className="px-4 py-3">{t.row}</th>
-                  <th className="px-4 py-3 min-w-[200px]">{t.account}</th>
-                  <th className="px-4 py-3 min-w-[150px]">{t.debit}</th>
-                  <th className="px-4 py-3 min-w-[150px]">{t.credit}</th>
-                  <th className="px-4 py-3 min-w-[250px]">{t.description}</th>
-                  <th className="px-4 py-3 min-w-[120px]">{t.trackingNumber}</th>
-                  <th className="px-4 py-3 min-w-[150px]">{t.trackingDate}</th>
-                  <th className="px-4 py-3 min-w-[100px]">{t.quantity}</th>
-                  <th className="px-4 py-3 text-center">{t.actions}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {voucherItems.map((item, index) => (
-                  <tr key={item.id} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                    <td className="px-4 py-3 text-center font-bold">{index + 1}</td>
-                    <td className="px-4 py-3">
-                      <select 
-                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none focus:border-blue-500 transition-colors"
-                        value={item.account_id || ''}
-                        onChange={(e) => handleItemChange(index, 'account_id', e.target.value)}
-                        disabled={isReadonly}
-                      >
-                        <option value="">--</option>
-                        {accounts.map(acc => (
-                          <option key={acc.id} value={acc.id}>{acc.code} - {acc.title}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input 
-                        type="number" 
-                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none focus:border-blue-500 transition-colors"
-                        value={item.debit}
-                        onChange={(e) => handleItemChange(index, 'debit', e.target.value)}
-                        disabled={isReadonly}
-                        min="0"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <input 
-                        type="number" 
-                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none focus:border-blue-500 transition-colors"
-                        value={item.credit}
-                        onChange={(e) => handleItemChange(index, 'credit', e.target.value)}
-                        disabled={isReadonly}
-                        min="0"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <input 
-                          type="text" 
-                          className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none focus:border-blue-500 transition-colors"
-                          value={item.description || ''}
-                          onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                          disabled={isReadonly}
-                          required
-                        />
-                        {!isReadonly && index > 0 && (
-                          <button className="bg-white/10 hover:bg-white/20 px-2 rounded font-bold text-white transition-colors" onClick={() => copyRowDescription(index)} title="Copy from above">
-                            ↑
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input 
-                        type="text" 
-                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none focus:border-blue-500 transition-colors"
-                        value={item.tracking_number || ''}
-                        onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)}
-                        disabled={isReadonly}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <input 
-                        type="date" 
-                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none focus:border-blue-500 transition-colors"
-                        value={item.tracking_date || ''}
-                        onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)}
-                        disabled={isReadonly}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <input 
-                        type="number" 
-                        className="w-full bg-black/30 border border-white/20 rounded p-2 text-white outline-none focus:border-blue-500 transition-colors"
-                        value={item.quantity || ''}
-                        onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                        disabled={isReadonly}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {!isReadonly && (
-                        <div className="flex gap-2 justify-center">
-                          <button className="bg-blue-600/50 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors" onClick={() => balanceVoucher(index)} title={t.balance}>=</button>
-                          <button className="bg-red-600/50 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors" onClick={() => removeItemRow(index)}>X</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="font-bold bg-black/40 border-t border-white/20">
-                <tr>
-                  <td colSpan="2" className="px-4 py-4 text-left rtl:text-right">{t.totalDebit} / {t.totalCredit}:</td>
-                  <td className="px-4 py-4 text-blue-400 text-lg">{formatNumber(totalDebit)}</td>
-                  <td className="px-4 py-4 text-blue-400 text-lg">{formatNumber(totalCredit)}</td>
-                  <td colSpan="5" className={`px-4 py-4 text-lg ${isBalanced ? 'text-green-400' : 'text-red-400'}`}>
-                    {isBalanced ? t.alreadyBalanced : `اختلاف: ${formatNumber(Math.abs(totalDebit - totalCredit))}`}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full space-y-6 p-4 text-white" dir={isRtl ? 'rtl' : 'ltr'}>
-      <div className="flex justify-between items-center bg-white/5 p-4 rounded-lg backdrop-blur-md border border-white/10 shadow-xl">
-        <h2 className="text-2xl font-bold">{t.title}</h2>
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={() => {}}>{t.numbering}</Button>
-          <Button variant="primary" onClick={() => handleOpenForm()}>{t.newVoucher}</Button>
-        </div>
-      </div>
-
-      <Card className="p-6 bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl rounded-xl">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4 cursor-pointer group" onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}>
-            <h3 className="text-lg font-semibold flex items-center gap-2 group-hover:text-blue-300 transition-colors">
-              <span className="text-blue-400">{showAdvancedSearch ? '▼' : '▶'}</span> {t.search}
-            </h3>
-          </div>
-          
-          {showAdvancedSearch && (
-            <div className="p-4 bg-black/20 rounded-lg border border-white/5 mb-4 space-y-4">
-              <div className="flex flex-wrap gap-4 items-end">
-                <div className="flex-1 min-w-[200px]">
-                  <Select 
-                    label={t.field}
-                    value={currentFilter.field}
-                    onChange={(e) => setCurrentFilter({...currentFilter, field: e.target.value})}
-                    options={[
-                      { value: 'voucher_number', label: t.voucherNumber },
-                      { value: 'voucher_date', label: t.date },
-                      { value: 'description', label: t.description }
-                    ]}
-                  />
-                </div>
-                <div className="flex-1 min-w-[150px]">
-                  <Select 
-                    label={t.operator}
-                    value={currentFilter.operator}
-                    onChange={(e) => setCurrentFilter({...currentFilter, operator: e.target.value})}
-                    options={[
-                      { value: 'eq', label: t.equals },
-                      { value: 'ilike', label: t.contains },
-                      { value: 'gt', label: t.greaterThan },
-                      { value: 'lt', label: t.lessThan }
-                    ]}
-                  />
-                </div>
-                <div className="flex-[2] min-w-[200px]">
-                  <Input 
-                    label={t.value}
-                    value={currentFilter.value}
-                    onChange={(e) => setCurrentFilter({...currentFilter, value: e.target.value})}
-                    onKeyPress={(e) => e.key === 'Enter' && addFilter()}
-                  />
-                </div>
-                <Button variant="primary" onClick={addFilter} className="mb-1 px-8">{t.applyFilter}</Button>
+        <div className="flex-1 overflow-auto flex flex-col gap-4">
+          {/* Header Info */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <SelectField 
+                label={t.branch} 
+                value={currentVoucher.branch_id || ''} 
+                onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})}
+                disabled={isReadonly}
+                isRtl={isRtl}
+              >
+                <option value="">--</option>
+                {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+              </SelectField>
+              <InputField 
+                type="date" 
+                label={t.date} 
+                value={currentVoucher.voucher_date || ''} 
+                onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})}
+                disabled={isReadonly}
+                isRtl={isRtl}
+              />
+              <SelectField 
+                label={t.type} 
+                value={currentVoucher.voucher_type || 'general'} 
+                onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})}
+                disabled={isReadonly}
+                isRtl={isRtl}
+              >
+                <option value="general">{t.general}</option>
+                <option value="opening">{t.opening}</option>
+              </SelectField>
+              <InputField 
+                label={t.subsidiaryNumber} 
+                value={currentVoucher.subsidiary_number || ''} 
+                onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})}
+                disabled={isReadonly}
+                isRtl={isRtl}
+              />
+              <div className="md:col-span-4">
+                <InputField 
+                  label={t.description} 
+                  value={currentVoucher.description || ''} 
+                  onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})}
+                  disabled={isReadonly}
+                  isRtl={isRtl}
+                />
               </div>
-
-              {filters.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-4 border-t border-white/10">
-                  {filters.map((f, i) => (
-                    <span key={i} className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-blue-500/30 font-bold">
-                      {f.field} {f.operator} {f.value}
-                      <button onClick={() => removeFilter(i)} className="text-white hover:text-red-400 ml-1">✕</button>
-                    </span>
-                  ))}
-                  <button onClick={() => setFilters([])} className="text-sm text-gray-400 hover:text-white underline ml-4">{t.clearFilters}</button>
-                </div>
-              )}
             </div>
-          )}
-        </div>
+          </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray-300 text-lg font-bold">در حال پردازش...</div>
-        ) : (
-          <>
-            <div className="overflow-x-auto rounded-lg border border-white/10 shadow-inner">
-              <table className="w-full text-sm text-left rtl:text-right whitespace-nowrap">
-                <thead className="text-xs uppercase bg-black/40 text-gray-300">
+          {/* Items Table */}
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[300px]">
+            <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
+              <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
+              {!isReadonly && <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>}
+            </div>
+            
+            <div className="flex-1 overflow-x-auto custom-scrollbar">
+              <table className="w-full text-[12px] text-left rtl:text-right border-collapse">
+                <thead className="bg-slate-100 text-slate-700 sticky top-0 z-10 shadow-sm">
                   <tr>
-                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('voucher_number')}>
-                      {t.voucherNumber} {sortField === 'voucher_number' && (sortAsc ? '↑' : '↓')}
-                    </th>
-                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('voucher_date')}>
-                      {t.date} {sortField === 'voucher_date' && (sortAsc ? '↑' : '↓')}
-                    </th>
-                    <th className="px-4 py-4">{t.type}</th>
-                    <th className="px-4 py-4">{t.status}</th>
-                    <th className="px-4 py-4 max-w-xs">{t.description}</th>
-                    <th className="px-4 py-4">{t.totalDebit}</th>
-                    <th className="px-4 py-4">{t.totalCredit}</th>
-                    <th className="px-4 py-4 text-center">{t.actions}</th>
+                    <th className="px-3 py-2 text-center w-12 border-b border-slate-200">{t.row}</th>
+                    <th className="px-3 py-2 min-w-[200px] border-b border-slate-200">{t.account}</th>
+                    <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.debit}</th>
+                    <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.credit}</th>
+                    <th className="px-3 py-2 min-w-[250px] border-b border-slate-200">{t.description}</th>
+                    <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.trackingNumber}</th>
+                    <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.trackingDate}</th>
+                    <th className="px-3 py-2 w-24 border-b border-slate-200">{t.quantity}</th>
+                    <th className="px-3 py-2 text-center w-24 border-b border-slate-200 sticky left-0 bg-slate-100 shadow-[-2px_0_5_rgba(0,0,0,0.05)]">{t.actions}</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {vouchers.map((voucher) => (
-                    <tr key={voucher.id} className="border-b border-white/5 hover:bg-white/10 transition-colors">
-                      <td className="px-4 py-3 font-mono font-bold text-center">{voucher.voucher_number || '-'}</td>
-                      <td className="px-4 py-3 font-mono">{voucher.voucher_date}</td>
-                      <td className="px-4 py-3">{voucher.voucher_type === 'opening' ? t.opening : t.general}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1.5 rounded-md text-xs font-bold shadow-sm ${
-                          voucher.status === 'final' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 
-                          voucher.status === 'reviewed' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
-                          voucher.status === 'temporary' ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30' :
-                          'bg-gray-500/20 text-gray-300 border border-gray-500/30'
-                        }`}>
-                          {getStatusLabel(voucher.status)}
-                        </span>
+                <tbody className="divide-y divide-slate-100">
+                  {voucherItems.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                      <td className="px-3 py-1.5 text-center font-bold text-slate-500">{index + 1}</td>
+                      <td className="px-3 py-1.5">
+                        <select 
+                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800"
+                          value={item.account_id || ''}
+                          onChange={(e) => handleItemChange(index, 'account_id', e.target.value)}
+                          disabled={isReadonly}
+                        >
+                          <option value="">--</option>
+                          {accounts.map(acc => (
+                            <option key={acc.id} value={acc.id}>{acc.code} - {acc.title}</option>
+                          ))}
+                        </select>
                       </td>
-                      <td className="px-4 py-3 truncate max-w-xs" title={voucher.description}>{voucher.description}</td>
-                      <td className="px-4 py-3 text-blue-300 font-mono font-bold">{formatNumber(voucher.total_debit)}</td>
-                      <td className="px-4 py-3 text-blue-300 font-mono font-bold">{formatNumber(voucher.total_credit)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex gap-2 justify-center">
-                          <Button variant="secondary" className="!px-3 !py-1 text-xs" onClick={() => handleOpenForm(voucher)}>{t.edit}</Button>
-                          <Button variant="danger" className="!px-3 !py-1 text-xs" onClick={() => handleDeleteClick(voucher)}>{t.delete}</Button>
+                      <td className="px-3 py-1.5">
+                        <input 
+                          type="number" 
+                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr"
+                          value={item.debit}
+                          onChange={(e) => handleItemChange(index, 'debit', e.target.value)}
+                          disabled={isReadonly}
+                          min="0"
+                        />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <input 
+                          type="number" 
+                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr"
+                          value={item.credit}
+                          onChange={(e) => handleItemChange(index, 'credit', e.target.value)}
+                          disabled={isReadonly}
+                          min="0"
+                        />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <div className="flex gap-1 relative">
+                          <input 
+                            type="text" 
+                            className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800"
+                            value={item.description || ''}
+                            onChange={(e) => handleItemChange(index, 'description', e.target.value)}
+                            disabled={isReadonly}
+                          />
+                          {!isReadonly && index > 0 && (
+                            <button 
+                              className="bg-slate-200 hover:bg-slate-300 text-slate-600 px-2 rounded transition-colors h-8 text-[10px] absolute left-0" 
+                              onClick={() => copyRowDescription(index)} 
+                              title="Copy from above"
+                            >
+                              ↑
+                            </button>
+                          )}
                         </div>
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <input 
+                          type="text" 
+                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800"
+                          value={item.tracking_number || ''}
+                          onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)}
+                          disabled={isReadonly}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <input 
+                          type="date" 
+                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr"
+                          value={item.tracking_date || ''}
+                          onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)}
+                          disabled={isReadonly}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <input 
+                          type="number" 
+                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr"
+                          value={item.quantity || ''}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          disabled={isReadonly}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5 text-center sticky left-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 z-10">
+                        {!isReadonly && (
+                          <div className="flex gap-1 justify-center">
+                            <button className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 h-7 px-2 rounded text-[11px] font-bold transition-colors" onClick={() => balanceVoucher(index)} title={t.balance}>=</button>
+                            <button className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 h-7 px-2 rounded text-[11px] font-bold transition-colors" onClick={() => removeItemRow(index)}>X</button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
-                  {vouchers.length === 0 && (
-                    <tr>
-                      <td colSpan="8" className="px-4 py-12 text-center text-gray-400 text-lg font-bold">{t.noData}</td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
 
-            <div className="flex justify-between items-center mt-6 bg-black/20 p-4 rounded-lg border border-white/5">
-              <div className="flex items-center gap-4">
-                <span className="text-gray-400 font-bold">{t.itemsCount}: <strong className="text-white text-lg">{totalRecords}</strong></span>
+            <div className="bg-slate-50 border-t border-slate-200 p-3 shrink-0">
+              <div className="flex items-center gap-6 font-mono text-[13px] font-bold">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400 font-bold">{t.rowsPerPage}:</span>
-                  <select 
-                    className="bg-black/40 border border-white/20 rounded p-1 text-white outline-none font-bold"
-                    value={pageSize}
-                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  >
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                  </select>
+                   <span className="text-slate-500 font-sans">{t.totalDebit}:</span>
+                   <span className="text-indigo-700">{formatNumber(totalDebit)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                   <span className="text-slate-500 font-sans">{t.totalCredit}:</span>
+                   <span className="text-indigo-700">{formatNumber(totalCredit)}</span>
+                </div>
+                <div className="h-4 w-px bg-slate-300"></div>
+                <div className={`flex items-center gap-2 ${isBalanced ? 'text-emerald-600' : 'text-red-500'}`}>
+                   {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
+                   <span>{isBalanced ? t.alreadyBalanced : `${formatNumber(Math.abs(totalDebit - totalCredit))}`}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" className="!px-3 !py-1" disabled={page === 1} onClick={() => setPage(page - 1)}>
-                  {isRtl ? 'قبلی' : 'Prev'}
-                </Button>
-                <span className="text-gray-300 px-4 font-bold">{t.page} {page} {t.of} {totalPages || 1}</span>
-                <Button variant="secondary" className="!px-3 !py-1" disabled={page === totalPages || totalPages === 0} onClick={() => setPage(page + 1)}>
-                  {isRtl ? 'بعدی' : 'Next'}
-                </Button>
-              </div>
             </div>
-          </>
-        )}
-      </Card>
-
-      <Modal 
-        isOpen={isDeleting} 
-        onClose={() => setIsDeleting(false)}
-        title={t.delete}
-      >
-        <div className="p-6 text-white">
-          <p className="mb-8 text-lg">{t.confirmDelete}</p>
-          <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setIsDeleting(false)}>انصراف</Button>
-            <Button variant="danger" onClick={confirmDelete}>حذف قطعی</Button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // --- List View ---
+  return (
+    <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+      <div className="mb-6 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
+            <FileText size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-800">{t.title}</h1>
+            <p className="text-xs text-slate-500 font-medium mt-1">{t.subtitle}</p>
+          </div>
+        </div>
+      </div>
+
+      <FilterSection onSearch={() => {}} onClear={handleClearSearch} isRtl={isRtl} title={t.search}>
+        <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} className="dir-ltr" />
+        <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
+      </FilterSection>
+
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <DataGrid 
+          columns={columns} 
+          data={filteredVouchers} 
+          selectedIds={selectedIds}
+          onSelectRow={(id, checked) => setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id))}
+          onSelectAll={(checked) => setSelectedIds(checked ? filteredVouchers.map(i => i.id) : [])}
+          onCreate={() => handleOpenForm()} 
+          onDelete={(ids) => promptDelete(filteredVouchers.find(v => v.id === ids[0]))} 
+          onDoubleClick={(row) => handleOpenForm(row)}
+          isRtl={isRtl}
+          isLoading={loading}
+          actions={(row) => (
+            <>
+              <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(row)} title={t.edit} />
+              <Button variant="ghost" size="iconSm" icon={Trash2} onClick={() => promptDelete(row)} title={t.delete} className="text-red-500 hover:text-red-700 hover:bg-red-50" />
+            </>
+          )}
+        />
+      </div>
+
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title={t.delete}
+        footer={<><Button variant="ghost" onClick={() => setShowDeleteModal(false)}>{t.backToList}</Button><Button variant="danger" onClick={confirmDelete}>{t.delete}</Button></>}>
+        <div className="p-4">
+          <p className="text-slate-700 font-medium">{t.confirmDelete}</p>
+        </div>
       </Modal>
+
     </div>
   );
 };
+
+window.Vouchers = Vouchers;
+export default Vouchers;
