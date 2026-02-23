@@ -179,7 +179,6 @@ const Vouchers = ({ language = 'fa' }) => {
   const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge } = UI;
   const supabase = window.supabase;
 
-  // UI & Global Context State
   const [view, setView] = useState('list');
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -187,7 +186,6 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '', branch_id: '' });
 
-  // Lookup Data
   const [vouchers, setVouchers] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -196,11 +194,9 @@ const Vouchers = ({ language = 'fa' }) => {
   const [docTypes, setDocTypes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   
-  // List State
   const [searchParams, setSearchParams] = useState({ voucher_number: '', description: '' });
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Form State
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [voucherItems, setVoucherItems] = useState([]);
 
@@ -222,9 +218,9 @@ const Vouchers = ({ language = 'fa' }) => {
     if (!supabase) return;
     try {
       const [brRes, fyRes, ledRes] = await Promise.all([
-        supabase.schema('gen').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
-        supabase.schema('gk').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
-        supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title')
+        supabase.from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
+        supabase.from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
+        supabase.from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title')
       ]);
       
       if (brRes.data) setBranches(brRes.data);
@@ -243,8 +239,7 @@ const Vouchers = ({ language = 'fa' }) => {
         return prev;
       });
 
-      // Fetch Accounts and build hierarchy including structure_id and metadata
-      const accRes = await supabase.schema('gl').from('accounts').select('id, full_code, title, level, parent_id, metadata, structure_id').eq('is_active', true).order('full_code');
+      const accRes = await supabase.from('accounts').select('id, full_code, title, level, parent_id, metadata, structure_id').eq('is_active', true).order('full_code');
       if (accRes.data) {
         const allAccs = accRes.data;
         const accMap = new Map(allAccs.map(a => [a.id, a]));
@@ -264,15 +259,10 @@ const Vouchers = ({ language = 'fa' }) => {
         setAccounts(processedAccounts);
       }
 
-      // Fetch Doc Types gracefully
-      let fetchedDocTypes = [];
-      let dtRes = await supabase.schema('gl').from('doc_types').select('id, code, title').eq('is_active', true);
-      if (dtRes.error) dtRes = await supabase.schema('gen').from('doc_types').select('id, code, title').eq('is_active', true);
-      if (dtRes.data) fetchedDocTypes = dtRes.data;
-      setDocTypes(fetchedDocTypes);
+      const dtRes = await supabase.from('doc_types').select('id, code, title').eq('is_active', true);
+      if (dtRes.data) setDocTypes(dtRes.data);
 
-      // Fetch Currencies strictly from gen.currencies
-      const currRes = await supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true);
+      const currRes = await supabase.from('currencies').select('id, code, title').eq('is_active', true);
       if (currRes.data) setCurrencies(currRes.data);
 
     } catch (error) {
@@ -284,7 +274,7 @@ const Vouchers = ({ language = 'fa' }) => {
     if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id || !contextVals.branch_id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.schema('gl')
+      const { data, error } = await supabase
         .from('vouchers')
         .select('*')
         .eq('fiscal_period_id', contextVals.fiscal_year_id)
@@ -319,7 +309,7 @@ const Vouchers = ({ language = 'fa' }) => {
       setCurrentVoucher(voucher);
       setLoading(true);
       try {
-        const { data, error } = await supabase.schema('gl')
+        const { data, error } = await supabase
           .from('voucher_items')
           .select('*')
           .eq('voucher_id', voucher.id)
@@ -403,11 +393,11 @@ const Vouchers = ({ language = 'fa' }) => {
       let savedVoucherId = currentVoucher.id;
 
       if (savedVoucherId) {
-        const { error } = await supabase.schema('gl').from('vouchers').update(voucherData).eq('id', savedVoucherId);
+        const { error } = await supabase.from('vouchers').update(voucherData).eq('id', savedVoucherId);
         if (error) throw error;
-        await supabase.schema('gl').from('voucher_items').delete().eq('voucher_id', savedVoucherId);
+        await supabase.from('voucher_items').delete().eq('voucher_id', savedVoucherId);
       } else {
-        const { data, error } = await supabase.schema('gl').from('vouchers').insert([voucherData]).select().single();
+        const { data, error } = await supabase.from('vouchers').insert([voucherData]).select().single();
         if (error) throw error;
         savedVoucherId = data.id;
       }
@@ -431,7 +421,7 @@ const Vouchers = ({ language = 'fa' }) => {
       });
 
       if (itemsToSave.length > 0) {
-        const { error: itemsError } = await supabase.schema('gl').from('voucher_items').insert(itemsToSave);
+        const { error: itemsError } = await supabase.from('voucher_items').insert(itemsToSave);
         if (itemsError) throw itemsError;
       }
 
@@ -456,7 +446,7 @@ const Vouchers = ({ language = 'fa' }) => {
   const confirmDelete = async () => {
     if (!voucherToDelete || !supabase) return;
     try {
-      const { error } = await supabase.schema('gl').from('vouchers').delete().eq('id', voucherToDelete.id);
+      const { error } = await supabase.from('vouchers').delete().eq('id', voucherToDelete.id);
       if (error) throw error;
       setShowDeleteModal(false);
       setVoucherToDelete(null);
