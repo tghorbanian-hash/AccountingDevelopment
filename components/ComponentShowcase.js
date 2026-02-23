@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Settings, User, Mail, Shield, Check, X, Filter } from 'lucide-react';
 
-export default function ComponentShowcase({ t, isRtl }) {
+const ComponentShowcase = ({ t, isRtl }) => {
   const UI = window.UI || {};
   const { 
     Button, InputField, SelectField, Toggle, Badge, ToggleChip, 
@@ -103,4 +103,7 @@ export default function ComponentShowcase({ t, isRtl }) {
       </section>
     </div>
   );
-}
+};
+
+window.ComponentShowcase = ComponentShowcase;
+export default ComponentShowcase;
