@@ -107,7 +107,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
 
-  const selectedAcc = accounts.find(a => a.id === value);
+  const selectedAcc = accounts.find(a => String(a.id) === String(value));
   const displaySelected = selectedAcc ? `${selectedAcc.full_code} - ${selectedAcc.title}` : '';
 
   useEffect(() => {
@@ -188,6 +188,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const [vouchers, setVouchers] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [accountStructures, setAccountStructures] = useState([]);
   const [branches, setBranches] = useState([]);
   const [fiscalYears, setFiscalYears] = useState([]);
   const [ledgers, setLedgers] = useState([]);
@@ -217,15 +218,17 @@ const Vouchers = ({ language = 'fa' }) => {
   const fetchLookups = async () => {
     if (!supabase) return;
     try {
-      const [brRes, fyRes, ledRes] = await Promise.all([
+      const [brRes, fyRes, ledRes, structRes] = await Promise.all([
         supabase.schema('gen').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
         supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
-        supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title')
+        supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title'),
+        supabase.schema('gl').from('account_structures').select('id, code, title').eq('status', true)
       ]);
       
       if (brRes.data) setBranches(brRes.data);
       if (fyRes.data) setFiscalYears(fyRes.data);
       if (ledRes.data) setLedgers(ledRes.data);
+      if (structRes.data) setAccountStructures(structRes.data);
 
       setContextVals(prev => {
         if (!prev.fiscal_year_id && !prev.ledger_id && !prev.branch_id) {
@@ -244,10 +247,7 @@ const Vouchers = ({ language = 'fa' }) => {
         const allAccs = accRes.data;
         const accMap = new Map(allAccs.map(a => [a.id, a]));
         
-        let subs = allAccs.filter(a => a.level === 'subsidiary' || a.level === 'معین' || a.level === '4');
-        if (subs.length === 0) subs = allAccs; 
-
-        const processedAccounts = subs.map(a => {
+        const processedAccounts = allAccs.map(a => {
           let path = a.title;
           let curr = a;
           while (curr.parent_id && accMap.has(curr.parent_id)) {
@@ -273,12 +273,8 @@ const Vouchers = ({ language = 'fa' }) => {
   const fetchVouchers = async () => {
     if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id || !contextVals.branch_id) return;
     
-    // Validate UUID format before fetching to prevent 400 Bad Request
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(contextVals.fiscal_year_id)) {
-       console.warn('fiscal_year_id is not a valid UUID. Skipping voucher fetch.');
-       return;
-    }
+    if (!uuidRegex.test(contextVals.fiscal_year_id)) return;
 
     setLoading(true);
     try {
@@ -472,7 +468,7 @@ const Vouchers = ({ language = 'fa' }) => {
     if (field === 'credit' && parseNum(value) > 0) newItems[index]['debit'] = 0;
     
     if (field === 'account_id') {
-      const selectedAcc = accounts.find(a => a.id === value);
+      const selectedAcc = accounts.find(a => String(a.id) === String(value));
       const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
       const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
       
@@ -581,9 +577,19 @@ const Vouchers = ({ language = 'fa' }) => {
     const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
     const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
     
-    // Core Logic: Filter accounts based on the Ledger's 'structure' field matching account's 'structure_id'
-    const ledgerStructureCode = currentLedger?.structure || '';
-    const validAccountsForLedger = accounts.filter(a => String(a.structure_id) === String(ledgerStructureCode));
+    // Core Logic: 
+    // 1. Get the structure code (e.g., '1') from the ledger
+    const ledgerStructureCode = String(currentLedger?.structure || '').trim();
+    
+    // 2. Find the actual structure record to get its BigInt ID
+    const targetStructure = accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
+    const structureId = targetStructure ? String(targetStructure.id) : null;
+
+    // 3. Filter accounts by that BigInt ID and ensure it's a subsidiary level
+    const validAccountsForLedger = accounts.filter(a => {
+        const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
+        return String(a.structure_id) === structureId && isSubsidiary;
+    });
 
     return (
       <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
