@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy
+  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check
 } from 'lucide-react';
 
 const localTranslations = {
@@ -29,6 +29,7 @@ const localTranslations = {
     addRow: 'Add Item',
     row: 'Row',
     account: 'Account',
+    detail: 'Detail',
     debit: 'Debit',
     credit: 'Credit',
     currency: 'Currency',
@@ -43,6 +44,7 @@ const localTranslations = {
     statusFinal: 'Final',
     general: 'General',
     trackingNumber: 'Tracking No.',
+    trackingDate: 'Tracking Date',
     quantity: 'Quantity',
     unbalancedError: 'Voucher is not balanced. Can only save as draft.',
     zeroAmountError: 'Total amount cannot be zero. Please enter debit or credit values.',
@@ -50,7 +52,9 @@ const localTranslations = {
     reqFields: 'Description and Account are required for all items.',
     globalFiltersTitle: 'Global System Context',
     searchAccount: 'Search account code or title...',
-    copyFromAbove: 'Copy from above'
+    searchDetail: 'Search detail...',
+    copyFromAbove: 'Copy from above',
+    trackingReqError: 'Tracking Number and Tracking Date are required for account in row',
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -75,6 +79,7 @@ const localTranslations = {
     addRow: 'ردیف جدید',
     row: 'ردیف',
     account: 'معین',
+    detail: 'تفصیل',
     debit: 'بدهکار',
     credit: 'بستانکار',
     currency: 'ارز',
@@ -89,6 +94,7 @@ const localTranslations = {
     statusFinal: 'قطعی شده',
     general: 'عمومی',
     trackingNumber: 'شماره پیگیری',
+    trackingDate: 'تاریخ پیگیری',
     quantity: 'مقدار',
     unbalancedError: 'سند بالانس نیست و فقط به عنوان یادداشت قابل ذخیره است.',
     zeroAmountError: 'مبلغ کل سند نمی‌تواند صفر باشد. لطفاً مقادیر بدهکار یا بستانکار را وارد کنید.',
@@ -96,7 +102,9 @@ const localTranslations = {
     reqFields: 'شرح و حساب معین برای تمامی اقلام اجباری است.',
     globalFiltersTitle: 'فیلترهای عمومی سیستم',
     searchAccount: 'جستجوی کد یا عنوان معین...',
-    copyFromAbove: 'کپی از ردیف بالا'
+    searchDetail: 'جستجوی تفصیل...',
+    copyFromAbove: 'کپی از ردیف بالا',
+    trackingReqError: 'شماره و تاریخ پیگیری برای معین در ردیف زیر الزامی است:',
   }
 };
 
@@ -127,7 +135,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
       <div className="relative">
         <input
           type="text"
-          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800"
+          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-1 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           value={isOpen ? search : displaySelected}
           onChange={e => { setSearch(e.target.value); setIsOpen(true); }}
           onFocus={() => { setIsOpen(true); setSearch(''); }}
@@ -135,15 +143,14 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
           placeholder={placeholder}
           title={displaySelected}
         />
-        <Search size={12} className="absolute top-1/2 -translate-y-1/2 left-2 text-slate-400 pointer-events-none" />
       </div>
       
       {isOpen && !disabled && (
-        <div className="absolute z-[60] w-[350px] rtl:right-0 ltr:left-0 mt-1 bg-white border border-slate-200 rounded shadow-xl max-h-60 overflow-y-auto custom-scrollbar">
+        <div className="absolute z-[60] w-[300px] rtl:right-0 ltr:left-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto custom-scrollbar">
           {filtered.map(acc => (
             <div
               key={acc.id}
-              className="px-3 py-2 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0"
+              className="px-3 py-1.5 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0"
               onMouseDown={(e) => { e.preventDefault(); onChange(acc.id); setIsOpen(false); }}
             >
               <div className="font-bold text-slate-800 dir-ltr text-right">{acc.full_code} - {acc.title}</div>
@@ -158,6 +165,70 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
     </div>
   );
 };
+
+
+const SearchableDetailSelect = ({ details, value, onChange, disabled, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef(null);
+
+  const selectedDetail = details.find(d => String(d.id) === String(value));
+  const displaySelected = selectedDetail ? `${selectedDetail.detail_code || ''} - ${selectedDetail.title}` : '';
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = details.filter(d => 
+    d.title.toLowerCase().includes(search.toLowerCase()) || 
+    (d.detail_code && d.detail_code.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  if (details.length === 0) {
+     return <div className="text-slate-300 text-[11px] px-1 h-8 flex items-center">-</div>;
+  }
+
+  return (
+    <div className="relative w-full" ref={wrapperRef}>
+      <div className="relative">
+        <input
+          type="text"
+          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-1 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          value={isOpen ? search : displaySelected}
+          onChange={e => { setSearch(e.target.value); setIsOpen(true); }}
+          onFocus={() => { setIsOpen(true); setSearch(''); }}
+          disabled={disabled}
+          placeholder={placeholder}
+          title={displaySelected}
+        />
+      </div>
+      
+      {isOpen && !disabled && (
+        <div className="absolute z-[60] w-[250px] rtl:right-0 ltr:left-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto custom-scrollbar">
+          {filtered.map(d => (
+            <div
+              key={d.id}
+              className="px-3 py-1.5 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0"
+              onMouseDown={(e) => { e.preventDefault(); onChange(d.id); setIsOpen(false); }}
+            >
+              <div className="font-bold text-slate-800">{d.detail_code ? `${d.detail_code} - ` : ''}{d.title}</div>
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">موردی یافت نشد</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 const formatNum = (num) => {
   if (num === null || num === undefined || num === '') return '';
@@ -193,11 +264,18 @@ const Vouchers = ({ language = 'fa' }) => {
   const [docTypes, setDocTypes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   
+  // States for Detail Management
+  const [detailTypes, setDetailTypes] = useState([]);
+  const [allDetailInstances, setAllDetailInstances] = useState([]);
+  
   const [searchParams, setSearchParams] = useState({ voucher_number: '', description: '' });
   const [selectedIds, setSelectedIds] = useState([]);
 
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [voucherItems, setVoucherItems] = useState([]);
+  
+  // To handle focused row for inline editing improvements
+  const [focusedRowId, setFocusedRowId] = useState(null);
 
   useEffect(() => {
     fetchLookups();
@@ -216,17 +294,21 @@ const Vouchers = ({ language = 'fa' }) => {
   const fetchLookups = async () => {
     if (!supabase) return;
     try {
-      const [brRes, fyRes, ledRes, structRes] = await Promise.all([
+      const [brRes, fyRes, ledRes, structRes, dtRes, diRes] = await Promise.all([
         supabase.schema('gen').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
         supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
         supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title'),
-        supabase.schema('gl').from('account_structures').select('id, code, title').eq('status', true)
+        supabase.schema('gl').from('account_structures').select('id, code, title').eq('status', true),
+        supabase.schema('gl').from('detail_types').select('id, code, title').eq('is_active', true),
+        supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)
       ]);
       
       if (brRes.data) setBranches(brRes.data);
       if (fyRes.data) setFiscalYears(fyRes.data);
       if (ledRes.data) setLedgers(ledRes.data);
       if (structRes.data) setAccountStructures(structRes.data);
+      if (dtRes.data) setDetailTypes(dtRes.data);
+      if (diRes.data) setAllDetailInstances(diRes.data);
 
       setContextVals(prev => {
         if (!prev.fiscal_year_id && !prev.ledger_id && !prev.branch_id) {
@@ -257,8 +339,8 @@ const Vouchers = ({ language = 'fa' }) => {
         setAccounts(processedAccounts);
       }
 
-      const dtRes = await supabase.schema('gl').from('doc_types').select('id, code, title').eq('is_active', true);
-      if (dtRes.data) setDocTypes(dtRes.data);
+      const doctypeRes = await supabase.schema('gl').from('doc_types').select('id, code, title').eq('is_active', true);
+      if (doctypeRes.data) setDocTypes(doctypeRes.data);
 
       const currRes = await supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true);
       if (currRes.data) setCurrencies(currRes.data);
@@ -308,7 +390,11 @@ const Vouchers = ({ language = 'fa' }) => {
         
         const mappedItems = (data || []).map(item => {
           const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
-          return { ...item, currency_code: detailsObj.currency_code || '' };
+          return { 
+             ...item, 
+             currency_code: detailsObj.currency_code || '',
+             detail_id: detailsObj.detail_id || '' 
+          };
         });
         setVoucherItems(mappedItems);
       } catch (error) {
@@ -335,11 +421,13 @@ const Vouchers = ({ language = 'fa' }) => {
         id: `temp_${Date.now()}`,
         row_number: 1,
         account_id: '',
+        detail_id: '',
         debit: 0,
         credit: 0,
         currency_code: defaultCurrency,
         description: '',
         tracking_number: '',
+        tracking_date: '',
         quantity: 0
       }]);
     }
@@ -349,9 +437,24 @@ const Vouchers = ({ language = 'fa' }) => {
   const handleSaveVoucher = async (status) => {
     if (!supabase) return;
     
-    if (voucherItems.some(item => !item.description || !item.account_id)) {
-      alert(t.reqFields);
-      return;
+    // Validations
+    for (let i = 0; i < voucherItems.length; i++) {
+        const item = voucherItems[i];
+        if (!item.description || !item.account_id) {
+           alert(t.reqFields);
+           return;
+        }
+
+        const account = accounts.find(a => String(a.id) === String(item.account_id));
+        if (account && account.metadata) {
+            const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+            if (meta.trackFeature && meta.trackMandatory) {
+                if (!item.tracking_number || !item.tracking_date) {
+                    alert(`${t.trackingReqError} ${i + 1} (${account.title})`);
+                    return;
+                }
+            }
+        }
     }
 
     const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
@@ -397,8 +500,9 @@ const Vouchers = ({ language = 'fa' }) => {
           credit: parseNum(item.credit),
           description: item.description,
           tracking_number: item.tracking_number || null,
+          tracking_date: item.tracking_date || null,
           quantity: parseNum(item.quantity),
-          details: { currency_code: item.currency_code }
+          details: { currency_code: item.currency_code, detail_id: item.detail_id }
         };
       });
 
@@ -441,6 +545,8 @@ const Vouchers = ({ language = 'fa' }) => {
         if (meta.currency_code) newCurrency = meta.currency_code;
       }
       newItems[index]['currency_code'] = newCurrency;
+      // Reset detail when account changes
+      newItems[index]['detail_id'] = '';
     }
 
     setVoucherItems(newItems);
@@ -451,17 +557,21 @@ const Vouchers = ({ language = 'fa' }) => {
     const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
     const lastDescription = voucherItems.length > 0 ? voucherItems[voucherItems.length - 1].description : '';
 
+    const newId = `temp_${Date.now()}`;
     setVoucherItems([...voucherItems, { 
-      id: `temp_${Date.now()}`, 
+      id: newId, 
       row_number: voucherItems.length + 1, 
       account_id: '', 
+      detail_id: '',
       debit: 0, 
       credit: 0, 
       currency_code: currentLedger?.currency || '',
       description: lastDescription, 
       tracking_number: '', 
+      tracking_date: '',
       quantity: 0 
     }]);
+    setFocusedRowId(newId);
   };
 
   const globalBalance = () => {
@@ -473,17 +583,21 @@ const Vouchers = ({ language = 'fa' }) => {
 
     const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
 
+    const newId = `temp_${Date.now()}`;
     setVoucherItems([...voucherItems, { 
-      id: `temp_${Date.now()}`, 
+      id: newId, 
       row_number: voucherItems.length + 1, 
       account_id: '', 
+      detail_id: '',
       debit: diff < 0 ? Math.abs(diff) : 0, 
       credit: diff > 0 ? diff : 0, 
       currency_code: currentLedger?.currency || '',
       description: '', 
       tracking_number: '', 
+      tracking_date: '',
       quantity: 0 
     }]);
+    setFocusedRowId(newId);
   };
 
   const copyDescription = (index) => {
@@ -523,6 +637,24 @@ const Vouchers = ({ language = 'fa' }) => {
     const variant = status === 'final' ? 'success' : status === 'reviewed' ? 'info' : status === 'temporary' ? 'warning' : 'neutral';
     return <Badge variant={variant}>{t[`status${status.charAt(0).toUpperCase() + status.slice(1)}`]}</Badge>;
   };
+
+  const getValidDetailInstances = (accountId) => {
+     if (!accountId) return [];
+     const account = accounts.find(a => String(a.id) === String(accountId));
+     if (!account || !account.metadata) return [];
+     const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+     const allowedTafsilCodesOrIds = meta.tafsils || [];
+     
+     if (allowedTafsilCodesOrIds.length === 0) return [];
+
+     const allowedTypeCodes = allowedTafsilCodesOrIds.map(t => {
+        const type = detailTypes.find(dt => String(dt.id) === String(t) || dt.code === String(t));
+        return type ? type.code : null;
+     }).filter(Boolean);
+
+     return allDetailInstances.filter(di => allowedTypeCodes.includes(di.detail_type_code));
+  };
+
 
   const columns = [
     { field: 'voucher_number', header: t.voucherNumber, width: 'w-24', sortable: true },
@@ -581,7 +713,7 @@ const Vouchers = ({ language = 'fa' }) => {
             </div>
           </div>
 
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
             <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
               <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
               {!isReadonly && (
@@ -592,72 +724,97 @@ const Vouchers = ({ language = 'fa' }) => {
               )}
             </div>
             
-            <div className="flex-1 overflow-auto custom-scrollbar">
-              <table className="w-full text-[12px] text-left rtl:text-right border-collapse">
-                <thead className="bg-slate-100 text-slate-700 sticky top-0 z-10 shadow-sm">
-                  <tr>
-                    <th className="px-3 py-2 text-center w-12 border-b border-slate-200">{t.row}</th>
-                    <th className="px-3 py-2 min-w-[250px] border-b border-slate-200">{t.account}</th>
-                    <th className="px-3 py-2 min-w-[140px] border-b border-slate-200">{t.debit}</th>
-                    <th className="px-3 py-2 min-w-[140px] border-b border-slate-200">{t.credit}</th>
-                    <th className="px-3 py-2 min-w-[100px] border-b border-slate-200">{t.currency}</th>
-                    <th className="px-3 py-2 min-w-[300px] border-b border-slate-200">{t.description}</th>
-                    <th className="px-3 py-2 min-w-[120px] border-b border-slate-200">{t.trackingNumber}</th>
-                    <th className="px-3 py-2 w-24 border-b border-slate-200">{t.quantity}</th>
-                    <th className="px-3 py-2 text-center w-20 border-b border-slate-200 sticky left-0 bg-slate-100 shadow-[-2px_0_5_rgba(0,0,0,0.05)]">{t.actions}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {voucherItems.map((item, index) => (
-                    <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
-                      <td className="px-3 py-2 text-center font-bold text-slate-400">{index + 1}</td>
-                      <td className="px-3 py-2">
-                        <SearchableAccountSelect accounts={validAccountsForLedger} value={item.account_id} onChange={(v) => handleItemChange(index, 'account_id', v)} disabled={isReadonly} placeholder={t.searchAccount} />
-                      </td>
-                      <td className="px-3 py-2">
-                         <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] dir-ltr text-right font-mono focus:bg-white focus:border-indigo-400 outline-none" value={formatNum(item.debit)} onChange={(e) => {
-                             const raw = e.target.value.replace(/,/g, '');
-                             if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
-                         }} disabled={isReadonly} />
-                      </td>
-                      <td className="px-3 py-2">
-                         <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] dir-ltr text-right font-mono focus:bg-white focus:border-indigo-400 outline-none" value={formatNum(item.credit)} onChange={(e) => {
-                             const raw = e.target.value.replace(/,/g, '');
-                             if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
-                         }} disabled={isReadonly} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <select className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] outline-none" value={item.currency_code || ''} onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)} disabled={isReadonly}>
-                          <option value="">--</option>
-                          {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex gap-1 items-center">
-                          <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] focus:bg-white focus:border-indigo-400 outline-none" value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} />
-                          {!isReadonly && index > 0 && (
-                            <button onClick={() => copyDescription(index)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title={t.copyFromAbove}><Copy size={14} /></button>
-                          )}
+            <div className="flex-1 overflow-auto custom-scrollbar p-2 bg-slate-100">
+               {voucherItems.map((item, index) => {
+                  const isFocused = focusedRowId === item.id;
+                  const accountObj = accounts.find(a => String(a.id) === String(item.account_id));
+                  let hasTracking = false;
+                  if (accountObj && accountObj.metadata) {
+                      const meta = typeof accountObj.metadata === 'string' ? JSON.parse(accountObj.metadata) : accountObj.metadata;
+                      if (meta.trackFeature) hasTracking = true;
+                  }
+
+                  const validDetails = getValidDetailInstances(item.account_id);
+
+                  return (
+                     <div 
+                        key={item.id} 
+                        className={`mb-2 bg-white rounded-lg border transition-all duration-200 ${isFocused ? 'border-indigo-400 shadow-md ring-1 ring-indigo-100' : 'border-slate-200 shadow-sm hover:border-indigo-200'}`}
+                        onClick={() => setFocusedRowId(item.id)}
+                     >
+                        <div className="flex flex-col md:flex-row gap-0">
+                           {/* Row Number & Basic Actions */}
+                           <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg">
+                              <span className="text-xs font-bold text-slate-400 mb-2">{index + 1}</span>
+                              {!isReadonly && (
+                                <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
+                              )}
+                           </div>
+                           
+                           {/* Main Content Area */}
+                           <div className="flex-1 p-2 grid grid-cols-12 gap-x-3 gap-y-2">
+                              {/* Account and Detail */}
+                              <div className="col-span-12 md:col-span-6 lg:col-span-4 flex flex-col gap-1">
+                                 <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
+                                 <div className={`border rounded ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
+                                    <SearchableAccountSelect accounts={validAccountsForLedger} value={item.account_id} onChange={(v) => handleItemChange(index, 'account_id', v)} disabled={isReadonly} placeholder={t.searchAccount} />
+                                 </div>
+                              </div>
+                              <div className="col-span-12 md:col-span-6 lg:col-span-4 flex flex-col gap-1">
+                                 <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
+                                 <div className={`border rounded ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${validDetails.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
+                                     <SearchableDetailSelect details={validDetails} value={item.detail_id} onChange={(v) => handleItemChange(index, 'detail_id', v)} disabled={isReadonly || validDetails.length === 0} placeholder={t.searchDetail} />
+                                 </div>
+                              </div>
+
+                              {/* Amount */}
+                              <div className="col-span-6 md:col-span-3 lg:col-span-2 flex flex-col gap-1">
+                                 <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
+                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right font-mono outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
+                                     const raw = e.target.value.replace(/,/g, '');
+                                     if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
+                                 }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
+                              </div>
+                              <div className="col-span-6 md:col-span-3 lg:col-span-2 flex flex-col gap-1">
+                                 <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
+                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right font-mono outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
+                                     const raw = e.target.value.replace(/,/g, '');
+                                     if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
+                                 }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
+                              </div>
+
+                              {/* Description - Full width mostly */}
+                              <div className="col-span-12 lg:col-span-8 flex flex-col gap-1 mt-1">
+                                 <div className="flex justify-between items-center">
+                                     <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
+                                     {!isReadonly && index > 0 && (
+                                         <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
+                                     )}
+                                 </div>
+                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
+                              </div>
+
+                              {/* Extra fields shown when focused or has data */}
+                              {(isFocused || hasTracking || item.tracking_number || item.quantity) && (
+                                  <div className="col-span-12 lg:col-span-4 flex gap-2 mt-1">
+                                      <div className={`flex-1 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                         <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
+                                         <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => setFocusedRowId(item.id)} />
+                                      </div>
+                                      <div className={`flex-1 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                         <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
+                                         <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} font-mono uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => setFocusedRowId(item.id)} />
+                                      </div>
+                                  </div>
+                              )}
+                           </div>
                         </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] outline-none" value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly} />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input type="number" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 text-[12px] dir-ltr outline-none" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} disabled={isReadonly} />
-                      </td>
-                      <td className="px-3 py-2 text-center sticky left-0 bg-white group-hover:bg-indigo-50/30">
-                        {!isReadonly && (
-                          <button className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-all" onClick={() => removeRow(index)}><Trash2 size={14} /></button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                     </div>
+                  );
+               })}
             </div>
 
-            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap gap-8 font-mono text-[14px] font-bold shrink-0">
+            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap gap-8 font-mono text-[14px] font-bold shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
               <div className="flex items-center gap-2.5">
                 <span className="text-slate-500 font-sans text-xs uppercase tracking-wider">{t.totalDebit}</span>
                 <span className="text-indigo-700 bg-indigo-50 px-3 py-1 rounded-md border border-indigo-100">{formatNum(totalDebit)}</span>
@@ -669,7 +826,7 @@ const Vouchers = ({ language = 'fa' }) => {
               <div className="flex-1"></div>
               <div className={`flex items-center gap-2 px-4 py-1 rounded-full border ${isBalanced ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-red-700 bg-red-50 border-red-100'}`}>
                  {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
-                 <span className="font-sans text-xs">{isBalanced ? t.alreadyBalanced : formatNum(Math.abs(totalDebit - totalCredit))}</span>
+                 <span className="font-sans text-xs">{isBalanced ? t.alreadyBalanced || 'Balanced' : formatNum(Math.abs(totalDebit - totalCredit))}</span>
               </div>
             </div>
           </div>
