@@ -808,4 +808,58 @@ const Callout = ({ title, children, icon: Icon, action, variant = 'info', classN
   );
 };
 
-window.UI = { Button, InputField, SelectField, Toggle, Badge, DataGrid, FilterSection, TreeMenu, TreeView, SelectionGrid, ToggleChip, Modal, DatePicker, LOV, SideMenu, Accordion, Callout, THEME };
+const GlobalContextFilter = ({ fields = [], values = {}, onChange, onConfirm, isComplete, isRtl, title, subtitle }) => {
+  if (!isComplete) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 bg-white border border-slate-200 rounded-2xl shadow-xl my-4 max-w-4xl mx-auto animate-in fade-in zoom-in-95">
+         <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-6 shadow-inner">
+           <Filter size={40} />
+         </div>
+         <h2 className="text-2xl font-black text-slate-800 mb-2">{title}</h2>
+         <p className="text-slate-500 text-sm mb-8 text-center max-w-lg">{subtitle}</p>
+         
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-8">
+           {fields.map(f => (
+             <SelectField 
+               key={f.name} label={f.label} value={values[f.name] || ''} onChange={e => onChange(f.name, e.target.value)} isRtl={isRtl} className="text-sm"
+             >
+               <option value="">{isRtl ? '- انتخاب کنید -' : '- Select -'}</option>
+               {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+             </SelectField>
+           ))}
+         </div>
+         <Button variant="primary" size="default" icon={Check} className="px-10 py-5 text-sm w-full md:w-auto shadow-md shadow-indigo-200" onClick={onConfirm} disabled={fields.some(f => f.required !== false && !values[f.name])}>
+           {isRtl ? 'تایید و ورود به صفحه' : 'Confirm & Enter'}
+         </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-xl mb-4 shrink-0 shadow-sm relative overflow-hidden">
+       <div className={`absolute top-0 bottom-0 w-1 bg-indigo-500 ${isRtl ? 'right-0' : 'left-0'}`}></div>
+       <div className={`flex flex-wrap items-center gap-6 ${isRtl ? 'pr-3' : 'pl-3'}`}>
+         <div className="flex items-center gap-2 text-indigo-800 font-bold text-sm">
+           <Filter size={18} className="text-indigo-500"/>
+           <span>{title}:</span>
+         </div>
+         <div className="flex flex-wrap items-center gap-3">
+           {fields.map(f => {
+             const selectedOpt = f.options.find(o => String(o.value) === String(values[f.name]));
+             return (
+               <div key={f.name} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs">
+                 <span className="text-slate-400 font-medium">{f.label}:</span>
+                 <span className="text-slate-800 font-bold">{selectedOpt ? selectedOpt.label : '-'}</span>
+               </div>
+             );
+           })}
+         </div>
+       </div>
+       <Button variant="outline" size="sm" icon={Edit} onClick={() => onChange('RESET', true)} className="hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors">
+         {isRtl ? 'تغییر فیلترها' : 'Change Filters'}
+       </Button>
+    </div>
+  );
+};
+
+window.UI = { Button, InputField, SelectField, Toggle, Badge, DataGrid, FilterSection, TreeMenu, TreeView, SelectionGrid, ToggleChip, Modal, DatePicker, LOV, SideMenu, Accordion, Callout, GlobalContextFilter, THEME };

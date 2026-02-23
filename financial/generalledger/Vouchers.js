@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Search 
+  Save, FileText, CheckCircle, FileWarning
 } from 'lucide-react';
 
 const localTranslations = {
@@ -22,6 +22,8 @@ const localTranslations = {
     edit: 'Edit',
     delete: 'Delete',
     branch: 'Branch',
+    fiscalPeriod: 'Fiscal Year',
+    ledger: 'Ledger',
     subsidiaryNumber: 'Subsidiary No.',
     items: 'Voucher Items',
     addRow: 'Add Item',
@@ -47,7 +49,8 @@ const localTranslations = {
     alreadyBalanced: 'Voucher is already balanced.',
     cannotDelete: 'Reviewed or Final vouchers cannot be deleted.',
     reqFields: 'Description and Account are required for all items.',
-    emptyData: 'No records found.'
+    globalFiltersTitle: 'Global System Context',
+    globalFiltersSubtitle: 'Please select fiscal year, ledger, and branch to view documents.'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -65,6 +68,8 @@ const localTranslations = {
     edit: 'ویرایش',
     delete: 'حذف',
     branch: 'شعبه',
+    fiscalPeriod: 'سال مالی',
+    ledger: 'دفتر کل',
     subsidiaryNumber: 'شماره فرعی',
     items: 'اقلام سند',
     addRow: 'ردیف جدید',
@@ -72,7 +77,7 @@ const localTranslations = {
     account: 'معین',
     debit: 'بدهکار',
     credit: 'بستانکار',
-    balance: 'موازنه',
+    balance: 'موازنه مبلغ',
     saveDraft: 'ذخیره یادداشت',
     saveTemp: 'ذخیره موقت',
     backToList: 'بازگشت به فهرست',
@@ -90,7 +95,8 @@ const localTranslations = {
     alreadyBalanced: 'سند بالانس است.',
     cannotDelete: 'اسناد بررسی شده یا قطعی قابل حذف نیستند.',
     reqFields: 'شرح و حساب معین برای تمامی اقلام اجباری است.',
-    emptyData: 'اطلاعاتی یافت نشد.'
+    globalFiltersTitle: 'فیلترهای عمومی سیستم',
+    globalFiltersSubtitle: 'لطفاً پیش از مشاهده و ثبت اسناد، سال مالی، دفتر و شعبه را انتخاب کنید.'
   }
 };
 
@@ -99,19 +105,24 @@ const Vouchers = ({ language = 'fa' }) => {
   const isRtl = language === 'fa';
   
   const UI = window.UI || {};
-  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, Callout } = UI;
+  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, GlobalContextFilter } = UI;
   const supabase = window.supabase;
 
-  // Views & UI State
-  const [view, setView] = useState('list'); // 'list' or 'form'
+  // UI & Global Context State
+  const [view, setView] = useState('list');
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
 
-  // Data State
+  const [contextComplete, setContextComplete] = useState(false);
+  const [contextVals, setContextVals] = useState({ fiscal_period_id: '', ledger_id: '', branch_id: '' });
+
+  // Lookup Data
   const [vouchers, setVouchers] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [branches, setBranches] = useState([]);
+  const [fiscalPeriods, setFiscalPeriods] = useState([]);
+  const [ledgers, setLedgers] = useState([]);
   
   // List State
   const [searchParams, setSearchParams] = useState({ voucher_number: '', description: '' });
@@ -126,32 +137,39 @@ const Vouchers = ({ language = 'fa' }) => {
   }, []);
 
   useEffect(() => {
-    if (view === 'list') {
+    if (view === 'list' && contextComplete) {
       fetchVouchers();
     }
-  }, [view]);
+  }, [view, contextComplete]);
 
   const fetchLookups = async () => {
     if (!supabase) return;
     try {
-      const [accRes, brRes] = await Promise.all([
+      const [accRes, brRes, fpRes, ledRes] = await Promise.all([
         supabase.schema('gl').from('accounts').select('id, code, title').eq('is_active', true).order('code'),
-        supabase.schema('gen').from('branches').select('id, code, title').eq('is_active', true)
+        supabase.from('branches').select('id, code, title').eq('is_active', true),
+        supabase.schema('gl').from('fiscal_periods').select('id, title, status').eq('status', true),
+        supabase.schema('gl').from('ledgers').select('id, title, code').eq('is_active', true)
       ]);
       if (accRes.data) setAccounts(accRes.data);
       if (brRes.data) setBranches(brRes.data);
+      if (fpRes.data) setFiscalPeriods(fpRes.data);
+      if (ledRes.data) setLedgers(ledRes.data);
     } catch (error) {
       console.error('Error fetching lookups:', error);
     }
   };
 
   const fetchVouchers = async () => {
-    if (!supabase) return;
+    if (!supabase || !contextComplete) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.schema('gl')
         .from('vouchers')
         .select('*')
+        .eq('fiscal_period_id', contextVals.fiscal_period_id)
+        .eq('ledger_id', contextVals.ledger_id)
+        .eq('branch_id', contextVals.branch_id)
         .order('voucher_date', { ascending: false })
         .order('voucher_number', { ascending: false });
       
@@ -201,7 +219,9 @@ const Vouchers = ({ language = 'fa' }) => {
         status: 'draft',
         description: '',
         subsidiary_number: '',
-        branch_id: branches.length > 0 ? branches[0].id : null
+        fiscal_period_id: contextVals.fiscal_period_id,
+        ledger_id: contextVals.ledger_id,
+        branch_id: contextVals.branch_id
       });
       setVoucherItems([{
         id: `temp_${Date.now()}`,
@@ -227,7 +247,6 @@ const Vouchers = ({ language = 'fa' }) => {
   const handleSaveVoucher = async (status) => {
     if (!supabase) return;
     
-    // Validation
     const missingReqs = voucherItems.some(item => !item.description || !item.account_id);
     if (missingReqs) {
       alert(t.reqFields);
@@ -311,29 +330,16 @@ const Vouchers = ({ language = 'fa' }) => {
     }
   };
 
-  // Item Table Methods
   const handleItemChange = (index, field, value) => {
     const newItems = [...voucherItems];
     newItems[index][field] = value;
-    
     if (field === 'debit' && parseFloat(value) > 0) newItems[index]['credit'] = 0;
     if (field === 'credit' && parseFloat(value) > 0) newItems[index]['debit'] = 0;
-    
     setVoucherItems(newItems);
   };
 
   const addItemRow = () => {
-    setVoucherItems([...voucherItems, {
-      id: `temp_${Date.now()}`,
-      row_number: voucherItems.length + 1,
-      account_id: '',
-      debit: 0,
-      credit: 0,
-      description: '',
-      tracking_number: '',
-      tracking_date: '',
-      quantity: 0
-    }]);
+    setVoucherItems([...voucherItems, { id: `temp_${Date.now()}`, row_number: voucherItems.length + 1, account_id: '', debit: 0, credit: 0, description: '', tracking_number: '', tracking_date: '', quantity: 0 }]);
   };
 
   const copyRowDescription = (index) => {
@@ -359,20 +365,11 @@ const Vouchers = ({ language = 'fa' }) => {
         totalC += parseFloat(item.credit) || 0;
       }
     });
-    
     const diff = totalD - totalC;
     const newItems = [...voucherItems];
-    
-    if (diff > 0) {
-      newItems[index].credit = diff;
-      newItems[index].debit = 0;
-    } else if (diff < 0) {
-      newItems[index].debit = Math.abs(diff);
-      newItems[index].credit = 0;
-    } else {
-      alert(t.alreadyBalanced);
-      return;
-    }
+    if (diff > 0) { newItems[index].credit = diff; newItems[index].debit = 0; } 
+    else if (diff < 0) { newItems[index].debit = Math.abs(diff); newItems[index].credit = 0; } 
+    else { alert(t.alreadyBalanced); return; }
     setVoucherItems(newItems);
   };
 
@@ -398,6 +395,29 @@ const Vouchers = ({ language = 'fa' }) => {
     { field: 'total_credit', header: t.totalCredit, width: 'w-32', render: (row) => formatNumber(row.total_credit) }
   ];
 
+  // GATEKEEPER RENDER
+  if (!contextComplete) {
+    return (
+       <div className={`p-4 md:p-6 h-full bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
+          <GlobalContextFilter 
+             isRtl={isRtl}
+             title={t.globalFiltersTitle}
+             subtitle={t.globalFiltersSubtitle}
+             isComplete={false}
+             values={contextVals}
+             onChange={(name, val) => setContextVals(prev => ({ ...prev, [name]: val }))}
+             onConfirm={() => setContextComplete(true)}
+             fields={[
+               { name: 'fiscal_period_id', label: t.fiscalPeriod, options: fiscalPeriods.map(f => ({value: f.id, label: f.title})) },
+               { name: 'ledger_id', label: t.ledger, options: ledgers.map(l => ({value: l.id, label: l.title})) },
+               { name: 'branch_id', label: t.branch, options: branches.map(b => ({value: b.id, label: b.title})) }
+             ]}
+          />
+       </div>
+    );
+  }
+
+  // FORM RENDER
   if (view === 'form' && currentVoucher) {
     const totalDebit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.debit) || 0), 0);
     const totalCredit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.credit) || 0), 0);
@@ -406,12 +426,9 @@ const Vouchers = ({ language = 'fa' }) => {
 
     return (
       <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
-        {/* Header Actions */}
-        <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 shadow-sm shrink-0">
+        <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={handleCloseForm} icon={isRtl ? ArrowRight : ArrowLeft}>
-              {t.backToList}
-            </Button>
+            <Button variant="ghost" onClick={handleCloseForm} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
             <div className="h-6 w-px bg-slate-300 mx-2"></div>
             <h2 className="text-lg font-bold text-slate-800">
               {currentVoucher.id ? t.edit : t.newVoucher}
@@ -430,57 +447,31 @@ const Vouchers = ({ language = 'fa' }) => {
         </div>
 
         <div className="flex-1 overflow-auto flex flex-col gap-4">
-          {/* Header Info */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <SelectField 
-                label={t.branch} 
-                value={currentVoucher.branch_id || ''} 
-                onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})}
-                disabled={isReadonly}
-                isRtl={isRtl}
-              >
-                <option value="">--</option>
+            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <SelectField label={t.fiscalPeriod} value={currentVoucher.fiscal_period_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
+                {fiscalPeriods.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+              </SelectField>
+              <SelectField label={t.ledger} value={currentVoucher.ledger_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
+                {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+              </SelectField>
+              <SelectField label={t.branch} value={currentVoucher.branch_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
                 {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
               </SelectField>
-              <InputField 
-                type="date" 
-                label={t.date} 
-                value={currentVoucher.voucher_date || ''} 
-                onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})}
-                disabled={isReadonly}
-                isRtl={isRtl}
-              />
-              <SelectField 
-                label={t.type} 
-                value={currentVoucher.voucher_type || 'general'} 
-                onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})}
-                disabled={isReadonly}
-                isRtl={isRtl}
-              >
+
+              <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2" />
+              <SelectField label={t.type} value={currentVoucher.voucher_type || 'general'} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2">
                 <option value="general">{t.general}</option>
                 <option value="opening">{t.opening}</option>
               </SelectField>
-              <InputField 
-                label={t.subsidiaryNumber} 
-                value={currentVoucher.subsidiary_number || ''} 
-                onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})}
-                disabled={isReadonly}
-                isRtl={isRtl}
-              />
-              <div className="md:col-span-4">
-                <InputField 
-                  label={t.description} 
-                  value={currentVoucher.description || ''} 
-                  onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})}
-                  disabled={isReadonly}
-                  isRtl={isRtl}
-                />
+              <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2" />
+              
+              <div className="md:col-span-4 lg:col-span-6">
+                <InputField label={t.description} value={currentVoucher.description || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
               </div>
             </div>
           </div>
 
-          {/* Items Table */}
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[300px]">
             <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
               <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
@@ -507,85 +498,22 @@ const Vouchers = ({ language = 'fa' }) => {
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-3 py-1.5 text-center font-bold text-slate-500">{index + 1}</td>
                       <td className="px-3 py-1.5">
-                        <select 
-                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800"
-                          value={item.account_id || ''}
-                          onChange={(e) => handleItemChange(index, 'account_id', e.target.value)}
-                          disabled={isReadonly}
-                        >
+                        <select className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800" value={item.account_id || ''} onChange={(e) => handleItemChange(index, 'account_id', e.target.value)} disabled={isReadonly}>
                           <option value="">--</option>
-                          {accounts.map(acc => (
-                            <option key={acc.id} value={acc.id}>{acc.code} - {acc.title}</option>
-                          ))}
+                          {accounts.map(acc => (<option key={acc.id} value={acc.id}>{acc.code} - {acc.title}</option>))}
                         </select>
                       </td>
-                      <td className="px-3 py-1.5">
-                        <input 
-                          type="number" 
-                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr"
-                          value={item.debit}
-                          onChange={(e) => handleItemChange(index, 'debit', e.target.value)}
-                          disabled={isReadonly}
-                          min="0"
-                        />
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <input 
-                          type="number" 
-                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr"
-                          value={item.credit}
-                          onChange={(e) => handleItemChange(index, 'credit', e.target.value)}
-                          disabled={isReadonly}
-                          min="0"
-                        />
-                      </td>
+                      <td className="px-3 py-1.5"><input type="number" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr" value={item.debit} onChange={(e) => handleItemChange(index, 'debit', e.target.value)} disabled={isReadonly} min="0" /></td>
+                      <td className="px-3 py-1.5"><input type="number" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr" value={item.credit} onChange={(e) => handleItemChange(index, 'credit', e.target.value)} disabled={isReadonly} min="0" /></td>
                       <td className="px-3 py-1.5">
                         <div className="flex gap-1 relative">
-                          <input 
-                            type="text" 
-                            className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800"
-                            value={item.description || ''}
-                            onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                            disabled={isReadonly}
-                          />
-                          {!isReadonly && index > 0 && (
-                            <button 
-                              className="bg-slate-200 hover:bg-slate-300 text-slate-600 px-2 rounded transition-colors h-8 text-[10px] absolute left-0" 
-                              onClick={() => copyRowDescription(index)} 
-                              title="Copy from above"
-                            >
-                              ↑
-                            </button>
-                          )}
+                          <input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800" value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} />
+                          {!isReadonly && index > 0 && (<button className="bg-slate-200 hover:bg-slate-300 text-slate-600 px-2 rounded transition-colors h-8 text-[10px] absolute left-0" onClick={() => copyRowDescription(index)} title="Copy from above">↑</button>)}
                         </div>
                       </td>
-                      <td className="px-3 py-1.5">
-                        <input 
-                          type="text" 
-                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800"
-                          value={item.tracking_number || ''}
-                          onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)}
-                          disabled={isReadonly}
-                        />
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <input 
-                          type="date" 
-                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr"
-                          value={item.tracking_date || ''}
-                          onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)}
-                          disabled={isReadonly}
-                        />
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <input 
-                          type="number" 
-                          className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr"
-                          value={item.quantity || ''}
-                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                          disabled={isReadonly}
-                        />
-                      </td>
+                      <td className="px-3 py-1.5"><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800" value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly} /></td>
+                      <td className="px-3 py-1.5"><input type="date" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr" value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly} /></td>
+                      <td className="px-3 py-1.5"><input type="number" className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800 dir-ltr" value={item.quantity || ''} onChange={(e) => handleItemChange(index, 'quantity', e.target.value)} disabled={isReadonly} /></td>
                       <td className="px-3 py-1.5 text-center sticky left-0 bg-white group-hover:bg-slate-50 border-l border-slate-100 z-10">
                         {!isReadonly && (
                           <div className="flex gap-1 justify-center">
@@ -602,14 +530,8 @@ const Vouchers = ({ language = 'fa' }) => {
 
             <div className="bg-slate-50 border-t border-slate-200 p-3 shrink-0">
               <div className="flex items-center gap-6 font-mono text-[13px] font-bold">
-                <div className="flex items-center gap-2">
-                   <span className="text-slate-500 font-sans">{t.totalDebit}:</span>
-                   <span className="text-indigo-700">{formatNumber(totalDebit)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                   <span className="text-slate-500 font-sans">{t.totalCredit}:</span>
-                   <span className="text-indigo-700">{formatNumber(totalCredit)}</span>
-                </div>
+                <div className="flex items-center gap-2"><span className="text-slate-500 font-sans">{t.totalDebit}:</span><span className="text-indigo-700">{formatNumber(totalDebit)}</span></div>
+                <div className="flex items-center gap-2"><span className="text-slate-500 font-sans">{t.totalCredit}:</span><span className="text-indigo-700">{formatNumber(totalCredit)}</span></div>
                 <div className="h-4 w-px bg-slate-300"></div>
                 <div className={`flex items-center gap-2 ${isBalanced ? 'text-emerald-600' : 'text-red-500'}`}>
                    {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
@@ -623,10 +545,23 @@ const Vouchers = ({ language = 'fa' }) => {
     );
   }
 
-  // --- List View ---
+  // LIST RENDER
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
-      <div className="mb-6 flex items-center justify-between shrink-0">
+      <GlobalContextFilter 
+         isRtl={isRtl}
+         title={t.globalFiltersTitle}
+         isComplete={true}
+         values={contextVals}
+         onChange={(name, val) => { if(name === 'RESET') setContextComplete(false); }}
+         fields={[
+           { name: 'fiscal_period_id', label: t.fiscalPeriod, options: fiscalPeriods.map(f => ({value: f.id, label: f.title})) },
+           { name: 'ledger_id', label: t.ledger, options: ledgers.map(l => ({value: l.id, label: l.title})) },
+           { name: 'branch_id', label: t.branch, options: branches.map(b => ({value: b.id, label: b.title})) }
+         ]}
+      />
+
+      <div className="mb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
             <FileText size={24} />
@@ -666,11 +601,8 @@ const Vouchers = ({ language = 'fa' }) => {
 
       <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title={t.delete}
         footer={<><Button variant="ghost" onClick={() => setShowDeleteModal(false)}>{t.backToList}</Button><Button variant="danger" onClick={confirmDelete}>{t.delete}</Button></>}>
-        <div className="p-4">
-          <p className="text-slate-700 font-medium">{t.confirmDelete}</p>
-        </div>
+        <div className="p-4"><p className="text-slate-700 font-medium">{t.confirmDelete}</p></div>
       </Modal>
-
     </div>
   );
 };
