@@ -1,7 +1,63 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
 const { supabase } = window;
-const { Card, Button, Input, Select, Table, Modal, Checkbox } = window.UI || {};
+
+// Safe UI Components Extraction / Fallback (Prevents React Error #130)
+const UI = window.UI || {};
+
+const Card = UI.Card || (({ children, className = '', ...props }) => (
+  <div className={`bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl rounded-xl ${className}`} {...props}>
+    {children}
+  </div>
+));
+
+const Button = UI.Button || (({ children, variant = 'primary', className = '', ...props }) => {
+  const bg = variant === 'primary' ? 'bg-blue-600 hover:bg-blue-500 text-white' : 
+             variant === 'danger' ? 'bg-red-600 hover:bg-red-500 text-white' : 
+             variant === 'warning' ? 'bg-yellow-600 hover:bg-yellow-500 text-white' : 
+             'bg-slate-700 hover:bg-slate-600 text-white';
+  return (
+    <button className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${bg} disabled:opacity-50 ${className}`} {...props}>
+      {children}
+    </button>
+  );
+});
+
+const Input = UI.Input || (({ label, className = '', ...props }) => (
+  <div className={`w-full ${className}`}>
+    {label && <label className="block text-xs mb-1.5 text-gray-300 font-bold">{label}</label>}
+    <input className="w-full bg-black/30 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-blue-500 transition-colors" {...props} />
+  </div>
+));
+
+const Select = UI.Select || (({ label, options = [], className = '', ...props }) => (
+  <div className={`w-full ${className}`}>
+    {label && <label className="block text-xs mb-1.5 text-gray-300 font-bold">{label}</label>}
+    <select className="w-full bg-black/30 border border-white/20 rounded-lg p-2.5 text-white outline-none focus:border-blue-500 transition-colors" {...props}>
+      <option value="">--</option>
+      {options.map((o, idx) => (
+        <option key={o.value || idx} value={o.value} className="bg-slate-800">{o.label}</option>
+      ))}
+    </select>
+  </div>
+));
+
+const Modal = UI.Modal || (({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden">
+        <div className="flex justify-between items-center p-4 border-b border-white/10 bg-slate-900/50">
+          <h3 className="font-bold text-lg text-white">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors text-xl font-bold">✕</button>
+        </div>
+        <div className="p-0">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+});
 
 const translations = {
   en: {
@@ -451,7 +507,7 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
     const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final';
 
     return (
-      <div className="w-full space-y-4 text-white" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="w-full space-y-4 p-4 text-white" dir={isRtl ? 'rtl' : 'ltr'}>
         <div className="flex justify-between items-center mb-4 bg-white/5 p-4 rounded-lg backdrop-blur-md border border-white/10 shadow-xl">
           <h2 className="text-2xl font-bold">{currentVoucher.id ? t.edit : t.newVoucher}</h2>
           <div className="flex gap-2">
@@ -502,15 +558,14 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
               value={currentVoucher.description || ''} 
               onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})}
               disabled={isReadonly}
-              className="w-full"
             />
           </div>
         </Card>
 
-        <Card className="p-0 bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl rounded-xl overflow-hidden">
+        <Card className="p-0 bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl rounded-xl overflow-hidden mt-6">
           <div className="flex justify-between items-center p-4 bg-black/20 border-b border-white/10">
             <h3 className="text-xl font-bold">{t.items}</h3>
-            {!isReadonly && <Button onClick={addItemRow} variant="primary">{t.addRow}</Button>}
+            {!isReadonly && <Button variant="primary" onClick={addItemRow}>{t.addRow}</Button>}
           </div>
           
           <div className="overflow-x-auto w-full">
@@ -524,7 +579,7 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
                   <th className="px-4 py-3 min-w-[250px]">{t.description}</th>
                   <th className="px-4 py-3 min-w-[120px]">{t.trackingNumber}</th>
                   <th className="px-4 py-3 min-w-[150px]">{t.trackingDate}</th>
-                  <th className="px-4 py-3">{t.quantity}</th>
+                  <th className="px-4 py-3 min-w-[100px]">{t.quantity}</th>
                   <th className="px-4 py-3 text-center">{t.actions}</th>
                 </tr>
               </thead>
@@ -576,9 +631,9 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
                           required
                         />
                         {!isReadonly && index > 0 && (
-                          <Button variant="secondary" className="px-2" onClick={() => copyRowDescription(index)} title="Copy from above">
+                          <button className="bg-white/10 hover:bg-white/20 px-2 rounded font-bold text-white transition-colors" onClick={() => copyRowDescription(index)} title="Copy from above">
                             ↑
-                          </Button>
+                          </button>
                         )}
                       </div>
                     </td>
@@ -612,8 +667,8 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
                     <td className="px-4 py-3 text-center">
                       {!isReadonly && (
                         <div className="flex gap-2 justify-center">
-                          <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => balanceVoucher(index)} title={t.balance}>=</Button>
-                          <Button variant="danger" className="px-2 py-1 text-xs" onClick={() => removeItemRow(index)}>X</Button>
+                          <button className="bg-blue-600/50 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors" onClick={() => balanceVoucher(index)} title={t.balance}>=</button>
+                          <button className="bg-red-600/50 hover:bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors" onClick={() => removeItemRow(index)}>X</button>
                         </div>
                       )}
                     </td>
@@ -638,7 +693,7 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
   }
 
   return (
-    <div className="w-full space-y-6 text-white" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="w-full space-y-6 p-4 text-white" dir={isRtl ? 'rtl' : 'ltr'}>
       <div className="flex justify-between items-center bg-white/5 p-4 rounded-lg backdrop-blur-md border border-white/10 shadow-xl">
         <h2 className="text-2xl font-bold">{t.title}</h2>
         <div className="flex gap-3">
@@ -649,8 +704,8 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
 
       <Card className="p-6 bg-white/5 backdrop-blur-lg border border-white/10 shadow-2xl rounded-xl">
         <div className="mb-6">
-          <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}>
-            <h3 className="text-lg font-semibold flex items-center gap-2">
+          <div className="flex justify-between items-center mb-4 cursor-pointer group" onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}>
+            <h3 className="text-lg font-semibold flex items-center gap-2 group-hover:text-blue-300 transition-colors">
               <span className="text-blue-400">{showAdvancedSearch ? '▼' : '▶'}</span> {t.search}
             </h3>
           </div>
@@ -691,18 +746,18 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
                     onKeyPress={(e) => e.key === 'Enter' && addFilter()}
                   />
                 </div>
-                <Button onClick={addFilter} className="mb-1 px-8">{t.applyFilter}</Button>
+                <Button variant="primary" onClick={addFilter} className="mb-1 px-8">{t.applyFilter}</Button>
               </div>
 
               {filters.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
+                <div className="flex flex-wrap gap-2 pt-4 border-t border-white/10">
                   {filters.map((f, i) => (
-                    <span key={i} className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-blue-500/30">
+                    <span key={i} className="bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full text-sm flex items-center gap-2 border border-blue-500/30 font-bold">
                       {f.field} {f.operator} {f.value}
-                      <button onClick={() => removeFilter(i)} className="text-white hover:text-red-400 ml-1 font-bold">×</button>
+                      <button onClick={() => removeFilter(i)} className="text-white hover:text-red-400 ml-1">✕</button>
                     </span>
                   ))}
-                  <button onClick={() => setFilters([])} className="text-sm text-gray-400 hover:text-white underline">{t.clearFilters}</button>
+                  <button onClick={() => setFilters([])} className="text-sm text-gray-400 hover:text-white underline ml-4">{t.clearFilters}</button>
                 </div>
               )}
             </div>
@@ -710,17 +765,17 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-gray-300 text-lg">در حال پردازش...</div>
+          <div className="text-center py-12 text-gray-300 text-lg font-bold">در حال پردازش...</div>
         ) : (
           <>
             <div className="overflow-x-auto rounded-lg border border-white/10 shadow-inner">
               <table className="w-full text-sm text-left rtl:text-right whitespace-nowrap">
                 <thead className="text-xs uppercase bg-black/40 text-gray-300">
                   <tr>
-                    <th className="px-4 py-4 cursor-pointer hover:text-white" onClick={() => handleSort('voucher_number')}>
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('voucher_number')}>
                       {t.voucherNumber} {sortField === 'voucher_number' && (sortAsc ? '↑' : '↓')}
                     </th>
-                    <th className="px-4 py-4 cursor-pointer hover:text-white" onClick={() => handleSort('voucher_date')}>
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('voucher_date')}>
                       {t.date} {sortField === 'voucher_date' && (sortAsc ? '↑' : '↓')}
                     </th>
                     <th className="px-4 py-4">{t.type}</th>
@@ -734,11 +789,11 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
                 <tbody>
                   {vouchers.map((voucher) => (
                     <tr key={voucher.id} className="border-b border-white/5 hover:bg-white/10 transition-colors">
-                      <td className="px-4 py-3 font-mono">{voucher.voucher_number || '-'}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-center">{voucher.voucher_number || '-'}</td>
                       <td className="px-4 py-3 font-mono">{voucher.voucher_date}</td>
                       <td className="px-4 py-3">{voucher.voucher_type === 'opening' ? t.opening : t.general}</td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-md text-xs font-bold shadow-sm ${
+                        <span className={`px-2 py-1.5 rounded-md text-xs font-bold shadow-sm ${
                           voucher.status === 'final' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 
                           voucher.status === 'reviewed' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
                           voucher.status === 'temporary' ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30' :
@@ -748,32 +803,32 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
                         </span>
                       </td>
                       <td className="px-4 py-3 truncate max-w-xs" title={voucher.description}>{voucher.description}</td>
-                      <td className="px-4 py-3 text-blue-300 font-mono">{formatNumber(voucher.total_debit)}</td>
-                      <td className="px-4 py-3 text-blue-300 font-mono">{formatNumber(voucher.total_credit)}</td>
+                      <td className="px-4 py-3 text-blue-300 font-mono font-bold">{formatNumber(voucher.total_debit)}</td>
+                      <td className="px-4 py-3 text-blue-300 font-mono font-bold">{formatNumber(voucher.total_credit)}</td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex gap-2 justify-center">
-                          <Button variant="secondary" className="px-3 py-1 text-xs" onClick={() => handleOpenForm(voucher)}>{t.edit}</Button>
-                          <Button variant="danger" className="px-3 py-1 text-xs" onClick={() => handleDeleteClick(voucher)}>{t.delete}</Button>
+                          <Button variant="secondary" className="!px-3 !py-1 text-xs" onClick={() => handleOpenForm(voucher)}>{t.edit}</Button>
+                          <Button variant="danger" className="!px-3 !py-1 text-xs" onClick={() => handleDeleteClick(voucher)}>{t.delete}</Button>
                         </div>
                       </td>
                     </tr>
                   ))}
                   {vouchers.length === 0 && (
                     <tr>
-                      <td colSpan="8" className="px-4 py-12 text-center text-gray-400 text-lg">{t.noData}</td>
+                      <td colSpan="8" className="px-4 py-12 text-center text-gray-400 text-lg font-bold">{t.noData}</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
 
-            <div className="flex justify-between items-center mt-6 bg-black/20 p-3 rounded-lg border border-white/5">
+            <div className="flex justify-between items-center mt-6 bg-black/20 p-4 rounded-lg border border-white/5">
               <div className="flex items-center gap-4">
-                <span className="text-gray-400">{t.itemsCount}: <strong className="text-white">{totalRecords}</strong></span>
+                <span className="text-gray-400 font-bold">{t.itemsCount}: <strong className="text-white text-lg">{totalRecords}</strong></span>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-400">{t.rowsPerPage}:</span>
+                  <span className="text-gray-400 font-bold">{t.rowsPerPage}:</span>
                   <select 
-                    className="bg-black/40 border border-white/20 rounded p-1 text-white outline-none"
+                    className="bg-black/40 border border-white/20 rounded p-1 text-white outline-none font-bold"
                     value={pageSize}
                     onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
                   >
@@ -785,11 +840,11 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="secondary" className="px-3 py-1" disabled={page === 1} onClick={() => setPage(page - 1)}>
+                <Button variant="secondary" className="!px-3 !py-1" disabled={page === 1} onClick={() => setPage(page - 1)}>
                   {isRtl ? 'قبلی' : 'Prev'}
                 </Button>
-                <span className="text-gray-300 px-4">{t.page} {page} {t.of} {totalPages || 1}</span>
-                <Button variant="secondary" className="px-3 py-1" disabled={page === totalPages || totalPages === 0} onClick={() => setPage(page + 1)}>
+                <span className="text-gray-300 px-4 font-bold">{t.page} {page} {t.of} {totalPages || 1}</span>
+                <Button variant="secondary" className="!px-3 !py-1" disabled={page === totalPages || totalPages === 0} onClick={() => setPage(page + 1)}>
                   {isRtl ? 'بعدی' : 'Next'}
                 </Button>
               </div>
@@ -798,21 +853,19 @@ window.Vouchers = function Vouchers({ language = 'fa' }) {
         )}
       </Card>
 
-      {isDeleting && (
-        <Modal 
-          isOpen={isDeleting} 
-          onClose={() => setIsDeleting(false)}
-          title={t.delete}
-        >
-          <div className="p-6 text-white bg-gray-900/90 rounded-b-lg">
-            <p className="mb-8 text-lg">{t.confirmDelete}</p>
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" className="px-6" onClick={() => setIsDeleting(false)}>انصراف</Button>
-              <Button variant="danger" className="px-6" onClick={confirmDelete}>حذف قطعی</Button>
-            </div>
+      <Modal 
+        isOpen={isDeleting} 
+        onClose={() => setIsDeleting(false)}
+        title={t.delete}
+      >
+        <div className="p-6 text-white">
+          <p className="mb-8 text-lg">{t.confirmDelete}</p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setIsDeleting(false)}>انصراف</Button>
+            <Button variant="danger" onClick={confirmDelete}>حذف قطعی</Button>
           </div>
-        </Modal>
-      )}
+        </div>
+      </Modal>
     </div>
   );
 };
