@@ -108,7 +108,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   const wrapperRef = useRef(null);
 
   const selectedAcc = accounts.find(a => a.id === value);
-  const displayValue = selectedAcc ? selectedAcc.displayValue : '';
+  const displaySelected = selectedAcc ? `${selectedAcc.full_code} - ${selectedAcc.title}` : '';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -121,7 +121,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   }, []);
 
   const filtered = accounts.filter(a => 
-    a.displayValue.toLowerCase().includes(search.toLowerCase())
+    a.displayPath.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -130,12 +130,12 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
         <input
           type="text"
           className="w-full bg-slate-50 border border-slate-200 rounded h-8 px-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-[12px] text-slate-800"
-          value={isOpen ? search : displayValue}
+          value={isOpen ? search : displaySelected}
           onChange={e => { setSearch(e.target.value); setIsOpen(true); }}
           onFocus={() => { setIsOpen(true); setSearch(''); }}
           disabled={disabled}
           placeholder={placeholder}
-          title={displayValue}
+          title={displaySelected}
         />
         <Search size={12} className="absolute top-1/2 -translate-y-1/2 left-2 text-slate-400 pointer-events-none" />
       </div>
@@ -148,8 +148,8 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
               className="px-3 py-2 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0"
               onMouseDown={(e) => { e.preventDefault(); onChange(acc.id); setIsOpen(false); }}
             >
-              <div className="font-bold text-slate-800 dir-ltr text-right">{acc.full_code}</div>
-              <div className="text-slate-600 truncate mt-0.5" title={acc.path}>{acc.path}</div>
+              <div className="font-bold text-slate-800 dir-ltr text-right">{acc.full_code} - {acc.title}</div>
+              <div className="text-slate-500 truncate mt-0.5 text-[10px]" title={acc.path}>{acc.path}</div>
             </div>
           ))}
           {filtered.length === 0 && (
@@ -224,7 +224,7 @@ const Vouchers = ({ language = 'fa' }) => {
       const [brRes, fyRes, ledRes] = await Promise.all([
         supabase.schema('gen').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
         supabase.schema('gk').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
-        supabase.schema('gl').from('ledgers').select('id, code, title').eq('is_active', true).order('title')
+        supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title')
       ]);
       
       if (brRes.data) setBranches(brRes.data);
@@ -243,8 +243,8 @@ const Vouchers = ({ language = 'fa' }) => {
         return prev;
       });
 
-      // Fetch Accounts and build hierarchy
-      const accRes = await supabase.schema('gl').from('accounts').select('id, full_code, title, level, parent_id').eq('is_active', true).order('full_code');
+      // Fetch Accounts and build hierarchy including structure_id and metadata
+      const accRes = await supabase.schema('gl').from('accounts').select('id, full_code, title, level, parent_id, metadata, structure_id').eq('is_active', true).order('full_code');
       if (accRes.data) {
         const allAccs = accRes.data;
         const accMap = new Map(allAccs.map(a => [a.id, a]));
@@ -259,7 +259,7 @@ const Vouchers = ({ language = 'fa' }) => {
             curr = accMap.get(curr.parent_id);
             path = `${curr.title} / ${path}`;
           }
-          return { ...a, path, displayValue: `${a.full_code} - ${path}` };
+          return { ...a, path, displayPath: `${a.full_code} - ${path}` };
         });
         setAccounts(processedAccounts);
       }
@@ -271,12 +271,9 @@ const Vouchers = ({ language = 'fa' }) => {
       if (dtRes.data) fetchedDocTypes = dtRes.data;
       setDocTypes(fetchedDocTypes);
 
-      // Fetch Currencies gracefully
-      let fetchedCurrencies = [];
-      let currRes = await supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true);
-      if (currRes.error) currRes = await supabase.schema('gl').from('currencies').select('id, code, title').eq('is_active', true);
-      if (currRes.data) fetchedCurrencies = currRes.data;
-      setCurrencies(fetchedCurrencies);
+      // Fetch Currencies strictly from gen.currencies
+      const currRes = await supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true);
+      if (currRes.data) setCurrencies(currRes.data);
 
     } catch (error) {
       console.error('Error fetching lookups:', error);
@@ -341,6 +338,10 @@ const Vouchers = ({ language = 'fa' }) => {
         setLoading(false);
       }
     } else {
+      const initialLedgerId = contextVals.ledger_id;
+      const currentLedger = ledgers.find(l => String(l.id) === String(initialLedgerId));
+      const defaultCurrency = currentLedger?.currency || '';
+
       setCurrentVoucher({
         voucher_date: new Date().toISOString().split('T')[0],
         voucher_type: docTypes.length > 0 ? docTypes[0].code : 'general',
@@ -348,7 +349,7 @@ const Vouchers = ({ language = 'fa' }) => {
         description: '',
         subsidiary_number: '',
         fiscal_period_id: contextVals.fiscal_year_id,
-        ledger_id: contextVals.ledger_id,
+        ledger_id: initialLedgerId,
         branch_id: contextVals.branch_id
       });
       setVoucherItems([{
@@ -357,7 +358,7 @@ const Vouchers = ({ language = 'fa' }) => {
         account_id: '',
         debit: 0,
         credit: 0,
-        currency_code: currencies.length > 0 ? currencies[0].code : '',
+        currency_code: defaultCurrency,
         description: '',
         tracking_number: '',
         tracking_date: '',
@@ -472,17 +473,37 @@ const Vouchers = ({ language = 'fa' }) => {
     if (field === 'debit' && parseNum(value) > 0) newItems[index]['credit'] = 0;
     if (field === 'credit' && parseNum(value) > 0) newItems[index]['debit'] = 0;
     
+    if (field === 'account_id') {
+      const selectedAcc = accounts.find(a => a.id === value);
+      const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
+      const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
+      
+      let newCurrency = currentLedger?.currency || '';
+
+      if (selectedAcc && selectedAcc.metadata) {
+        const meta = typeof selectedAcc.metadata === 'string' ? JSON.parse(selectedAcc.metadata) : selectedAcc.metadata;
+        if ((meta.has_currency || meta.is_foreign_currency || meta.is_currency) && meta.currency_code) {
+          newCurrency = meta.currency_code;
+        }
+      }
+      newItems[index]['currency_code'] = newCurrency;
+    }
+
     setVoucherItems(newItems);
   };
 
   const addItemRow = () => {
+    const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
+    const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
+    const defaultCurrency = currentLedger?.currency || '';
+
     setVoucherItems([...voucherItems, { 
       id: `temp_${Date.now()}`, 
       row_number: voucherItems.length + 1, 
       account_id: '', 
       debit: 0, 
       credit: 0, 
-      currency_code: currencies.length > 0 ? currencies[0].code : '',
+      currency_code: defaultCurrency,
       description: '', 
       tracking_number: '', 
       tracking_date: '', 
@@ -558,6 +579,11 @@ const Vouchers = ({ language = 'fa' }) => {
     const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
     const isBalanced = totalDebit === totalCredit;
     const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final';
+
+    const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
+    const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
+    const ledgerStructure = currentLedger?.structure || '';
+    const validAccountsForLedger = accounts.filter(a => String(a.structure_id) === String(ledgerStructure));
 
     return (
       <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
@@ -635,7 +661,7 @@ const Vouchers = ({ language = 'fa' }) => {
                       <td className="px-3 py-1.5 text-center font-bold text-slate-500">{index + 1}</td>
                       <td className="px-3 py-1.5 align-top">
                         <SearchableAccountSelect 
-                           accounts={accounts} 
+                           accounts={validAccountsForLedger} 
                            value={item.account_id} 
                            onChange={(val) => handleItemChange(index, 'account_id', val)} 
                            disabled={isReadonly}
