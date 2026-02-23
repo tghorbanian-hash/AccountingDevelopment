@@ -22,7 +22,7 @@ const localTranslations = {
     edit: 'Edit',
     delete: 'Delete',
     branch: 'Branch',
-    fiscalPeriod: 'Fiscal Year',
+    fiscalYear: 'Fiscal Year',
     ledger: 'Ledger',
     subsidiaryNumber: 'Subsidiary No.',
     items: 'Voucher Items',
@@ -67,7 +67,7 @@ const localTranslations = {
     edit: 'ویرایش',
     delete: 'حذف',
     branch: 'شعبه',
-    fiscalPeriod: 'سال مالی',
+    fiscalYear: 'سال مالی',
     ledger: 'دفتر کل',
     subsidiaryNumber: 'شماره فرعی',
     items: 'اقلام سند',
@@ -112,13 +112,13 @@ const Vouchers = ({ language = 'fa' }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
 
-  const [contextVals, setContextVals] = useState({ fiscal_period_id: '', ledger_id: '', branch_id: '' });
+  const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '', branch_id: '' });
 
   // Lookup Data
   const [vouchers, setVouchers] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [branches, setBranches] = useState([]);
-  const [fiscalPeriods, setFiscalPeriods] = useState([]);
+  const [fiscalYears, setFiscalYears] = useState([]);
   const [ledgers, setLedgers] = useState([]);
   
   // List State
@@ -135,7 +135,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
   useEffect(() => {
     if (view === 'list') {
-      if (contextVals.fiscal_period_id && contextVals.ledger_id && contextVals.branch_id) {
+      if (contextVals.fiscal_year_id && contextVals.ledger_id && contextVals.branch_id) {
         fetchVouchers();
       } else {
         setVouchers([]);
@@ -146,26 +146,25 @@ const Vouchers = ({ language = 'fa' }) => {
   const fetchLookups = async () => {
     if (!supabase) return;
     try {
-      const [accRes, brRes, fpRes, ledRes] = await Promise.all([
+      const [accRes, brRes, fyRes, ledRes] = await Promise.all([
         supabase.schema('gl').from('accounts').select('id, code, title').eq('is_active', true).order('code'),
-        supabase.from('branches').select('id, code, title').eq('is_active', true).order('title'),
-        // سفارش نزولی روی عنوان برای نمایش جدیدترین سال مالی در بالا
-        supabase.schema('gl').from('fiscal_periods').select('id, title, status').eq('status', true).order('title', { ascending: false }),
-        supabase.schema('gl').from('ledgers').select('id, title, code').eq('is_active', true).order('title')
+        supabase.schema('base').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
+        supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('status', true).order('code', { ascending: false }),
+        supabase.schema('gl').from('ledgers').select('id, code, title').eq('is_active', true).order('title')
       ]);
       
       if (accRes.data) setAccounts(accRes.data);
       if (brRes.data) setBranches(brRes.data);
-      if (fpRes.data) setFiscalPeriods(fpRes.data);
+      if (fyRes.data) setFiscalYears(fyRes.data);
       if (ledRes.data) setLedgers(ledRes.data);
 
-      // Auto-select first available options
       setContextVals(prev => {
-        if (!prev.fiscal_period_id && !prev.ledger_id && !prev.branch_id) {
+        if (!prev.fiscal_year_id && !prev.ledger_id && !prev.branch_id) {
+          const defaultBranch = brRes.data?.find(b => b.is_default) || brRes.data?.[0];
           return {
-            fiscal_period_id: fpRes.data?.[0]?.id || '',
+            fiscal_year_id: fyRes.data?.[0]?.id || '',
             ledger_id: ledRes.data?.[0]?.id || '',
-            branch_id: brRes.data?.[0]?.id || ''
+            branch_id: defaultBranch?.id || ''
           };
         }
         return prev;
@@ -177,13 +176,13 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const fetchVouchers = async () => {
-    if (!supabase || !contextVals.fiscal_period_id || !contextVals.ledger_id || !contextVals.branch_id) return;
+    if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id || !contextVals.branch_id) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.schema('gl')
         .from('vouchers')
         .select('*')
-        .eq('fiscal_period_id', contextVals.fiscal_period_id)
+        .eq('fiscal_year_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
         .eq('branch_id', contextVals.branch_id)
         .order('voucher_date', { ascending: false })
@@ -235,7 +234,7 @@ const Vouchers = ({ language = 'fa' }) => {
         status: 'draft',
         description: '',
         subsidiary_number: '',
-        fiscal_period_id: contextVals.fiscal_period_id,
+        fiscal_year_id: contextVals.fiscal_year_id,
         ledger_id: contextVals.ledger_id,
         branch_id: contextVals.branch_id
       });
@@ -411,7 +410,6 @@ const Vouchers = ({ language = 'fa' }) => {
     { field: 'total_credit', header: t.totalCredit, width: 'w-32', render: (row) => formatNumber(row.total_credit) }
   ];
 
-  // FORM RENDER
   if (view === 'form' && currentVoucher) {
     const totalDebit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.debit) || 0), 0);
     const totalCredit = voucherItems.reduce((sum, item) => sum + (parseFloat(item.credit) || 0), 0);
@@ -443,8 +441,8 @@ const Vouchers = ({ language = 'fa' }) => {
         <div className="flex-1 overflow-auto flex flex-col gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
             <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <SelectField label={t.fiscalPeriod} value={currentVoucher.fiscal_period_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
-                {fiscalPeriods.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+              <SelectField label={t.fiscalYear} value={currentVoucher.fiscal_year_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
+                {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.code} - {f.title}</option>)}
               </SelectField>
               <SelectField label={t.ledger} value={currentVoucher.ledger_id || ''} disabled={true} isRtl={isRtl} className="lg:col-span-2">
                 {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
@@ -539,31 +537,27 @@ const Vouchers = ({ language = 'fa' }) => {
     );
   }
 
-  // LIST RENDER
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
       
-      {/* Global Context Filter Chips */}
       <div className="mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-indigo-800 font-bold text-sm">
           <Filter size={18} className="text-indigo-500"/>
           <span>{t.globalFiltersTitle}:</span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* Fiscal Period Chip */}
           <div className="relative group">
             <select 
-              value={contextVals.fiscal_period_id || ''} 
-              onChange={e => setContextVals(p => ({...p, fiscal_period_id: e.target.value}))}
+              value={contextVals.fiscal_year_id || ''} 
+              onChange={e => setContextVals(p => ({...p, fiscal_year_id: e.target.value}))}
               className={`appearance-none bg-indigo-50 border border-indigo-200 hover:border-indigo-300 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer transition-colors shadow-sm ${isRtl ? 'pl-8 pr-3' : 'pr-8 pl-3'}`}
             >
-              <option value="" disabled>{t.fiscalPeriod}</option>
-              {fiscalPeriods.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+              <option value="" disabled>{t.fiscalYear}</option>
+              {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.code} - {f.title}</option>)}
             </select>
             <ChevronDown size={14} className={`absolute top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500 ${isRtl ? 'left-2' : 'right-2'}`} />
           </div>
           
-          {/* Ledger Chip */}
           <div className="relative group">
             <select 
               value={contextVals.ledger_id || ''} 
@@ -576,7 +570,6 @@ const Vouchers = ({ language = 'fa' }) => {
             <ChevronDown size={14} className={`absolute top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500 ${isRtl ? 'left-2' : 'right-2'}`} />
           </div>
 
-          {/* Branch Chip */}
           <div className="relative group">
             <select 
               value={contextVals.branch_id || ''} 
@@ -584,7 +577,7 @@ const Vouchers = ({ language = 'fa' }) => {
               className={`appearance-none bg-indigo-50 border border-indigo-200 hover:border-indigo-300 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer transition-colors shadow-sm ${isRtl ? 'pl-8 pr-3' : 'pr-8 pl-3'}`}
             >
               <option value="" disabled>{t.branch}</option>
-              {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+              {branches.map(b => <option key={b.id} value={b.id}>{b.code ? `${b.code} - ` : ''}{b.title}</option>)}
             </select>
             <ChevronDown size={14} className={`absolute top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500 ${isRtl ? 'left-2' : 'right-2'}`} />
           </div>
