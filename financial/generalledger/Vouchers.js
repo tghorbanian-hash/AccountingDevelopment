@@ -55,6 +55,10 @@ const localTranslations = {
     searchDetail: 'Search detail...',
     copyFromAbove: 'Copy from above',
     trackingReqError: 'Tracking Number and Tracking Date are required for account in row',
+    dailyNumber: 'Daily No.',
+    crossReference: 'Cross Ref.',
+    referenceNumber: 'Reference No.',
+    headerInfo: 'Voucher Header',
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -105,6 +109,10 @@ const localTranslations = {
     searchDetail: 'جستجوی تفصیل...',
     copyFromAbove: 'کپی از ردیف بالا',
     trackingReqError: 'شماره و تاریخ پیگیری برای معین در ردیف زیر الزامی است:',
+    dailyNumber: 'شماره روزانه',
+    crossReference: 'شماره عطف',
+    referenceNumber: 'شماره ارجاع',
+    headerInfo: 'اطلاعات سربرگ سند',
   }
 };
 
@@ -245,7 +253,7 @@ const Vouchers = ({ language = 'fa' }) => {
   const isRtl = language === 'fa';
   
   const UI = window.UI || {};
-  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge } = UI;
+  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, Accordion } = UI;
   const supabase = window.supabase;
 
   const [view, setView] = useState('list');
@@ -274,8 +282,8 @@ const Vouchers = ({ language = 'fa' }) => {
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [voucherItems, setVoucherItems] = useState([]);
   
-  // To handle focused row for inline editing improvements
   const [focusedRowId, setFocusedRowId] = useState(null);
+  const [isHeaderOpen, setIsHeaderOpen] = useState(true);
 
   useEffect(() => {
     fetchLookups();
@@ -376,6 +384,7 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const handleOpenForm = async (voucher = null) => {
+    setIsHeaderOpen(true);
     if (voucher) {
       setCurrentVoucher(voucher);
       setLoading(true);
@@ -413,6 +422,10 @@ const Vouchers = ({ language = 'fa' }) => {
         status: 'draft',
         description: '',
         subsidiary_number: '',
+        voucher_number: '',
+        daily_number: '',
+        cross_reference: '',
+        reference_number: '',
         fiscal_period_id: contextVals.fiscal_year_id,
         ledger_id: initialLedgerId,
         branch_id: contextVals.branch_id
@@ -437,7 +450,6 @@ const Vouchers = ({ language = 'fa' }) => {
   const handleSaveVoucher = async (status) => {
     if (!supabase) return;
     
-    // Validations
     for (let i = 0; i < voucherItems.length; i++) {
         const item = voucherItems[i];
         if (!item.description || !item.account_id) {
@@ -545,7 +557,6 @@ const Vouchers = ({ language = 'fa' }) => {
         if (meta.currency_code) newCurrency = meta.currency_code;
       }
       newItems[index]['currency_code'] = newCurrency;
-      // Reset detail when account changes
       newItems[index]['detail_id'] = '';
     }
 
@@ -677,6 +688,10 @@ const Vouchers = ({ language = 'fa' }) => {
     const targetStructure = accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
     const structureId = targetStructure ? String(targetStructure.id) : null;
 
+    const currentFiscalYearTitle = fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || '';
+    const currentLedgerTitle = currentLedger?.title || '';
+    const currentBranchTitle = branches.find(b => String(b.id) === String(currentVoucher.branch_id))?.title || '';
+
     const validAccountsForLedger = accounts.filter(a => {
         const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
         return String(a.structure_id) === structureId && isSubsidiary;
@@ -701,19 +716,39 @@ const Vouchers = ({ language = 'fa' }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto flex flex-col gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2" />
-            <SelectField label={t.type} value={currentVoucher.voucher_type || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2">
-              {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
-            </SelectField>
-            <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} className="lg:col-span-2" />
-            <div className="md:col-span-4 lg:col-span-6">
-                <InputField label={t.description} value={currentVoucher.description || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
-            </div>
-          </div>
+        <div className="flex-1 overflow-auto flex flex-col gap-3">
+          <Accordion 
+            title={t.headerInfo} 
+            isOpen={isHeaderOpen} 
+            onToggle={() => setIsHeaderOpen(!isHeaderOpen)} 
+            isRtl={isRtl} 
+            icon={FileText}
+            className="shrink-0"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <InputField label={t.fiscalYear} value={currentFiscalYearTitle} disabled isRtl={isRtl} />
+              <InputField label={t.ledger} value={currentLedgerTitle} disabled isRtl={isRtl} />
+              <InputField label={t.branch} value={currentBranchTitle} disabled isRtl={isRtl} />
+              
+              <InputField label={t.voucherNumber} value={currentVoucher.voucher_number || '-'} disabled isRtl={isRtl} dir="ltr" className="font-mono text-center bg-slate-50" />
+              <InputField label={t.dailyNumber} value={currentVoucher.daily_number || '-'} disabled isRtl={isRtl} dir="ltr" className="font-mono text-center bg-slate-50" />
+              <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
 
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+              <InputField label={t.crossReference} value={currentVoucher.cross_reference || '-'} disabled isRtl={isRtl} dir="ltr" className="font-mono text-center bg-slate-50" />
+              <InputField label={t.referenceNumber} value={currentVoucher.reference_number || '-'} disabled isRtl={isRtl} dir="ltr" className="font-mono text-center bg-slate-50" />
+              <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} dir="ltr" />
+              
+              <SelectField label={t.type} value={currentVoucher.voucher_type || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} disabled={isReadonly} isRtl={isRtl} >
+                {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
+              </SelectField>
+
+              <div className="md:col-span-2 lg:col-span-2">
+                  <InputField label={t.description} value={currentVoucher.description || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
+              </div>
+            </div>
+          </Accordion>
+
+          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
             <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
               <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
               {!isReadonly && (
