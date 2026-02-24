@@ -9,7 +9,7 @@ const formatNum = (num) => {
 
 const VoucherPrint = ({ voucherId, onClose }) => {
   const supabase = window.supabase;
-  const isRtl = document.dir === 'rtl' || true; 
+  const isRtl = document.dir === 'rtl' || true;
   
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
@@ -26,11 +26,12 @@ const VoucherPrint = ({ voucherId, onClose }) => {
     const style = document.createElement('style');
     style.innerHTML = `
       @media print {
+        @page { size: A5 landscape; margin: 10mm; }
         body * { visibility: hidden; }
         #printable-voucher, #printable-voucher * { visibility: visible; }
         #printable-voucher { 
            position: absolute; left: 0; top: 0; width: 100%; 
-           padding: 10mm; background: white; margin: 0;
+           padding: 0; background: white; margin: 0;
            box-sizing: border-box;
         }
         .no-print { display: none !important; }
@@ -148,7 +149,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
   };
 
   return (
-    <div className={`w-full max-w-5xl mx-auto bg-white ${isRtl ? 'font-vazir text-right' : 'font-sans text-left'}`} dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className={`w-full max-w-4xl mx-auto bg-white ${isRtl ? 'font-vazir text-right' : 'font-sans text-left'}`} dir={isRtl ? 'rtl' : 'ltr'}>
        <div className="no-print flex items-center justify-between bg-slate-50 border-b border-slate-200 p-4 mb-4 rounded-t-lg">
           <div className="text-slate-500 text-sm font-bold flex items-center gap-2">
              <Printer size={18} />
@@ -162,40 +163,40 @@ const VoucherPrint = ({ voucherId, onClose }) => {
           </div>
        </div>
 
-       <div id="printable-voucher" className="p-4 md:p-8 bg-white text-black min-h-[500px]">
+       <div id="printable-voucher" className="p-4 md:p-6 bg-white text-black">
            <div className="flex items-start justify-between border-b-2 border-slate-800 pb-4 mb-4 print-border-b">
-               <div className="w-1/3 flex flex-col gap-2 text-[13px]">
-                   <div><span className="font-bold text-slate-600">دفتر مالی:</span> {ledgerTitle}</div>
-                   <div><span className="font-bold text-slate-600">شعبه:</span> {branchTitle}</div>
+               <div className="w-1/3 flex flex-col gap-1 text-xs">
+                   <div><span className="font-bold">دفتر مالی:</span> {ledgerTitle}</div>
+                   <div><span className="font-bold">شعبه:</span> {branchTitle}</div>
                    <div className="flex items-center gap-1">
-                       <span className="font-bold text-slate-600">تاریخ سند:</span> 
+                       <span className="font-bold">تاریخ سند:</span> 
                        <span className="font-mono dir-ltr inline-block">{voucher.voucher_date}</span>
-                   </div>
-                   <div className="flex items-center gap-1">
-                       <span className="font-bold text-slate-600">شماره فرعی:</span> 
-                       <span className="font-mono dir-ltr inline-block">{voucher.subsidiary_number || '-'}</span>
                    </div>
                </div>
                
-               <div className="w-1/3 text-center flex flex-col gap-3 items-center justify-center">
-                   <h1 className="text-2xl font-black tracking-tight border-b-2 border-slate-800 pb-1 px-4 inline-block">سند حسابداری</h1>
-                   <div className="text-lg font-black bg-slate-100 px-6 py-1 rounded-full border border-slate-300 shadow-sm print-bg-gray">
+               <div className="w-1/3 text-center flex flex-col gap-2 items-center">
+                   <h1 className="text-xl font-black tracking-tight">سند حسابداری</h1>
+                   <div className="text-sm font-black text-slate-700 px-3 py-0.5 bg-slate-100 border border-slate-300 rounded print-bg-gray">
                        {getStatusText(voucher.status)}
                    </div>
                </div>
                
-               <div className="w-1/3 flex flex-col gap-2 text-[13px] items-end">
+               <div className="w-1/3 flex flex-col gap-1 text-xs items-end">
                    <div className="flex items-center gap-1">
-                       <span className="font-bold text-slate-600">شماره سند:</span> 
-                       <span className="font-mono dir-ltr inline-block text-base font-bold">{voucher.voucher_number || '-'}</span>
+                       <span className="font-bold">شماره سند:</span> 
+                       <span className="font-mono dir-ltr inline-block text-[13px] font-bold">{voucher.voucher_number || '-'}</span>
                    </div>
                    <div className="flex items-center gap-1">
-                       <span className="font-bold text-slate-600">شماره روزانه:</span> 
+                       <span className="font-bold">شماره روزانه:</span> 
                        <span className="font-mono dir-ltr inline-block">{voucher.daily_number || '-'}</span>
                    </div>
                    <div className="flex items-center gap-1">
-                       <span className="font-bold text-slate-600">شماره عطف:</span> 
+                       <span className="font-bold">شماره عطف:</span> 
                        <span className="font-mono dir-ltr inline-block">{voucher.cross_reference || '-'}</span>
+                   </div>
+                   <div className="flex items-center gap-1">
+                       <span className="font-bold">شماره فرعی:</span> 
+                       <span className="font-mono dir-ltr inline-block">{voucher.subsidiary_number || '-'}</span>
                    </div>
                </div>
            </div>
@@ -207,17 +208,17 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                </div>
            )}
 
-           <table className="w-full text-[12px] mb-8 border-collapse border border-slate-800 print-border">
+           <table className="w-full text-[11px] mb-8 border-collapse border border-slate-800 print-border">
                <thead className="bg-slate-100 print-bg-gray font-bold text-center">
                    <tr>
-                       <th className="border border-slate-800 p-2 w-10 print-border">ردیف</th>
-                       <th className="border border-slate-800 p-2 w-24 print-border">کد حساب</th>
-                       <th className="border border-slate-800 p-2 w-[35%] print-border">عنوان حساب / تفصیل</th>
-                       <th className="border border-slate-800 p-2 w-auto print-border">شرح ردیف</th>
-                       <th className="border border-slate-800 p-2 w-20 print-border">پیگیری/مقدار</th>
-                       <th className="border border-slate-800 p-2 w-16 print-border">ارز</th>
-                       <th className="border border-slate-800 p-2 w-32 print-border">بدهکار</th>
-                       <th className="border border-slate-800 p-2 w-32 print-border">بستانکار</th>
+                       <th className="border border-slate-800 p-1.5 w-8 print-border">ردیف</th>
+                       <th className="border border-slate-800 p-1.5 w-20 print-border">کد حساب</th>
+                       <th className="border border-slate-800 p-1.5 w-[30%] print-border">عنوان حساب / تفصیل</th>
+                       <th className="border border-slate-800 p-1.5 w-auto print-border">شرح ردیف</th>
+                       <th className="border border-slate-800 p-1.5 w-20 print-border">پیگیری/مقدار</th>
+                       <th className="border border-slate-800 p-1.5 w-12 print-border">ارز</th>
+                       <th className="border border-slate-800 p-1.5 w-24 print-border">بدهکار</th>
+                       <th className="border border-slate-800 p-1.5 w-24 print-border">بستانکار</th>
                    </tr>
                </thead>
                <tbody>
@@ -245,27 +246,27 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                <tfoot className="bg-slate-100 print-bg-gray font-black">
                    <tr>
                        <td colSpan="6" className="border border-slate-800 p-2 text-left print-border">جمع کل:</td>
-                       <td className="border border-slate-800 p-2 text-right font-mono print-border dir-ltr text-sm">{formatNum(voucher.total_debit)}</td>
-                       <td className="border border-slate-800 p-2 text-right font-mono print-border dir-ltr text-sm">{formatNum(voucher.total_credit)}</td>
+                       <td className="border border-slate-800 p-2 text-right font-mono print-border dir-ltr">{formatNum(voucher.total_debit)}</td>
+                       <td className="border border-slate-800 p-2 text-right font-mono print-border dir-ltr">{formatNum(voucher.total_credit)}</td>
                    </tr>
                </tfoot>
            </table>
 
-           <div className="flex items-start justify-between mt-16 pt-4 px-8 text-sm">
+           <div className="flex items-start justify-between mt-12 pt-4 px-8 text-xs">
                <div className="text-center w-1/3">
-                   <div className="font-bold text-slate-600 mb-16">صادرکننده</div>
+                   <div className="font-bold text-slate-600 mb-12">صادرکننده</div>
                    <div className="border-t border-slate-400 border-dashed pt-2 mx-8 font-bold text-slate-800">
                        {creatorName || '\u00A0'}
                    </div>
                </div>
                <div className="text-center w-1/3">
-                   <div className="font-bold text-slate-600 mb-16">بررسی‌کننده</div>
+                   <div className="font-bold text-slate-600 mb-12">بررسی‌کننده</div>
                    <div className="border-t border-slate-400 border-dashed pt-2 mx-8 font-bold text-slate-800">
                        {reviewerName || '\u00A0'}
                    </div>
                </div>
                <div className="text-center w-1/3">
-                   <div className="font-bold text-slate-600 mb-16">تاییدکننده</div>
+                   <div className="font-bold text-slate-600 mb-12">تاییدکننده</div>
                    <div className="border-t border-slate-400 border-dashed pt-2 mx-8 font-bold text-slate-800">
                        {approverName || '\u00A0'}
                    </div>
