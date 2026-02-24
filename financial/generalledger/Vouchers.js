@@ -345,62 +345,70 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const fetchLookups = async () => {
     if (!supabase) return;
-    try {
-      const [brRes, fyRes, ledRes, structRes, dtRes, diRes] = await Promise.all([
-        supabase.schema('gen').from('branches').select('*'),
-        supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
-        supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title'),
-        supabase.schema('gl').from('account_structures').select('id, code, title').eq('status', true),
-        supabase.schema('gl').from('detail_types').select('id, code, title').eq('is_active', true),
-        supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)
-      ]);
-      
-      if (brRes.data) setBranches(brRes.data.filter(b => b.is_active !== false));
-      if (fyRes.data) setFiscalYears(fyRes.data);
-      if (ledRes.data) setLedgers(ledRes.data);
-      if (structRes.data) setAccountStructures(structRes.data);
-      if (dtRes.data) setDetailTypes(dtRes.data);
-      if (diRes.data) setAllDetailInstances(diRes.data);
+    
+    // Resilient Fetch: Each query is caught independently to prevent 400/401 errors from blocking others (like branches)
+    const safeFetch = async (query) => {
+        try {
+            const res = await query;
+            if (res.error) console.error("API Error in fetchLookups:", res.error);
+            return res.data || null;
+        } catch (e) {
+            console.error("Exception in fetchLookups:", e);
+            return null;
+        }
+    };
 
-      setContextVals(prev => {
+    const [brData, fyData, ledData, structData, dtData, diData, doctypeData, currData] = await Promise.all([
+        safeFetch(supabase.schema('gen').from('branches').select('*')),
+        safeFetch(supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false })),
+        safeFetch(supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title')),
+        safeFetch(supabase.schema('gl').from('account_structures').select('id, code, title').eq('status', true)),
+        safeFetch(supabase.schema('gl').from('detail_types').select('id, code, title').eq('is_active', true)),
+        safeFetch(supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)),
+        safeFetch(supabase.schema('gl').from('doc_types').select('id, code, title, type').eq('is_active', true)),
+        safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true))
+    ]);
+
+    if (brData) setBranches(brData);
+    if (fyData) setFiscalYears(fyData);
+    if (ledData) setLedgers(ledData);
+    if (structData) setAccountStructures(structData);
+    if (dtData) setDetailTypes(dtData);
+    if (diData) setAllDetailInstances(diData);
+
+    setContextVals(prev => {
         if (!prev.fiscal_year_id && !prev.ledger_id) {
-          return {
-            fiscal_year_id: fyRes.data?.[0]?.id || '',
-            ledger_id: ledRes.data?.[0]?.id || ''
-          };
+            return {
+                fiscal_year_id: fyData?.[0]?.id || '',
+                ledger_id: ledData?.[0]?.id || ''
+            };
         }
         return prev;
-      });
+    });
 
-      const accRes = await supabase.schema('gl').from('accounts').select('id, full_code, title, level, parent_id, metadata, structure_id').eq('is_active', true).order('full_code');
-      if (accRes.data) {
-        const allAccs = accRes.data;
+    if (doctypeData) {
+        const allowedSysCodes = ['sys_opening', 'sys_general', 'sys_closing', 'sys_close_acc'];
+        const filteredDocTypes = doctypeData.filter(d => d.type === 'user' || allowedSysCodes.includes(d.code));
+        setDocTypes(filteredDocTypes);
+    }
+
+    if (currData) setCurrencies(currData);
+
+    const accData = await safeFetch(supabase.schema('gl').from('accounts').select('id, full_code, title, level, parent_id, metadata, structure_id').eq('is_active', true).order('full_code'));
+    if (accData) {
+        const allAccs = accData;
         const accMap = new Map(allAccs.map(a => [a.id, a]));
         
         const processedAccounts = allAccs.map(a => {
-          let path = a.title;
-          let curr = a;
-          while (curr.parent_id && accMap.has(curr.parent_id)) {
-            curr = accMap.get(curr.parent_id);
-            path = curr.title + ' / ' + path;
-          }
-          return { ...a, path, displayPath: a.full_code + ' - ' + path };
+            let path = a.title;
+            let curr = a;
+            while (curr.parent_id && accMap.has(curr.parent_id)) {
+                curr = accMap.get(curr.parent_id);
+                path = curr.title + ' / ' + path;
+            }
+            return { ...a, path, displayPath: a.full_code + ' - ' + path };
         });
         setAccounts(processedAccounts);
-      }
-
-      const doctypeRes = await supabase.schema('gl').from('doc_types').select('id, code, title, type').eq('is_active', true);
-      if (doctypeRes.data) {
-         const allowedSysCodes = ['sys_opening', 'sys_general', 'sys_closing', 'sys_close_acc'];
-         const filteredDocTypes = doctypeRes.data.filter(d => d.type === 'user' || allowedSysCodes.includes(d.code));
-         setDocTypes(filteredDocTypes);
-      }
-
-      const currRes = await supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true);
-      if (currRes.data) setCurrencies(currRes.data);
-
-    } catch (error) {
-      console.error('Error fetching lookups:', error);
     }
   };
 
