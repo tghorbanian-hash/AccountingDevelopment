@@ -18,6 +18,7 @@ const localTranslations = {
     description: 'Description',
     totalDebit: 'Total Debit',
     totalCredit: 'Total Credit',
+    amount: 'Voucher Amount',
     actions: 'Actions',
     edit: 'Edit',
     delete: 'Delete',
@@ -91,6 +92,7 @@ const localTranslations = {
     description: 'شرح',
     totalDebit: 'جمع بدهکار',
     totalCredit: 'جمع بستانکار',
+    amount: 'مبلغ سند',
     actions: 'عملیات',
     edit: 'ویرایش',
     delete: 'حذف',
@@ -154,7 +156,6 @@ const localTranslations = {
   }
 };
 
-// Helper for accurate Persian search
 const normalizeFa = (str) => {
   if (!str) return '';
   return String(str).replace(/[يِي]/g, 'ی').replace(/[كک]/g, 'ک').replace(/[إأآا]/g, 'ا').toLowerCase();
@@ -338,7 +339,6 @@ const Vouchers = ({ language = 'fa' }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
   
-  // Print State
   const [voucherToPrint, setVoucherToPrint] = useState(null);
 
   const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
@@ -1015,8 +1015,12 @@ const Vouchers = ({ language = 'fa' }) => {
     { field: 'voucher_type', header: t.type, width: 'w-32', render: (row) => docTypes.find(d => d.code === row.voucher_type)?.title || row.voucher_type },
     { field: 'branch_id', header: t.branch, width: 'w-32', render: (row) => branches.find(b => b.id === row.branch_id)?.title || '-' },
     { field: 'description', header: t.description, width: 'w-64' },
-    { field: 'total_debit', header: t.totalDebit, width: 'w-32', render: (row) => formatNum(row.total_debit) },
-    { field: 'total_credit', header: t.totalCredit, width: 'w-32', render: (row) => formatNum(row.total_credit) },
+    { field: 'total_debit', header: t.amount, width: 'w-32', render: (row) => formatNum(row.total_debit) },
+    { field: 'currency', header: t.currency, width: 'w-24', render: (row) => {
+        const ledger = ledgers.find(l => String(l.id) === String(row.ledger_id));
+        const currCode = ledger?.currency;
+        return currencies.find(c => c.code === currCode)?.title || currCode || '-';
+    }},
     { field: 'daily_number', header: t.dailyNumber, width: 'w-24' },
     { field: 'cross_reference', header: t.crossReference, width: 'w-24' }
   ];
@@ -1328,7 +1332,6 @@ const Vouchers = ({ language = 'fa' }) => {
          isRtl={isRtl} 
          title={t.search}
       >
-        {/* این فیلدها مستقیماً در Grid مربوط به FilterSection قرار می‌گیرند */}
         <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
         <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
            <option value="">{t.all}</option>
@@ -1345,7 +1348,7 @@ const Vouchers = ({ language = 'fa' }) => {
            {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
         </SelectField>
 
-        <div className="md:col-span-2 lg:col-span-3 flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
            <label className="text-[11px] font-bold text-slate-600 rtl:pr-1 ltr:pl-1">{t.account}</label>
            <SearchableAccountSelect 
                accounts={validAccountsForLedger} 
@@ -1356,9 +1359,7 @@ const Vouchers = ({ language = 'fa' }) => {
            />
         </div>
 
-        <div className="md:col-span-3 lg:col-span-4">
-           <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
-        </div>
+        <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
       </FilterSection>
 
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1393,7 +1394,6 @@ const Vouchers = ({ language = 'fa' }) => {
         <div className="p-4"><p className="text-slate-700 font-medium">{t.confirmDelete}</p></div>
       </Modal>
 
-      {/* Print Modal Overlay */}
       <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
          {voucherToPrint && window.VoucherPrint ? (
              <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
