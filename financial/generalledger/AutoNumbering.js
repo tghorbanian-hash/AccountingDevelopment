@@ -27,6 +27,10 @@ const AutoNumbering = ({ t, isRtl }) => {
   const [docFormData, setDocFormData] = useState({ lastNumbers: {} });
   const [showDocModal, setShowDocModal] = useState(false);
 
+  // View Numbers State
+  const [viewingDocNumbers, setViewingDocNumbers] = useState(null);
+  const [showNumbersModal, setShowNumbersModal] = useState(false);
+
   useEffect(() => {
     fetchDetailSettings();
     fetchDocSettings();
@@ -67,7 +71,7 @@ const AutoNumbering = ({ t, isRtl }) => {
          return {
             id: l.id,
             title: l.title,
-            metadata: meta, // Store raw metadata to prevent overwriting other attributes later
+            metadata: meta, 
             resetYear: meta.resetYear !== undefined ? meta.resetYear : true,
             uniquenessScope: meta.uniquenessScope || 'ledger',
             lastNumbers: meta.lastNumbers || {}
@@ -150,6 +154,11 @@ const AutoNumbering = ({ t, isRtl }) => {
         console.error('Error saving ledger settings:', err);
         alert(isRtl ? 'خطا در ذخیره تنظیمات شماره‌گذاری اسناد' : 'Error saving document numbering settings');
     }
+  };
+
+  const openNumbersModal = (item) => {
+     setViewingDocNumbers(item);
+     setShowNumbersModal(true);
   };
 
   // --- Render Sections ---
@@ -236,7 +245,7 @@ const AutoNumbering = ({ t, isRtl }) => {
                    width: 'w-48', 
                    render: r => (
                       <Badge variant="primary" icon={ShieldCheck}>
-                         {r.uniquenessScope === 'none' ? (isRtl ? 'بدون کنترل (دستی)' : 'None (Manual)') : (t[`an_scope_${r.uniquenessScope}`] || r.uniquenessScope)}
+                         {r.uniquenessScope === 'none' ? (isRtl ? 'بدون کنترل' : 'None') : (t[`an_scope_${r.uniquenessScope}`] || (isRtl && r.uniquenessScope === 'branch' ? 'دفتر و شعبه' : isRtl && r.uniquenessScope === 'ledger' ? 'دفتر کل' : r.uniquenessScope))}
                       </Badge>
                    )
                 },
@@ -244,32 +253,36 @@ const AutoNumbering = ({ t, isRtl }) => {
              data={docSettings}
              isRtl={isRtl}
              actions={(row) => (
-                <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => openDocModal(row)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"/>
+                <div className="flex gap-1 justify-center">
+                   <Button variant="ghost" size="iconSm" icon={Hash} onClick={() => openNumbersModal(row)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" title={isRtl ? 'مشاهده شماره‌ها' : 'View Numbers'}/>
+                   <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => openDocModal(row)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" title={isRtl ? 'ویرایش تنظیمات' : 'Edit Settings'}/>
+                </div>
              )}
           />
        </div>
 
+       {/* Edit Document Numbering Settings Modal */}
        <Modal
          isOpen={showDocModal}
          onClose={() => setShowDocModal(false)}
-         title={t.an_tab_docs || (isRtl ? 'تنظیمات اسناد' : 'Document Settings')}
+         title={t.an_tab_docs || (isRtl ? 'تنظیمات شماره‌گذاری اسناد' : 'Document Settings')}
+         size="sm"
          footer={<><Button variant="outline" onClick={() => setShowDocModal(false)}>{t.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button><Button variant="primary" onClick={saveDoc}>{t.btn_save || (isRtl ? 'ذخیره' : 'Save')}</Button></>}
        >
-          <div className="flex flex-col gap-5">
-             <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-indigo-900">
-                <Settings size={20}/>
-                <span className="font-bold">{editingDoc?.title}</span>
+          <div className="flex flex-col gap-4">
+             <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded border border-indigo-100 text-indigo-900">
+                <Settings size={16} className="shrink-0"/>
+                <span className="font-bold text-xs">{editingDoc?.title}</span>
              </div>
 
-             <div className="space-y-2">
+             <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-600">{t.an_unique_scope || (isRtl ? 'دامنه تولید و کنترل شماره' : 'Numbering Scope')}</label>
                 <div className="flex flex-wrap gap-2">
-                   {['none', 'branch', 'ledger', 'company'].map(scope => {
+                   {['none', 'branch', 'ledger'].map(scope => {
                       let label = scope;
-                      if (scope === 'none') label = isRtl ? 'بدون کنترل (دستی)' : 'None (Manual)';
+                      if (scope === 'none') label = isRtl ? 'بدون کنترل' : 'None';
                       else if (scope === 'branch') label = isRtl ? 'دفتر و شعبه' : 'Ledger & Branch';
                       else if (scope === 'ledger') label = isRtl ? 'دفتر کل' : 'Ledger Only';
-                      else if (scope === 'company') label = isRtl ? 'سطح شرکت' : 'Company Level';
 
                       return (
                          <ToggleChip 
@@ -284,7 +297,10 @@ const AutoNumbering = ({ t, isRtl }) => {
                 </div>
              </div>
 
-             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-3 rounded-lg">
+             <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded mt-2">
+                <label htmlFor="resetYearCheck" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
+                   {t.an_reset_year || (isRtl ? 'ریست شماره‌گذاری در سال مالی جدید' : 'Reset numbering in new fiscal year')}
+                </label>
                 <input 
                    type="checkbox" 
                    id="resetYearCheck"
@@ -292,47 +308,61 @@ const AutoNumbering = ({ t, isRtl }) => {
                    checked={docFormData.resetYear} 
                    onChange={e => setDocFormData({...docFormData, resetYear: e.target.checked})}
                 />
-                <label htmlFor="resetYearCheck" className="text-sm font-bold text-slate-700 select-none cursor-pointer flex-1">
-                   {t.an_reset_year || (isRtl ? 'ریست شماره‌گذاری در سال مالی جدید' : 'Reset numbering in new fiscal year')}
-                </label>
              </div>
-             
-             {/* Fiscal Years Tracking List */}
-             {docFormData.uniquenessScope !== 'none' && (
-                 <div className="space-y-2 mt-2">
-                    <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-                       <List size={14}/> {isRtl ? 'آخرین شماره‌های تولید شده (به تفکیک سال مالی)' : 'Last Generated Numbers (per Fiscal Year)'}
-                    </label>
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                       {fiscalYears.length > 0 ? fiscalYears.map(fy => (
-                          <div key={fy.id} className="flex items-center justify-between gap-4 p-2 bg-white rounded border border-slate-100 shadow-sm">
-                             <span className="text-xs text-slate-700 font-medium">{fy.title}</span>
-                             <div className="w-32">
-                                <InputField 
-                                   type="number" 
-                                   value={docFormData.lastNumbers[fy.id] || ''}
-                                   onChange={e => setDocFormData(prev => ({
-                                      ...prev,
-                                      lastNumbers: { ...prev.lastNumbers, [fy.id]: e.target.value }
-                                   }))}
-                                   isRtl={isRtl}
-                                   dir="ltr"
-                                   placeholder="0"
-                                />
-                             </div>
-                          </div>
-                       )) : (
-                          <div className="text-xs text-slate-400 text-center py-2">{isRtl ? 'سال مالی تعریف نشده است' : 'No fiscal years defined'}</div>
-                       )}
-                    </div>
-                 </div>
-             )}
+          </div>
+       </Modal>
 
-             {docFormData.resetYear && (
-                 <div className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-100 flex gap-2">
-                    <AlertCircle size={14} className="shrink-0 mt-0.5"/>
-                    <span>{isRtl ? 'با فعال‌سازی ریست سالانه، در ابتدای هر سال مالی، صدور شماره سند این دفتر مجدداً از ۱ آغاز خواهد شد.' : 'Enabling annual reset will restart document numbering from 1 at the beginning of each fiscal year.'}</span>
-                 </div>
+       {/* View Last Generated Numbers Modal */}
+       <Modal
+         isOpen={showNumbersModal}
+         onClose={() => setShowNumbersModal(false)}
+         title={isRtl ? 'آخرین شماره‌های صادر شده' : 'Last Issued Numbers'}
+         size="sm"
+         footer={<Button variant="outline" onClick={() => setShowNumbersModal(false)}>{isRtl ? 'بستن' : 'Close'}</Button>}
+       >
+          <div className="flex flex-col gap-3">
+             <div className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200 text-slate-700 mb-1">
+                <Hash size={16} className="text-indigo-500 shrink-0"/>
+                <span className="font-bold text-xs">{viewingDocNumbers?.title}</span>
+             </div>
+
+             {viewingDocNumbers?.uniquenessScope === 'none' ? (
+                <div className="p-4 text-center text-slate-500 bg-slate-50 rounded border border-slate-100 text-xs">
+                   {isRtl ? 'شماره‌گذاری برای این دفتر در حالت "بدون کنترل" است.' : 'Numbering for this ledger is set to "None".'}
+                </div>
+             ) : (
+                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                   <table className="w-full text-xs text-right">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                         <tr>
+                            <th className="p-2.5 font-bold">{isRtl ? 'سال مالی' : 'Fiscal Year'}</th>
+                            <th className="p-2.5 font-bold w-32">{isRtl ? 'آخرین شماره' : 'Last Number'}</th>
+                         </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                         {fiscalYears.map(fy => {
+                             const lastNum = viewingDocNumbers?.lastNumbers?.[fy.id];
+                             return (
+                                <tr key={fy.id} className="hover:bg-slate-50 transition-colors">
+                                   <td className="p-2.5 text-slate-700 font-medium">{fy.title}</td>
+                                   <td className="p-2.5">
+                                      <Badge variant="neutral" className="font-mono bg-slate-100 px-2 py-0.5 text-[11px]">
+                                         {lastNum || '0'}
+                                      </Badge>
+                                   </td>
+                                </tr>
+                             );
+                         })}
+                         {fiscalYears.length === 0 && (
+                            <tr>
+                               <td colSpan="2" className="p-4 text-center text-slate-400 italic">
+                                  {isRtl ? 'سال مالی یافت نشد' : 'No fiscal years'}
+                               </td>
+                            </tr>
+                         )}
+                      </tbody>
+                   </table>
+                </div>
              )}
           </div>
        </Modal>
