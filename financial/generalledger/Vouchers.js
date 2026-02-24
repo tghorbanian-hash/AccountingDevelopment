@@ -173,8 +173,8 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   );
 
   return (
-    <div className="relative w-full h-full flex items-center" ref={wrapperRef}>
-      <div className="relative w-full h-full flex items-center">
+    <div className="relative w-full" ref={wrapperRef}>
+      <div className="relative w-full">
         <input
           type="text"
           className={className || `w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
@@ -1304,45 +1304,41 @@ const Vouchers = ({ language = 'fa' }) => {
          isRtl={isRtl} 
          title={t.search}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-4 w-full items-start">
-            <div className="col-span-1">
-               <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
-            </div>
-            <div className="col-span-1">
-               <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
-                  <option value="">{t.all}</option>
-                  <option value="draft">{t.statusDraft}</option>
-                  <option value="temporary">{t.statusTemporary}</option>
-                  <option value="reviewed">{t.statusReviewed}</option>
-                  <option value="final">{t.statusFinal}</option>
-               </SelectField>
-            </div>
-            <div className="col-span-1">
-               <InputField type="date" label={t.fromDate} value={searchParams.from_date} onChange={e => setSearchParams({...searchParams, from_date: e.target.value})} isRtl={isRtl} />
-            </div>
-            <div className="col-span-1">
-               <InputField type="date" label={t.toDate} value={searchParams.to_date} onChange={e => setSearchParams({...searchParams, to_date: e.target.value})} isRtl={isRtl} />
+        <div className="flex flex-col gap-4 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+                <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
+                <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
+                   <option value="">{t.all}</option>
+                   <option value="draft">{t.statusDraft}</option>
+                   <option value="temporary">{t.statusTemporary}</option>
+                   <option value="reviewed">{t.statusReviewed}</option>
+                   <option value="final">{t.statusFinal}</option>
+                </SelectField>
+                <InputField type="date" label={t.fromDate} value={searchParams.from_date} onChange={e => setSearchParams({...searchParams, from_date: e.target.value})} isRtl={isRtl} />
+                <InputField type="date" label={t.toDate} value={searchParams.to_date} onChange={e => setSearchParams({...searchParams, to_date: e.target.value})} isRtl={isRtl} />
             </div>
             
-            <div className="col-span-1">
-               <SelectField label={t.type} value={searchParams.voucher_type} onChange={e => setSearchParams({...searchParams, voucher_type: e.target.value})} isRtl={isRtl}>
-                  <option value="">{t.all}</option>
-                  {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
-               </SelectField>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 w-full">
+                <div className="lg:col-span-1">
+                   <SelectField label={t.type} value={searchParams.voucher_type} onChange={e => setSearchParams({...searchParams, voucher_type: e.target.value})} isRtl={isRtl}>
+                      <option value="">{t.all}</option>
+                      {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
+                   </SelectField>
+                </div>
+
+                <div className="lg:col-span-3 flex flex-col gap-1.5">
+                   <label className="text-[11px] font-bold text-slate-600 rtl:pr-1 ltr:pl-1">{t.account}</label>
+                   <SearchableAccountSelect 
+                       accounts={validAccountsForLedger} 
+                       value={searchParams.account_id} 
+                       onChange={v => setSearchParams({...searchParams, account_id: v})} 
+                       placeholder={t.searchAccount} 
+                       className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg h-[38px] px-3 outline-none text-[12px] text-slate-800 shadow-sm transition-all"
+                   />
+                </div>
             </div>
 
-            <div className="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col">
-               <label className="block text-[11px] font-bold text-slate-600 mb-1 rtl:pr-1 ltr:pl-1">{t.account}</label>
-               <SearchableAccountSelect 
-                   accounts={validAccountsForLedger} 
-                   value={searchParams.account_id} 
-                   onChange={v => setSearchParams({...searchParams, account_id: v})} 
-                   placeholder={t.searchAccount} 
-                   className="w-full bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg h-9 px-3 outline-none text-[12px] text-slate-800 shadow-sm transition-all"
-               />
-            </div>
-
-            <div className="col-span-1 md:col-span-3 lg:col-span-4">
+            <div className="w-full">
                <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
             </div>
         </div>
