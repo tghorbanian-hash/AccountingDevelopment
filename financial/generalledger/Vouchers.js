@@ -347,7 +347,7 @@ const Vouchers = ({ language = 'fa' }) => {
     if (!supabase) return;
     try {
       const [brRes, fyRes, ledRes, structRes, dtRes, diRes] = await Promise.all([
-        supabase.schema('gen').from('branches').select('id, code, title, is_default').eq('is_active', true).order('title'),
+        supabase.schema('gen').from('branches').select('*'),
         supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false }),
         supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title'),
         supabase.schema('gl').from('account_structures').select('id, code, title').eq('status', true),
@@ -355,7 +355,7 @@ const Vouchers = ({ language = 'fa' }) => {
         supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)
       ]);
       
-      if (brRes.data) setBranches(brRes.data);
+      if (brRes.data) setBranches(brRes.data.filter(b => b.is_active !== false));
       if (fyRes.data) setFiscalYears(fyRes.data);
       if (ledRes.data) setLedgers(ledRes.data);
       if (structRes.data) setAccountStructures(structRes.data);
@@ -450,7 +450,7 @@ const Vouchers = ({ language = 'fa' }) => {
             const pad = String(n).padStart(data.number_length || 5, '0');
             nextVoucher = `${data.prefix || ''}${pad}${data.suffix || ''}`;
         } else {
-            nextVoucher = String(nextCross); // Fallback to cross_reference if no auto numbering setup
+            nextVoucher = String(nextCross);
         }
     }
 
@@ -862,7 +862,7 @@ const Vouchers = ({ language = 'fa' }) => {
               <InputField label={t.dailyNumber} value={currentVoucher.daily_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               <InputField label={t.crossReference} value={currentVoucher.cross_reference || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               
-              <InputField label={t.referenceNumber} value={currentVoucher.reference_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, reference_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} dir="ltr" className="text-center" />
+              <InputField label={t.referenceNumber} value={currentVoucher.reference_number || '-'} disabled={true} isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} dir="ltr" className="text-center" />
               <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => {
                  const newDate = e.target.value;
