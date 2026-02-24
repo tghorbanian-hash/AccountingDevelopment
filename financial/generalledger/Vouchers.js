@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X, Layers
+  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X, Layers, Printer
 } from 'lucide-react';
 
 const localTranslations = {
@@ -21,6 +21,8 @@ const localTranslations = {
     actions: 'Actions',
     edit: 'Edit',
     delete: 'Delete',
+    print: 'Print',
+    printVoucher: 'Print Voucher',
     branch: 'Branch',
     selectBranch: 'Select Branch',
     branchReqError: 'Please select a branch.',
@@ -70,11 +72,12 @@ const localTranslations = {
     fromDate: 'From Date',
     toDate: 'To Date',
     all: 'All',
-    makeTemporary: 'Make Temporary',
-    makeDraft: 'Make Draft',
+    makeTemporary: 'Change to Temporary',
+    makeDraft: 'Change to Draft',
     noPeriodsFound: 'No fiscal periods defined for this fiscal year.',
     dateNotInPeriods: 'Voucher date does not fall within any period of this fiscal year.',
-    periodClosed: 'The fiscal period for this date is closed and you do not have permission to edit/save.'
+    periodClosed: 'The fiscal period for this date is closed and you do not have permission to edit/save.',
+    selectedItems: '{count} items selected'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -91,6 +94,8 @@ const localTranslations = {
     actions: 'عملیات',
     edit: 'ویرایش',
     delete: 'حذف',
+    print: 'چاپ',
+    printVoucher: 'چاپ سند حسابداری',
     branch: 'شعبه',
     selectBranch: 'انتخاب شعبه',
     branchReqError: 'لطفاً شعبه را انتخاب کنید.',
@@ -144,8 +149,15 @@ const localTranslations = {
     makeDraft: 'تبدیل به یادداشت',
     noPeriodsFound: 'دوره‌های مالی برای این سال تعریف نشده است.',
     dateNotInPeriods: 'تاریخ سند در محدوده دوره‌های این سال مالی نیست.',
-    periodClosed: 'دوره مالی مربوط به این تاریخ بسته است و شما مجوز ثبت/ویرایش ندارید.'
+    periodClosed: 'دوره مالی مربوط به این تاریخ بسته است و شما مجوز ثبت/ویرایش ندارید.',
+    selectedItems: '{count} مورد انتخاب شده'
   }
+};
+
+// Helper for accurate Persian search
+const normalizeFa = (str) => {
+  if (!str) return '';
+  return String(str).replace(/[يِي]/g, 'ی').replace(/[كک]/g, 'ک').replace(/[إأآا]/g, 'ا').toLowerCase();
 };
 
 const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placeholder, className }) => {
@@ -166,9 +178,13 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = accounts.filter(a => 
-    a.displayPath.toLowerCase().includes(search.toLowerCase())
-  );
+  const normalizedSearch = normalizeFa(search);
+  const filtered = accounts.filter(a => {
+      const matchCode = a.full_code ? normalizeFa(a.full_code).includes(normalizedSearch) : false;
+      const matchTitle = a.title ? normalizeFa(a.title).includes(normalizedSearch) : false;
+      const matchPath = a.displayPath ? normalizeFa(a.displayPath).includes(normalizedSearch) : false;
+      return matchCode || matchTitle || matchPath;
+  });
 
   return (
     <div className="relative w-full h-full flex items-center" ref={wrapperRef}>
@@ -198,7 +214,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">موردی یافت نشد</div>
+            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">{t?.notFound || 'موردی یافت نشد'}</div>
           )}
         </div>
       )}
@@ -264,7 +280,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
                       />
                       <div className="absolute z-[70] w-[220px] rtl:right-0 ltr:left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
                          {allInstances
-                           .filter(d => d.detail_type_code === type.code && (d.title.includes(search) || (d.detail_code && d.detail_code.includes(search))))
+                           .filter(d => d.detail_type_code === type.code && (normalizeFa(d.title).includes(normalizeFa(search)) || (d.detail_code && normalizeFa(d.detail_code).includes(normalizeFa(search)))))
                            .map(d => (
                              <div
                                key={d.id}
@@ -279,7 +295,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
                                <div className="font-bold text-slate-800">{d.detail_code ? d.detail_code + ' - ' : ''}{d.title}</div>
                              </div>
                          ))}
-                         {allInstances.filter(d => d.detail_type_code === type.code && (d.title.includes(search) || (d.detail_code && d.detail_code.includes(search)))).length === 0 && (
+                         {allInstances.filter(d => d.detail_type_code === type.code && (normalizeFa(d.title).includes(normalizeFa(search)) || (d.detail_code && normalizeFa(d.detail_code).includes(normalizeFa(search))))).length === 0 && (
                             <div className="px-3 py-3 text-[11px] text-slate-400 text-center">{t.notFound}</div>
                          )}
                       </div>
@@ -321,6 +337,9 @@ const Vouchers = ({ language = 'fa' }) => {
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
+  
+  // Print State
+  const [voucherToPrint, setVoucherToPrint] = useState(null);
 
   const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
 
@@ -851,6 +870,10 @@ const Vouchers = ({ language = 'fa' }) => {
     }
   };
 
+  const handlePrint = (voucher) => {
+     setVoucherToPrint(voucher);
+  };
+
   const handleItemChange = (index, field, value) => {
     const newItems = [...voucherItems];
     
@@ -1040,6 +1063,9 @@ const Vouchers = ({ language = 'fa' }) => {
             {currentVoucher.id && getStatusBadge(currentVoucher.status)}
           </div>
           <div className="flex items-center gap-2">
+            {currentVoucher.id && (
+               <Button variant="outline" onClick={() => handlePrint(currentVoucher)} icon={Printer}>{t.print}</Button>
+            )}
             {!isReadonly && (
               <>
                 <Button variant="outline" onClick={() => handleSaveVoucher('draft')} icon={Save}>{t.saveDraft}</Button>
@@ -1302,37 +1328,36 @@ const Vouchers = ({ language = 'fa' }) => {
          isRtl={isRtl} 
          title={t.search}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-            <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
-            <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
-               <option value="">{t.all}</option>
-               <option value="draft">{t.statusDraft}</option>
-               <option value="temporary">{t.statusTemporary}</option>
-               <option value="reviewed">{t.statusReviewed}</option>
-               <option value="final">{t.statusFinal}</option>
-            </SelectField>
-            <InputField type="date" label={t.fromDate} value={searchParams.from_date} onChange={e => setSearchParams({...searchParams, from_date: e.target.value})} isRtl={isRtl} />
-            <InputField type="date" label={t.toDate} value={searchParams.to_date} onChange={e => setSearchParams({...searchParams, to_date: e.target.value})} isRtl={isRtl} />
-            
-            <SelectField label={t.type} value={searchParams.voucher_type} onChange={e => setSearchParams({...searchParams, voucher_type: e.target.value})} isRtl={isRtl}>
-               <option value="">{t.all}</option>
-               {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
-            </SelectField>
+        {/* این فیلدها مستقیماً در Grid مربوط به FilterSection قرار می‌گیرند */}
+        <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
+        <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
+           <option value="">{t.all}</option>
+           <option value="draft">{t.statusDraft}</option>
+           <option value="temporary">{t.statusTemporary}</option>
+           <option value="reviewed">{t.statusReviewed}</option>
+           <option value="final">{t.statusFinal}</option>
+        </SelectField>
+        <InputField type="date" label={t.fromDate} value={searchParams.from_date} onChange={e => setSearchParams({...searchParams, from_date: e.target.value})} isRtl={isRtl} />
+        <InputField type="date" label={t.toDate} value={searchParams.to_date} onChange={e => setSearchParams({...searchParams, to_date: e.target.value})} isRtl={isRtl} />
+        
+        <SelectField label={t.type} value={searchParams.voucher_type} onChange={e => setSearchParams({...searchParams, voucher_type: e.target.value})} isRtl={isRtl}>
+           <option value="">{t.all}</option>
+           {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
+        </SelectField>
 
-            <div className="md:col-span-1 lg:col-span-3 flex flex-col">
-               <label className="block text-[11px] font-bold text-slate-600 mb-1 rtl:pr-1 ltr:pl-1">{t.account}</label>
-               <SearchableAccountSelect 
-                   accounts={validAccountsForLedger} 
-                   value={searchParams.account_id} 
-                   onChange={v => setSearchParams({...searchParams, account_id: v})} 
-                   placeholder={t.searchAccount} 
-                   className="w-full bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg h-8 px-3 outline-none text-[12px] text-slate-800 shadow-sm transition-all"
-               />
-            </div>
+        <div className="md:col-span-2 lg:col-span-3 flex flex-col gap-1">
+           <label className="text-[11px] font-bold text-slate-600 rtl:pr-1 ltr:pl-1">{t.account}</label>
+           <SearchableAccountSelect 
+               accounts={validAccountsForLedger} 
+               value={searchParams.account_id} 
+               onChange={v => setSearchParams({...searchParams, account_id: v})} 
+               placeholder={t.searchAccount} 
+               className="w-full bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-md h-8 px-2 outline-none text-[12px] text-slate-800 shadow-sm transition-all"
+           />
+        </div>
 
-            <div className="md:col-span-2 lg:col-span-4">
-               <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
-            </div>
+        <div className="md:col-span-3 lg:col-span-4">
+           <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
         </div>
       </FilterSection>
 
@@ -1356,6 +1381,7 @@ const Vouchers = ({ language = 'fa' }) => {
           }
           actions={(r) => (
             <div className="flex gap-1 justify-center">
+              <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => handlePrint(r)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
               <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r)} />
               <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} />
             </div>
@@ -1365,6 +1391,18 @@ const Vouchers = ({ language = 'fa' }) => {
 
       <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title={t.delete} footer={<><Button variant="ghost" onClick={() => setShowDeleteModal(false)}>{t.backToList}</Button><Button variant="danger" onClick={confirmDelete}>{t.delete}</Button></>}>
         <div className="p-4"><p className="text-slate-700 font-medium">{t.confirmDelete}</p></div>
+      </Modal>
+
+      {/* Print Modal Overlay */}
+      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
+         {voucherToPrint && window.VoucherPrint ? (
+             <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
+         ) : (
+             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                <FileWarning size={48} className="text-amber-400" />
+                <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
+             </div>
+         )}
       </Modal>
     </div>
   );
