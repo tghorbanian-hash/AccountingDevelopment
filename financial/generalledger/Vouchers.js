@@ -57,6 +57,7 @@ const localTranslations = {
     searchDetail: 'Search detail...',
     copyFromAbove: 'Copy from above',
     trackingReqError: 'Tracking Number and Tracking Date are required for account in row',
+    qtyReqError: 'Quantity is required for account in row',
     dailyNumber: 'Daily No.',
     crossReference: 'Cross Ref.',
     referenceNumber: 'Reference No.',
@@ -117,6 +118,7 @@ const localTranslations = {
     searchDetail: 'جستجوی تفصیل...',
     copyFromAbove: 'کپی از ردیف بالا',
     trackingReqError: 'شماره و تاریخ پیگیری برای معین در ردیف زیر الزامی است:',
+    qtyReqError: 'مقدار برای معین در ردیف زیر الزامی است:',
     dailyNumber: 'شماره روزانه',
     crossReference: 'شماره عطف',
     referenceNumber: 'شماره ارجاع',
@@ -151,11 +153,11 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   );
 
   return (
-    <div className="relative w-full" ref={wrapperRef}>
-      <div className="relative">
+    <div className="relative w-full h-full flex items-center" ref={wrapperRef}>
+      <div className="relative w-full">
         <input
           type="text"
-          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-1 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           value={isOpen ? search : displaySelected}
           onChange={e => { setSearch(e.target.value); setIsOpen(true); }}
           onFocus={() => { setIsOpen(true); setSearch(''); }}
@@ -166,7 +168,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
       </div>
       
       {isOpen && !disabled && (
-        <div className="absolute z-[60] w-[300px] rtl:right-0 ltr:left-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto custom-scrollbar">
+        <div className="absolute z-[60] w-[300px] rtl:right-0 ltr:left-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto custom-scrollbar">
           {filtered.map(acc => (
             <div
               key={acc.id}
@@ -203,11 +205,11 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
   }, []);
 
   if (!allowedTypes || allowedTypes.length === 0) {
-     return <div className="text-slate-300 text-[11px] px-1 h-8 flex items-center">{t.noDetail}</div>;
+     return <div className="text-slate-300 text-[11px] px-2 h-8 flex items-center">{t.noDetail}</div>;
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5 w-full items-center p-1" ref={wrapperRef}>
+    <div className="flex flex-wrap gap-1.5 w-full items-center p-1 px-1.5" ref={wrapperRef}>
        {allowedTypes.map(type => {
           const selectedId = value[type.code];
           
@@ -215,7 +217,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
              const selectedDetail = allInstances.find(d => String(d.id) === String(selectedId));
              const display = selectedDetail ? ((selectedDetail.detail_code ? selectedDetail.detail_code + ' - ' : '') + selectedDetail.title) : 'Unknown';
              return (
-               <div key={type.code} className="flex items-center gap-1 bg-indigo-50 text-indigo-800 text-[11px] px-2 py-1 rounded border border-indigo-200 shadow-sm transition-all hover:shadow-md">
+               <div key={type.code} className="flex items-center gap-1 bg-indigo-50 text-indigo-800 text-[11px] px-2 py-0.5 rounded border border-indigo-200 shadow-sm transition-all hover:shadow-md">
                  <span className="font-bold truncate max-w-[140px] select-none" title={display}>{display}</span>
                  {!disabled && (
                     <X size={12} className="cursor-pointer text-indigo-400 hover:text-red-500 hover:bg-red-50 rounded-full p-0.5 shrink-0 transition-colors" 
@@ -237,7 +239,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
                    <div className="relative">
                       <input 
                          autoFocus
-                         className="w-[140px] bg-white border border-indigo-400 shadow-sm focus:ring-2 focus:ring-indigo-100 rounded h-7 px-2 outline-none text-[11px] text-slate-800 transition-all"
+                         className="w-[140px] bg-white border border-indigo-400 shadow-sm focus:ring-2 focus:ring-indigo-100 rounded h-6 px-2 outline-none text-[11px] text-slate-800 transition-all"
                          value={search} 
                          onChange={e => setSearch(e.target.value)} 
                          placeholder={t.searchPlaceholder.replace('{type}', type.title)}
@@ -267,7 +269,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
                 ) : (
                    <button 
                       onClick={(e) => { e.preventDefault(); if(!disabled) { setActiveType(type.code); setSearch(''); } }} 
-                      className={`bg-white border border-dashed text-[11px] px-2 py-1 rounded transition-colors ${disabled ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`}
+                      className={`bg-white border border-dashed text-[11px] px-2 py-0.5 rounded transition-colors ${disabled ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`}
                    >
                       + {type.title}
                    </button>
@@ -483,7 +485,7 @@ const Vouchers = ({ language = 'fa' }) => {
         description: '',
         tracking_number: '',
         tracking_date: '',
-        quantity: 0
+        quantity: ''
       }]);
     }
     setView('form');
@@ -519,9 +521,17 @@ const Vouchers = ({ language = 'fa' }) => {
         const account = accounts.find(a => String(a.id) === String(item.account_id));
         if (account && account.metadata) {
             const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+            
             if (meta.trackFeature && meta.trackMandatory) {
                 if (!item.tracking_number || !item.tracking_date) {
                     alert(t.trackingReqError + ' ' + (i + 1) + ' (' + account.title + ')');
+                    return;
+                }
+            }
+
+            if (meta.qtyFeature && meta.qtyMandatory) {
+                if (!item.quantity || parseNum(item.quantity) <= 0) {
+                    alert(t.qtyReqError + ' ' + (i + 1) + ' (' + account.title + ')');
                     return;
                 }
             }
@@ -651,7 +661,7 @@ const Vouchers = ({ language = 'fa' }) => {
       description: lastDescription, 
       tracking_number: '', 
       tracking_date: '',
-      quantity: 0 
+      quantity: '' 
     }]);
     setFocusedRowId(newId);
   };
@@ -677,7 +687,7 @@ const Vouchers = ({ language = 'fa' }) => {
       description: '', 
       tracking_number: '', 
       tracking_date: '',
-      quantity: 0 
+      quantity: '' 
     }]);
     setFocusedRowId(newId);
   };
@@ -819,9 +829,11 @@ const Vouchers = ({ language = 'fa' }) => {
                   const isFocused = focusedRowId === item.id;
                   const accountObj = accounts.find(a => String(a.id) === String(item.account_id));
                   let hasTracking = false;
+                  let hasQuantity = false;
                   if (accountObj && accountObj.metadata) {
                       const meta = typeof accountObj.metadata === 'string' ? JSON.parse(accountObj.metadata) : accountObj.metadata;
                       if (meta.trackFeature) hasTracking = true;
+                      if (meta.qtyFeature) hasQuantity = true;
                   }
 
                   const allowedDetailTypes = getValidDetailTypes(item.account_id);
@@ -841,15 +853,54 @@ const Vouchers = ({ language = 'fa' }) => {
                            </div>
                            
                            <div className="flex-1 p-2 grid grid-cols-12 gap-x-3 gap-y-2">
-                              <div className="col-span-12 md:col-span-6 lg:col-span-4 flex flex-col gap-1">
+                              {/* --- ROW 1: Account, Debit, Credit, Currency --- */}
+                              <div className="col-span-12 lg:col-span-4 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
-                                 <div className={`border rounded flex items-center h-[54px] ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
+                                 <div className={`border rounded h-8 flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
                                     <SearchableAccountSelect accounts={validAccountsForLedger} value={item.account_id} onChange={(v) => handleItemChange(index, 'account_id', v)} disabled={isReadonly} placeholder={t.searchAccount} />
                                  </div>
                               </div>
-                              <div className="col-span-12 md:col-span-6 lg:col-span-4 flex flex-col gap-1">
+                              <div className="col-span-6 lg:col-span-3 flex flex-col gap-1">
+                                 <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
+                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
+                                     const raw = e.target.value.replace(/,/g, '');
+                                     if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
+                                 }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
+                              </div>
+                              <div className="col-span-6 lg:col-span-3 flex flex-col gap-1">
+                                 <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
+                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
+                                     const raw = e.target.value.replace(/,/g, '');
+                                     if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
+                                 }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
+                              </div>
+                              <div className="col-span-12 lg:col-span-2 flex flex-col gap-1">
+                                 <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
+                                 <select 
+                                    className={`w-full border rounded h-8 px-1 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
+                                    value={item.currency_code || ''}
+                                    onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
+                                    disabled={isReadonly}
+                                    onFocus={() => setFocusedRowId(item.id)}
+                                 >
+                                    <option value="">-</option>
+                                    {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
+                                 </select>
+                              </div>
+
+                              {/* --- ROW 2: Description, Detail --- */}
+                              <div className="col-span-12 lg:col-span-4 flex flex-col gap-1 mt-1">
+                                 <div className="flex justify-between items-center">
+                                     <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
+                                     {!isReadonly && index > 0 && (
+                                         <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
+                                     )}
+                                 </div>
+                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
+                              </div>
+                              <div className="col-span-12 lg:col-span-8 flex flex-col gap-1 mt-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
-                                 <div className={`border rounded min-h-[54px] flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
+                                 <div className={`border rounded min-h-8 h-auto flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
                                      <MultiDetailSelector 
                                         allowedTypes={allowedDetailTypes}
                                         allInstances={allDetailInstances}
@@ -861,40 +912,23 @@ const Vouchers = ({ language = 'fa' }) => {
                                  </div>
                               </div>
 
-                              <div className="col-span-6 md:col-span-3 lg:col-span-2 flex flex-col gap-1">
-                                 <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
-                                 <input type="text" className={`w-full border rounded h-8 mt-auto px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
-                                     const raw = e.target.value.replace(/,/g, '');
-                                     if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
-                                 }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                              </div>
-                              <div className="col-span-6 md:col-span-3 lg:col-span-2 flex flex-col gap-1">
-                                 <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
-                                 <input type="text" className={`w-full border rounded h-8 mt-auto px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
-                                     const raw = e.target.value.replace(/,/g, '');
-                                     if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
-                                 }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                              </div>
-
-                              <div className="col-span-12 lg:col-span-8 flex flex-col gap-1 mt-1">
-                                 <div className="flex justify-between items-center">
-                                     <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
-                                     {!isReadonly && index > 0 && (
-                                         <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
-                                     )}
-                                 </div>
-                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                              </div>
-
-                              {(isFocused || hasTracking || item.tracking_number || item.quantity) && (
-                                  <div className="col-span-12 lg:col-span-4 flex gap-2 mt-1">
-                                      <div className={`flex-1 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                              {/* --- ROW 3: Conditional (Tracking & Quantity) --- */}
+                              {(isFocused || hasTracking || item.tracking_number || item.tracking_date || hasQuantity || item.quantity) && (
+                                  <div className="col-span-12 grid grid-cols-12 gap-3 mt-1 p-2 bg-slate-50/80 rounded border border-slate-100">
+                                      <div className={`col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
                                          <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
                                          <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => setFocusedRowId(item.id)} />
                                       </div>
-                                      <div className={`flex-1 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                      <div className={`col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
                                          <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
                                          <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => setFocusedRowId(item.id)} />
+                                      </div>
+                                      <div className={`col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
+                                         <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
+                                         <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={formatNum(item.quantity)} onChange={(e) => {
+                                             const raw = e.target.value.replace(/,/g, '');
+                                             if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
+                                         }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => setFocusedRowId(item.id)} />
                                       </div>
                                   </div>
                               )}
