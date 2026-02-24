@@ -346,7 +346,6 @@ const Vouchers = ({ language = 'fa' }) => {
   const fetchLookups = async () => {
     if (!supabase) return;
     
-    // Resilient Fetch: Each query is caught independently to prevent 400/401 errors from blocking others (like branches)
     const safeFetch = async (query) => {
         try {
             const res = await query;
@@ -361,7 +360,7 @@ const Vouchers = ({ language = 'fa' }) => {
     const [brData, fyData, ledData, structData, dtData, diData, doctypeData, currData] = await Promise.all([
         safeFetch(supabase.schema('gen').from('branches').select('*')),
         safeFetch(supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false })),
-        safeFetch(supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure').eq('is_active', true).order('title')),
+        safeFetch(supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure, metadata').eq('is_active', true).order('title')),
         safeFetch(supabase.schema('gl').from('account_structures').select('id, code, title').eq('status', true)),
         safeFetch(supabase.schema('gl').from('detail_types').select('id, code, title').eq('is_active', true)),
         safeFetch(supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)),
@@ -369,7 +368,7 @@ const Vouchers = ({ language = 'fa' }) => {
         safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true))
     ]);
 
-    if (brData) setBranches(brData);
+    if (brData) setBranches(brData.filter(b => b.is_active !== false));
     if (fyData) setFiscalYears(fyData);
     if (ledData) setLedgers(ledData);
     if (structData) setAccountStructures(structData);
@@ -434,7 +433,7 @@ const Vouchers = ({ language = 'fa' }) => {
     }
   };
 
-  const fetchAutoNumbers = async (date, ledgerId, fyId) => {
+  const fetchAutoNumbers = async (date, ledgerId, fyId, branchId) => {
     let nextDaily = 1;
     let nextCross = 1;
     let nextVoucher = '';
@@ -445,20 +444,42 @@ const Vouchers = ({ language = 'fa' }) => {
         if (data && data.length > 0 && data[0].daily_number) nextDaily = Number(data[0].daily_number) + 1;
     }
 
-    if (fyId) {
-        const { data } = await supabase.schema('gl').from('vouchers').select('cross_reference').eq('fiscal_period_id', fyId).order('cross_reference', { ascending: false }).limit(1);
+    if (fyId && ledgerId) {
+        const { data } = await supabase.schema('gl').from('vouchers').select('cross_reference').eq('fiscal_period_id', fyId).eq('ledger_id', ledgerId).order('cross_reference', { ascending: false }).limit(1);
         if (data && data.length > 0 && data[0].cross_reference) nextCross = Number(data[0].cross_reference) + 1;
     }
 
-    if (ledgerId && fyId) {
-        const { data } = await supabase.schema('gl').from('auto_numbering').select('*').eq('entity_name', 'voucher').eq('ledger_id', ledgerId).eq('fiscal_period_id', fyId).single();
+    if (ledgerId) {
+        const { data } = await supabase.schema('gl').from('ledgers').select('metadata').eq('id', ledgerId).single();
         if (data) {
-            config = data;
-            const n = Math.max((data.current_number || 0) + 1, data.start_number || 1);
-            const pad = String(n).padStart(data.number_length || 5, '0');
-            nextVoucher = `${data.prefix || ''}${pad}${data.suffix || ''}`;
-        } else {
-            nextVoucher = String(nextCross);
+            const meta = (typeof data.metadata === 'string' ? JSON.parse(data.metadata) : data.metadata) || {};
+            config = { metadata: meta };
+            
+            const scope = meta.uniquenessScope || 'ledger';
+            const resetYear = meta.resetYear !== false; 
+            const lastNums = meta.lastNumbers || {};
+
+            let lastVoucherNum = 0;
+
+            if (scope === 'none') {
+                nextVoucher = ''; // Manual mode
+            } else if (scope === 'ledger') {
+                if (resetYear) {
+                    lastVoucherNum = lastNums[fyId] || 0;
+                } else {
+                    lastVoucherNum = typeof lastNums === 'object' ? (lastNums.global || lastNums.ledger || 0) : (isNaN(lastNums) ? 0 : Number(lastNums));
+                }
+                nextVoucher = String(Number(lastVoucherNum) + 1);
+            } else if (scope === 'branch' && branchId) {
+                if (resetYear) {
+                    lastVoucherNum = (lastNums[fyId] && lastNums[fyId][branchId]) ? lastNums[fyId][branchId] : 0;
+                } else {
+                    lastVoucherNum = lastNums[branchId] || 0;
+                }
+                nextVoucher = String(Number(lastVoucherNum) + 1);
+            } else {
+                nextVoucher = String(nextCross);
+            }
         }
     }
 
@@ -502,7 +523,7 @@ const Vouchers = ({ language = 'fa' }) => {
       const defaultBranch = branches.find(b => b.is_default) || branches[0];
       const today = new Date().toISOString().split('T')[0];
 
-      const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, initialLedgerId, initialFyId);
+      const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, initialLedgerId, initialFyId, defaultBranch?.id);
 
       setCurrentVoucher({
         voucher_date: today,
@@ -639,19 +660,58 @@ const Vouchers = ({ language = 'fa' }) => {
         if (error) throw error;
         await supabase.schema('gl').from('voucher_items').delete().eq('voucher_id', savedVoucherId);
       } else {
-        const { nextDaily, nextCross, nextVoucher, config } = await fetchAutoNumbers(voucherData.voucher_date, voucherData.ledger_id, voucherData.fiscal_period_id);
+        const { nextDaily, nextCross, nextVoucher, config } = await fetchAutoNumbers(voucherData.voucher_date, voucherData.ledger_id, voucherData.fiscal_period_id, voucherData.branch_id);
         
         voucherData.daily_number = nextDaily;
         voucherData.cross_reference = nextCross;
-        voucherData.voucher_number = nextVoucher;
+        
+        const meta = config?.metadata || {};
+        const scope = meta.uniquenessScope || 'ledger';
+
+        if (scope !== 'none') {
+            voucherData.voucher_number = nextVoucher;
+        } else {
+            if (!voucherData.voucher_number) {
+                alert(isRtl ? 'شماره سند الزامی است.' : 'Voucher Number is required.');
+                setLoading(false);
+                return;
+            }
+        }
 
         const { data, error } = await supabase.schema('gl').from('vouchers').insert([voucherData]).select().single();
         if (error) throw error;
         savedVoucherId = data.id;
 
-        if (config) {
-            const nextVal = Math.max((config.current_number || 0) + 1, config.start_number || 1);
-            await supabase.schema('gl').from('auto_numbering').update({ current_number: nextVal }).eq('id', config.id);
+        // Update Auto Numbering Metadata
+        if (scope !== 'none' && config) {
+            const resetYear = meta.resetYear !== false;
+            let lastNums = meta.lastNumbers || {};
+            const fyId = voucherData.fiscal_period_id;
+            const branchId = voucherData.branch_id;
+            const savedVoucherNum = Number(voucherData.voucher_number); 
+
+            if (scope === 'ledger') {
+                if (resetYear) {
+                    lastNums[fyId] = savedVoucherNum;
+                } else {
+                    lastNums.global = savedVoucherNum;
+                }
+            } else if (scope === 'branch') {
+                if (resetYear) {
+                    if (!lastNums[fyId]) lastNums[fyId] = {};
+                    lastNums[fyId][branchId] = savedVoucherNum;
+                } else {
+                    lastNums[branchId] = savedVoucherNum;
+                }
+            }
+
+            const { data: latestLedger } = await supabase.schema('gl').from('ledgers').select('metadata').eq('id', voucherData.ledger_id).single();
+            if (latestLedger) {
+               const latestMeta = (typeof latestLedger.metadata === 'string' ? JSON.parse(latestLedger.metadata) : latestLedger.metadata) || {};
+               await supabase.schema('gl').from('ledgers').update({
+                   metadata: { ...latestMeta, lastNumbers: lastNums }
+               }).eq('id', voucherData.ledger_id);
+            }
         }
       }
 
@@ -818,6 +878,9 @@ const Vouchers = ({ language = 'fa' }) => {
     const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final';
 
     const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
+    const currentLedgerMeta = (typeof currentLedger?.metadata === 'string' ? JSON.parse(currentLedger.metadata) : currentLedger?.metadata) || {};
+    const isVoucherNoManual = currentLedgerMeta.uniquenessScope === 'none';
+
     const ledgerStructureCode = String(currentLedger?.structure || '').trim();
     const targetStructure = accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
     const structureId = targetStructure ? String(targetStructure.id) : null;
@@ -861,12 +924,30 @@ const Vouchers = ({ language = 'fa' }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <InputField label={t.fiscalYear} value={currentFiscalYearTitle} disabled isRtl={isRtl} />
               <InputField label={t.ledger} value={currentLedgerTitle} disabled isRtl={isRtl} />
-              <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})} disabled={isReadonly} isRtl={isRtl}>
+              <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => {
+                  const newBranch = e.target.value;
+                  setCurrentVoucher({...currentVoucher, branch_id: newBranch});
+                  if (!currentVoucher.id) {
+                     fetchAutoNumbers(currentVoucher.voucher_date, currentVoucher.ledger_id, currentVoucher.fiscal_period_id, newBranch).then(({nextVoucher}) => {
+                         if (currentLedgerMeta.uniquenessScope === 'branch') {
+                             setCurrentVoucher(prev => ({...prev, voucher_number: nextVoucher}));
+                         }
+                     });
+                  }
+              }} disabled={isReadonly} isRtl={isRtl}>
                  <option value="" disabled>{t.selectBranch}</option>
                  {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
               </SelectField>
               
-              <InputField label={t.voucherNumber} value={currentVoucher.voucher_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
+              <InputField 
+                 label={t.voucherNumber} 
+                 value={currentVoucher.voucher_number || ''} 
+                 onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_number: e.target.value})}
+                 disabled={isReadonly || !isVoucherNoManual} 
+                 isRtl={isRtl} 
+                 dir="ltr" 
+                 className={`text-center ${!isVoucherNoManual ? 'bg-slate-50' : 'bg-white'}`} 
+              />
               <InputField label={t.dailyNumber} value={currentVoucher.daily_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               <InputField label={t.crossReference} value={currentVoucher.cross_reference || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               
@@ -876,7 +957,7 @@ const Vouchers = ({ language = 'fa' }) => {
                  const newDate = e.target.value;
                  setCurrentVoucher({...currentVoucher, voucher_date: newDate});
                  if (!currentVoucher.id) {
-                     fetchAutoNumbers(newDate, currentVoucher.ledger_id, currentVoucher.fiscal_period_id).then(({nextDaily}) => {
+                     fetchAutoNumbers(newDate, currentVoucher.ledger_id, currentVoucher.fiscal_period_id, currentVoucher.branch_id).then(({nextDaily}) => {
                          setCurrentVoucher(prev => ({...prev, daily_number: nextDaily}));
                      });
                  }

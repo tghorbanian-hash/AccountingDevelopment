@@ -340,58 +340,101 @@ const AutoNumbering = ({ t, isRtl }) => {
                    <table className="w-full text-xs text-right">
                       <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 sticky top-0 z-10 shadow-sm">
                          <tr>
-                            <th className="p-2.5 font-bold">{isRtl ? 'سال مالی' : 'Fiscal Year'}</th>
+                            {viewingDocNumbers?.resetYear && <th className="p-2.5 font-bold">{isRtl ? 'سال مالی' : 'Fiscal Year'}</th>}
                             {viewingDocNumbers?.uniquenessScope === 'branch' && <th className="p-2.5 font-bold">{isRtl ? 'شعبه' : 'Branch'}</th>}
+                            {(!viewingDocNumbers?.resetYear && viewingDocNumbers?.uniquenessScope === 'ledger') && <th className="p-2.5 font-bold">{isRtl ? 'دفتر کل' : 'Ledger'}</th>}
                             <th className="p-2.5 font-bold w-32">{isRtl ? 'آخرین شماره' : 'Last Number'}</th>
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                         {fiscalYears.map(fy => {
-                             const fyNumbers = viewingDocNumbers?.lastNumbers?.[fy.id];
+                         {(() => {
+                            const scope = viewingDocNumbers?.uniquenessScope;
+                            const resetYear = viewingDocNumbers?.resetYear;
+                            const lastNums = viewingDocNumbers?.lastNumbers || {};
 
-                             if (viewingDocNumbers?.uniquenessScope === 'branch') {
-                                 return (
-                                     <React.Fragment key={fy.id}>
-                                         <tr className="bg-slate-50 border-b border-slate-200">
-                                             <td colSpan="3" className="p-2 font-bold text-indigo-700 text-center text-[11px]">{fy.title}</td>
-                                         </tr>
-                                         {branches.map(br => {
-                                             const brNum = (typeof fyNumbers === 'object' && fyNumbers !== null) ? fyNumbers[br.id] : null;
-                                             return (
-                                                 <tr key={`${fy.id}_${br.id}`} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-2.5 text-slate-400">↳</td>
-                                                    <td className="p-2.5 text-slate-700 font-medium">{br.title}</td>
-                                                    <td className="p-2.5">
-                                                       <Badge variant="neutral" className="font-mono bg-white border-slate-200 px-2 py-0.5 text-[11px]">
-                                                          {brNum || '0'}
-                                                       </Badge>
-                                                    </td>
-                                                 </tr>
-                                             );
-                                         })}
-                                     </React.Fragment>
-                                 );
-                             } else {
-                                 const num = (typeof fyNumbers === 'object') ? '0' : fyNumbers;
-                                 return (
-                                    <tr key={fy.id} className="hover:bg-slate-50 transition-colors">
-                                       <td className="p-2.5 text-slate-700 font-medium">{fy.title}</td>
-                                       <td className="p-2.5">
-                                          <Badge variant="neutral" className="font-mono bg-slate-100 px-2 py-0.5 text-[11px]">
-                                             {num || '0'}
-                                          </Badge>
-                                       </td>
-                                    </tr>
-                                 );
-                             }
-                         })}
-                         {fiscalYears.length === 0 && (
-                            <tr>
-                               <td colSpan={viewingDocNumbers?.uniquenessScope === 'branch' ? 3 : 2} className="p-4 text-center text-slate-400 italic">
-                                  {isRtl ? 'سال مالی یافت نشد' : 'No fiscal years'}
-                               </td>
-                            </tr>
-                         )}
+                            if (resetYear) {
+                                // Reset annually -> group by FY
+                                if (fiscalYears.length === 0) {
+                                    return <tr><td colSpan={scope === 'branch' ? 3 : 2} className="p-4 text-center text-slate-400 italic">{isRtl ? 'سال مالی یافت نشد' : 'No fiscal years'}</td></tr>;
+                                }
+                                return fiscalYears.map(fy => {
+                                    const fyNumbers = lastNums[fy.id];
+                                    if (scope === 'branch') {
+                                        return (
+                                            <React.Fragment key={fy.id}>
+                                                <tr className="bg-indigo-50/50 border-b border-slate-200">
+                                                    <td colSpan="3" className="p-2 font-bold text-indigo-800 text-center text-[11px]">{fy.title}</td>
+                                                </tr>
+                                                {branches.map(br => {
+                                                    const brNum = (typeof fyNumbers === 'object' && fyNumbers !== null) ? fyNumbers[br.id] : null;
+                                                    return (
+                                                        <tr key={`${fy.id}_${br.id}`} className="hover:bg-slate-50 transition-colors">
+                                                           <td className="p-2.5 text-slate-300 pr-4 rtl:pl-4">↳</td>
+                                                           <td className="p-2.5 text-slate-700 font-medium">{br.title}</td>
+                                                           <td className="p-2.5">
+                                                              <Badge variant="neutral" className="font-mono bg-white border-slate-200 px-2 py-0.5 text-[11px]">
+                                                                 {brNum || '0'}
+                                                              </Badge>
+                                                           </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        );
+                                    } else {
+                                        const num = (typeof fyNumbers === 'object') ? '0' : fyNumbers;
+                                        return (
+                                           <tr key={fy.id} className="hover:bg-slate-50 transition-colors">
+                                              <td className="p-2.5 text-slate-700 font-medium">{fy.title}</td>
+                                              <td className="p-2.5">
+                                                 <Badge variant="neutral" className="font-mono bg-slate-100 px-2 py-0.5 text-[11px]">
+                                                    {num || '0'}
+                                                 </Badge>
+                                              </td>
+                                           </tr>
+                                        );
+                                    }
+                                });
+                            } else {
+                                // No annual reset -> flat list
+                                if (scope === 'branch') {
+                                    if (branches.length === 0) {
+                                        return <tr><td colSpan="2" className="p-4 text-center text-slate-400 italic">{isRtl ? 'شعبه‌ای یافت نشد' : 'No branches'}</td></tr>;
+                                    }
+                                    return branches.map(br => {
+                                        const brNum = lastNums[br.id];
+                                        return (
+                                            <tr key={br.id} className="hover:bg-slate-50 transition-colors">
+                                               <td className="p-2.5 text-slate-700 font-medium">{br.title}</td>
+                                               <td className="p-2.5">
+                                                  <Badge variant="neutral" className="font-mono bg-slate-100 px-2 py-0.5 text-[11px]">
+                                                     {brNum || '0'}
+                                                  </Badge>
+                                               </td>
+                                            </tr>
+                                        );
+                                    });
+                                } else {
+                                    // Ledger scope without reset: single global number
+                                    let globalNum = 0;
+                                    if (typeof lastNums === 'number' || typeof lastNums === 'string') {
+                                        globalNum = lastNums;
+                                    } else if (typeof lastNums === 'object' && lastNums !== null) {
+                                        globalNum = lastNums.global || lastNums.ledger || 0;
+                                    }
+                                    return (
+                                        <tr className="hover:bg-slate-50 transition-colors">
+                                           <td className="p-2.5 text-slate-700 font-medium">{viewingDocNumbers?.title}</td>
+                                           <td className="p-2.5">
+                                              <Badge variant="neutral" className="font-mono bg-slate-100 px-2 py-0.5 text-[11px]">
+                                                 {globalNum || '0'}
+                                              </Badge>
+                                           </td>
+                                        </tr>
+                                    );
+                                }
+                            }
+                         })()}
                       </tbody>
                    </table>
                 </div>
