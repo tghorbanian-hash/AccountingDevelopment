@@ -1,14 +1,28 @@
 /* Filename: financial/generalledger/AutoNumbering.js */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { 
   Settings, Hash, Layers, Save, Edit, AlertCircle, 
   ShieldCheck, RotateCcw, X as XIcon, Box, CheckSquare, List
 } from 'lucide-react';
 
+// تابع کمکی و امن برای پردازش JSON
+const parseMeta = (meta) => {
+    if (!meta) return {};
+    if (typeof meta === 'object') return meta;
+    try { 
+        return JSON.parse(meta) || {}; 
+    } catch (e) { 
+        console.warn('Error parsing metadata JSON:', e);
+        return {}; 
+    }
+};
+
 const AutoNumbering = ({ t, isRtl }) => {
+  const tSafe = t || {}; // جلوگیری از خطای undefined برای t
+  const UI = window.UI || {};
   const { 
     Button, InputField, SelectField, DataGrid, Modal, Badge, SideMenu, ToggleChip 
-  } = window.UI;
+  } = UI;
   const supabase = window.supabase;
 
   // --- States ---
@@ -59,20 +73,17 @@ const AutoNumbering = ({ t, isRtl }) => {
   const fetchDocSettings = async () => {
     if (!supabase) return;
     try {
-      // Fetch Fiscal Years for multi-record display
       const { data: fyData } = await supabase.schema('gl').from('fiscal_years').select('id, title').order('code', { ascending: false });
       if (fyData) setFiscalYears(fyData);
 
-      // Fetch Branches for branch-scope display
       const { data: brData } = await supabase.schema('gen').from('branches').select('id, title').eq('is_active', true).order('title');
       if (brData) setBranches(brData);
 
-      // Fetch Ledgers
       const { data: ledgersData, error } = await supabase.schema('gl').from('ledgers').select('*').order('title');
       if (error) throw error;
 
       const mappedLedgers = (ledgersData || []).map(l => {
-         const meta = (typeof l.metadata === 'string' ? JSON.parse(l.metadata) : l.metadata) || {};
+         const meta = parseMeta(l.metadata);
          return {
             id: l.id,
             title: l.title,
@@ -99,7 +110,6 @@ const AutoNumbering = ({ t, isRtl }) => {
     const newLen = parseInt(e.target.value);
     if (isNaN(newLen) || newLen < 1) return;
 
-    // Smart Suggestion
     const start = "1".padEnd(newLen, "0");
     const end = "9".padEnd(newLen, "9");
 
@@ -147,7 +157,6 @@ const AutoNumbering = ({ t, isRtl }) => {
             ...(editingDoc.metadata || {}),
             resetYear: docFormData.resetYear,
             uniquenessScope: docFormData.uniquenessScope
-            // We intentionally do NOT modify lastNumbers here
         };
 
         const { error } = await supabase.schema('gl').from('ledgers').update({ metadata: payloadMeta }).eq('id', editingDoc.id);
@@ -174,11 +183,11 @@ const AutoNumbering = ({ t, isRtl }) => {
          <DataGrid 
            columns={[
               { field: 'code', header: isRtl ? 'کد سیستم' : 'Sys Code', width: 'w-32', render: r => <span className="text-slate-500 font-mono text-[10px]">{r.code}</span> },
-              { field: 'title', header: t.an_dt_type || (isRtl ? 'نوع تفصیل' : 'Detail Type'), width: 'w-64', render: r => <span className="font-bold text-slate-700">{r.title}</span> },
-              { field: 'length', header: t.an_dt_length || (isRtl ? 'طول کد' : 'Length'), width: 'w-32', render: r => <span className="font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 font-bold text-xs">{r.length}</span> },
-              { field: 'startCode', header: t.an_dt_start || (isRtl ? 'کد شروع' : 'Start Code'), width: 'w-32', render: r => <span className="font-mono text-slate-500">{r.startCode || '-'}</span> },
-              { field: 'endCode', header: t.an_dt_end || (isRtl ? 'کد پایان' : 'End Code'), width: 'w-32', render: r => <span className="font-mono text-slate-500">{r.endCode || '-'}</span> },
-              { field: 'lastCode', header: t.an_dt_last || (isRtl ? 'آخرین کد' : 'Last Code'), width: 'w-48', render: r => <Badge variant="neutral" className="font-mono">{r.lastCode || '-'}</Badge> },
+              { field: 'title', header: tSafe.an_dt_type || (isRtl ? 'نوع تفصیل' : 'Detail Type'), width: 'w-64', render: r => <span className="font-bold text-slate-700">{r.title}</span> },
+              { field: 'length', header: tSafe.an_dt_length || (isRtl ? 'طول کد' : 'Length'), width: 'w-32', render: r => <span className="font-mono bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100 font-bold text-xs">{r.length}</span> },
+              { field: 'startCode', header: tSafe.an_dt_start || (isRtl ? 'کد شروع' : 'Start Code'), width: 'w-32', render: r => <span className="font-mono text-slate-500">{r.startCode || '-'}</span> },
+              { field: 'endCode', header: tSafe.an_dt_end || (isRtl ? 'کد پایان' : 'End Code'), width: 'w-32', render: r => <span className="font-mono text-slate-500">{r.endCode || '-'}</span> },
+              { field: 'lastCode', header: tSafe.an_dt_last || (isRtl ? 'آخرین کد' : 'Last Code'), width: 'w-48', render: r => <Badge variant="neutral" className="font-mono">{r.lastCode || '-'}</Badge> },
            ]}
            data={detailSettings}
            isRtl={isRtl}
@@ -191,9 +200,9 @@ const AutoNumbering = ({ t, isRtl }) => {
        <Modal
          isOpen={showDetailModal}
          onClose={() => setShowDetailModal(false)}
-         title={t.an_edit_dt || (isRtl ? 'ویرایش تنظیمات تفصیل' : 'Edit Detail Settings')}
+         title={tSafe.an_edit_dt || (isRtl ? 'ویرایش تنظیمات تفصیل' : 'Edit Detail Settings')}
          size="md"
-         footer={<><Button variant="outline" onClick={() => setShowDetailModal(false)}>{t.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button><Button variant="primary" onClick={saveDetail}>{t.btn_save || (isRtl ? 'ذخیره' : 'Save')}</Button></>}
+         footer={<><Button variant="outline" onClick={() => setShowDetailModal(false)}>{tSafe.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button><Button variant="primary" onClick={saveDetail}>{tSafe.btn_save || (isRtl ? 'ذخیره' : 'Save')}</Button></>}
        >
           <div className="flex flex-col gap-4">
              <div className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200 text-slate-700">
@@ -203,20 +212,20 @@ const AutoNumbering = ({ t, isRtl }) => {
              
              <div className="grid grid-cols-2 gap-4">
                 <InputField 
-                  label={t.an_dt_length || (isRtl ? 'طول کد' : 'Length')} 
+                  label={tSafe.an_dt_length || (isRtl ? 'طول کد' : 'Length')} 
                   type="number" 
                   value={detailFormData.length || ''} 
                   onChange={handleLengthChange} 
                   isRtl={isRtl} 
                 />
                 <InputField 
-                  label={t.an_dt_last || (isRtl ? 'آخرین کد ثبت شده' : 'Last Code')} 
+                  label={tSafe.an_dt_last || (isRtl ? 'آخرین کد ثبت شده' : 'Last Code')} 
                   value={detailFormData.lastCode || ''} 
                   onChange={e => setDetailFormData({...detailFormData, lastCode: e.target.value})} 
                   isRtl={isRtl} 
                 />
-                <InputField label={t.an_dt_start || (isRtl ? 'کد شروع' : 'Start Code')} value={detailFormData.startCode || ''} onChange={e => setDetailFormData({...detailFormData, startCode: e.target.value})} isRtl={isRtl} />
-                <InputField label={t.an_dt_end || (isRtl ? 'کد پایان' : 'End Code')} value={detailFormData.endCode || ''} onChange={e => setDetailFormData({...detailFormData, endCode: e.target.value})} isRtl={isRtl} />
+                <InputField label={tSafe.an_dt_start || (isRtl ? 'کد شروع' : 'Start Code')} value={detailFormData.startCode || ''} onChange={e => setDetailFormData({...detailFormData, startCode: e.target.value})} isRtl={isRtl} />
+                <InputField label={tSafe.an_dt_end || (isRtl ? 'کد پایان' : 'End Code')} value={detailFormData.endCode || ''} onChange={e => setDetailFormData({...detailFormData, endCode: e.target.value})} isRtl={isRtl} />
              </div>
              
              <div className="text-[10px] text-orange-600 bg-orange-50 p-2 rounded border border-orange-100 flex items-center gap-2">
@@ -233,24 +242,24 @@ const AutoNumbering = ({ t, isRtl }) => {
        <div className="flex-1 overflow-hidden">
           <DataGrid 
              columns={[
-                { field: 'title', header: t.lg_title || 'دفتر کل', width: 'w-64', render: r => <span className="font-bold text-slate-700">{r.title}</span> },
+                { field: 'title', header: tSafe.lg_title || 'دفتر کل', width: 'w-64', render: r => <span className="font-bold text-slate-700">{r.title}</span> },
                 { 
                    field: 'resetYear', 
-                   header: t.an_reset_year || (isRtl ? 'ریست سالانه' : 'Reset Annually'), 
+                   header: tSafe.an_reset_year || (isRtl ? 'ریست سالانه' : 'Reset Annually'), 
                    width: 'w-48', 
                    render: r => (
                       <Badge variant={r.resetYear ? 'success' : 'neutral'} icon={r.resetYear ? RotateCcw : XIcon}>
-                         {r.resetYear ? (t.active || 'فعال') : (t.inactive || 'غیرفعال')}
+                         {r.resetYear ? (tSafe.active || 'فعال') : (tSafe.inactive || 'غیرفعال')}
                       </Badge>
                    )
                 },
                 { 
                    field: 'uniquenessScope', 
-                   header: t.an_unique_scope || (isRtl ? 'دامنه کنترل شماره' : 'Uniqueness Scope'), 
+                   header: tSafe.an_unique_scope || (isRtl ? 'دامنه کنترل شماره' : 'Uniqueness Scope'), 
                    width: 'w-48', 
                    render: r => (
                       <Badge variant="primary" icon={ShieldCheck}>
-                         {r.uniquenessScope === 'none' ? (isRtl ? 'بدون کنترل (دستی)' : 'None (Manual)') : (t[`an_scope_${r.uniquenessScope}`] || (isRtl && r.uniquenessScope === 'branch' ? 'دفتر و شعبه' : isRtl && r.uniquenessScope === 'ledger' ? 'دفتر کل' : r.uniquenessScope))}
+                         {r.uniquenessScope === 'none' ? (isRtl ? 'بدون کنترل (دستی)' : 'None (Manual)') : (tSafe[`an_scope_${r.uniquenessScope}`] || (isRtl && r.uniquenessScope === 'branch' ? 'دفتر و شعبه' : isRtl && r.uniquenessScope === 'ledger' ? 'دفتر کل' : r.uniquenessScope))}
                       </Badge>
                    )
                 },
@@ -270,9 +279,9 @@ const AutoNumbering = ({ t, isRtl }) => {
        <Modal
          isOpen={showDocModal}
          onClose={() => setShowDocModal(false)}
-         title={t.an_tab_docs || (isRtl ? 'تنظیمات شماره‌گذاری اسناد' : 'Document Settings')}
+         title={tSafe.an_tab_docs || (isRtl ? 'تنظیمات شماره‌گذاری اسناد' : 'Document Settings')}
          size="sm"
-         footer={<><Button variant="outline" onClick={() => setShowDocModal(false)}>{t.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button><Button variant="primary" onClick={saveDoc}>{t.btn_save || (isRtl ? 'ذخیره' : 'Save')}</Button></>}
+         footer={<><Button variant="outline" onClick={() => setShowDocModal(false)}>{tSafe.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button><Button variant="primary" onClick={saveDoc}>{tSafe.btn_save || (isRtl ? 'ذخیره' : 'Save')}</Button></>}
        >
           <div className="flex flex-col gap-5">
              <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-indigo-900">
@@ -281,7 +290,7 @@ const AutoNumbering = ({ t, isRtl }) => {
              </div>
 
              <div className="space-y-2">
-                <label className="text-[11px] font-bold text-slate-600">{t.an_unique_scope || (isRtl ? 'دامنه تولید و کنترل شماره' : 'Numbering Scope')}</label>
+                <label className="text-[11px] font-bold text-slate-600">{tSafe.an_unique_scope || (isRtl ? 'دامنه تولید و کنترل شماره' : 'Numbering Scope')}</label>
                 <div className="flex flex-wrap gap-2">
                    {['none', 'branch', 'ledger'].map(scope => {
                       let label = scope;
@@ -304,13 +313,13 @@ const AutoNumbering = ({ t, isRtl }) => {
 
              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-lg">
                 <label htmlFor="resetYearCheck" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
-                   {t.an_reset_year || (isRtl ? 'ریست شماره در سال جدید' : 'Reset numbering in new FY')}
+                   {tSafe.an_reset_year || (isRtl ? 'ریست شماره در سال جدید' : 'Reset numbering in new FY')}
                 </label>
                 <input 
                    type="checkbox" 
                    id="resetYearCheck"
                    className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
-                   checked={docFormData.resetYear} 
+                   checked={docFormData.resetYear || false} 
                    onChange={e => setDocFormData({...docFormData, resetYear: e.target.checked})}
                 />
              </div>
@@ -360,16 +369,18 @@ const AutoNumbering = ({ t, isRtl }) => {
                                 return fiscalYears.map(fy => {
                                     const fyNumbers = lastNums[fy.id];
                                     if (scope === 'branch') {
+                                        if (branches.length === 0) return null;
                                         return (
-                                            <React.Fragment key={fy.id}>
-                                                <tr className="bg-indigo-50/50 border-b border-slate-200">
-                                                    <td colSpan="3" className="p-2 font-bold text-indigo-800 text-center text-[11px]">{fy.title}</td>
-                                                </tr>
-                                                {branches.map(br => {
+                                            <Fragment key={fy.id}>
+                                                {branches.map((br, index) => {
                                                     const brNum = (typeof fyNumbers === 'object' && fyNumbers !== null) ? fyNumbers[br.id] : null;
                                                     return (
-                                                        <tr key={`${fy.id}_${br.id}`} className="hover:bg-slate-50 transition-colors">
-                                                           <td className="p-2.5 text-slate-300 pr-4 rtl:pl-4">↳</td>
+                                                        <tr key={`${fy.id}_${br.id}`} className="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                                                           {index === 0 && (
+                                                              <td rowSpan={branches.length} className="p-2.5 text-slate-800 font-bold bg-slate-100/40 align-middle text-center border-x border-slate-200">
+                                                                 {fy.title}
+                                                              </td>
+                                                           )}
                                                            <td className="p-2.5 text-slate-700 font-medium">{br.title}</td>
                                                            <td className="p-2.5">
                                                               <Badge variant="neutral" className="font-mono bg-white border-slate-200 px-2 py-0.5 text-[11px]">
@@ -379,7 +390,7 @@ const AutoNumbering = ({ t, isRtl }) => {
                                                         </tr>
                                                     );
                                                 })}
-                                            </React.Fragment>
+                                            </Fragment>
                                         );
                                     } else {
                                         const num = (typeof fyNumbers === 'object') ? '0' : fyNumbers;
@@ -445,23 +456,23 @@ const AutoNumbering = ({ t, isRtl }) => {
   );
 
   const tabs = [
-    { id: 'details', icon: Hash, label: t.an_tab_details || (isRtl ? 'شماره‌گذاری تفصیل‌ها' : 'Details Numbering') },
-    { id: 'docs', icon: Settings, label: t.an_tab_docs || (isRtl ? 'تنظیمات اسناد' : 'Document Settings') },
+    { id: 'details', icon: Hash, label: tSafe.an_tab_details || (isRtl ? 'شماره‌گذاری تفصیل‌ها' : 'Details Numbering') },
+    { id: 'docs', icon: Settings, label: tSafe.an_tab_docs || (isRtl ? 'تنظیمات اسناد' : 'Document Settings') },
   ];
 
   return (
     <div className={`flex flex-col h-full bg-slate-50/50 p-4 md:p-6 overflow-hidden ${isRtl ? 'font-vazir' : 'font-sans'}`}>
       <div className="mb-6 shrink-0 flex items-center justify-between">
          <div>
-            <h1 className="text-xl font-black text-slate-900">{t.an_title || (isRtl ? 'تنظیمات شماره‌گذاری' : 'Auto Numbering')}</h1>
-            <p className="text-xs font-medium text-slate-500 mt-1">{t.an_subtitle || (isRtl ? 'مدیریت و پیکربندی الگوهای تولید کد' : 'Manage and configure code generation patterns')}</p>
+            <h1 className="text-xl font-black text-slate-900">{tSafe.an_title || (isRtl ? 'تنظیمات شماره‌گذاری' : 'Auto Numbering')}</h1>
+            <p className="text-xs font-medium text-slate-500 mt-1">{tSafe.an_subtitle || (isRtl ? 'مدیریت و پیکربندی الگوهای تولید کد' : 'Manage and configure code generation patterns')}</p>
          </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 overflow-hidden">
         <div className="w-full md:w-64 shrink-0">
             <SideMenu 
-               title={t.an_title || (isRtl ? 'تنظیمات شماره‌گذاری' : 'Auto Numbering')} 
+               title={tSafe.an_title || (isRtl ? 'تنظیمات شماره‌گذاری' : 'Auto Numbering')} 
                items={tabs} 
                activeId={activeTab} 
                onChange={setActiveTab} 
