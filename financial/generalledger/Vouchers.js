@@ -70,12 +70,11 @@ const localTranslations = {
     fromDate: 'From Date',
     toDate: 'To Date',
     all: 'All',
-    makeTemporary: 'Change to Temporary',
-    makeDraft: 'Change to Draft',
+    makeTemporary: 'Make Temporary',
+    makeDraft: 'Make Draft',
     noPeriodsFound: 'No fiscal periods defined for this fiscal year.',
     dateNotInPeriods: 'Voucher date does not fall within any period of this fiscal year.',
-    periodClosed: 'The fiscal period for this date is closed and you do not have permission to edit/save.',
-    selectedItems: '{count} items selected'
+    periodClosed: 'The fiscal period for this date is closed and you do not have permission to edit/save.'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -145,8 +144,7 @@ const localTranslations = {
     makeDraft: 'تبدیل به یادداشت',
     noPeriodsFound: 'دوره‌های مالی برای این سال تعریف نشده است.',
     dateNotInPeriods: 'تاریخ سند در محدوده دوره‌های این سال مالی نیست.',
-    periodClosed: 'دوره مالی مربوط به این تاریخ بسته است و شما مجوز ثبت/ویرایش ندارید.',
-    selectedItems: '{count} مورد انتخاب شده'
+    periodClosed: 'دوره مالی مربوط به این تاریخ بسته است و شما مجوز ثبت/ویرایش ندارید.'
   }
 };
 
@@ -173,8 +171,8 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   );
 
   return (
-    <div className="relative w-full" ref={wrapperRef}>
-      <div className="relative w-full">
+    <div className="relative w-full h-full flex items-center" ref={wrapperRef}>
+      <div className="relative w-full h-full flex items-center">
         <input
           type="text"
           className={className || `w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
@@ -1304,58 +1302,39 @@ const Vouchers = ({ language = 'fa' }) => {
          isRtl={isRtl} 
          title={t.search}
       >
-        <div className="flex flex-col gap-4 w-full">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-                <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
-                   <option value="">{t.all}</option>
-                   <option value="draft">{t.statusDraft}</option>
-                   <option value="temporary">{t.statusTemporary}</option>
-                   <option value="reviewed">{t.statusReviewed}</option>
-                   <option value="final">{t.statusFinal}</option>
-                </SelectField>
-                <InputField type="date" label={t.fromDate} value={searchParams.from_date} onChange={e => setSearchParams({...searchParams, from_date: e.target.value})} isRtl={isRtl} />
-                <InputField type="date" label={t.toDate} value={searchParams.to_date} onChange={e => setSearchParams({...searchParams, to_date: e.target.value})} isRtl={isRtl} />
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+            <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
+            <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
+               <option value="">{t.all}</option>
+               <option value="draft">{t.statusDraft}</option>
+               <option value="temporary">{t.statusTemporary}</option>
+               <option value="reviewed">{t.statusReviewed}</option>
+               <option value="final">{t.statusFinal}</option>
+            </SelectField>
+            <InputField type="date" label={t.fromDate} value={searchParams.from_date} onChange={e => setSearchParams({...searchParams, from_date: e.target.value})} isRtl={isRtl} />
+            <InputField type="date" label={t.toDate} value={searchParams.to_date} onChange={e => setSearchParams({...searchParams, to_date: e.target.value})} isRtl={isRtl} />
             
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 w-full">
-                <div className="lg:col-span-1">
-                   <SelectField label={t.type} value={searchParams.voucher_type} onChange={e => setSearchParams({...searchParams, voucher_type: e.target.value})} isRtl={isRtl}>
-                      <option value="">{t.all}</option>
-                      {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
-                   </SelectField>
-                </div>
+            <SelectField label={t.type} value={searchParams.voucher_type} onChange={e => setSearchParams({...searchParams, voucher_type: e.target.value})} isRtl={isRtl}>
+               <option value="">{t.all}</option>
+               {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
+            </SelectField>
 
-                <div className="lg:col-span-3 flex flex-col gap-1.5">
-                   <label className="text-[11px] font-bold text-slate-600 rtl:pr-1 ltr:pl-1">{t.account}</label>
-                   <SearchableAccountSelect 
-                       accounts={validAccountsForLedger} 
-                       value={searchParams.account_id} 
-                       onChange={v => setSearchParams({...searchParams, account_id: v})} 
-                       placeholder={t.searchAccount} 
-                       className="w-full bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg h-[38px] px-3 outline-none text-[12px] text-slate-800 shadow-sm transition-all"
-                   />
-                </div>
+            <div className="md:col-span-1 lg:col-span-3 flex flex-col">
+               <label className="block text-[11px] font-bold text-slate-600 mb-1 rtl:pr-1 ltr:pl-1">{t.account}</label>
+               <SearchableAccountSelect 
+                   accounts={validAccountsForLedger} 
+                   value={searchParams.account_id} 
+                   onChange={v => setSearchParams({...searchParams, account_id: v})} 
+                   placeholder={t.searchAccount} 
+                   className="w-full bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg h-8 px-3 outline-none text-[12px] text-slate-800 shadow-sm transition-all"
+               />
             </div>
 
-            <div className="w-full">
+            <div className="md:col-span-2 lg:col-span-4">
                <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
             </div>
         </div>
       </FilterSection>
-
-      {selectedIds.length > 0 && (
-         <div className="bg-indigo-50 border border-indigo-100 p-2.5 rounded-lg mb-3 flex items-center justify-between animate-in fade-in zoom-in-95 shrink-0">
-            <div className="flex items-center gap-2 text-indigo-800">
-               <Layers size={18} />
-               <span className="text-sm font-bold">{t.selectedItems.replace('{count}', selectedIds.length)}</span>
-            </div>
-            <div className="flex gap-2">
-               {allDraft && <Button variant="primary" size="sm" onClick={() => handleBulkStatus('temporary')}>{t.makeTemporary}</Button>}
-               {allTemp && <Button variant="primary" size="sm" onClick={() => handleBulkStatus('draft')}>{t.makeDraft}</Button>}
-            </div>
-         </div>
-      )}
 
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <DataGrid 
@@ -1369,6 +1348,12 @@ const Vouchers = ({ language = 'fa' }) => {
           onDoubleClick={(r) => handleOpenForm(r)} 
           isRtl={isRtl} 
           isLoading={loading} 
+          bulkActions={
+             <>
+               {allDraft && <Button variant="secondary" size="sm" onClick={() => handleBulkStatus('temporary')} icon={CheckCircle}>{t.makeTemporary}</Button>}
+               {allTemp && <Button variant="secondary" size="sm" onClick={() => handleBulkStatus('draft')} icon={FileText}>{t.makeDraft}</Button>}
+             </>
+          }
           actions={(r) => (
             <div className="flex gap-1 justify-center">
               <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r)} />

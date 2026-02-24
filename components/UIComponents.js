@@ -378,7 +378,8 @@ const DataGrid = ({
   onCreate,
   onDelete,
   onDoubleClick,
-  actions 
+  actions,
+  bulkActions
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -491,6 +492,7 @@ const DataGrid = ({
           {onCreate && (
              <Button variant="primary" size="sm" icon={Plus} onClick={onCreate}>{txtNew}</Button>
           )}
+          {selectedIds.length > 0 && bulkActions}
           {selectedIds.length > 0 && onDelete && (
              <Button variant="danger" size="sm" icon={Trash2} onClick={() => onDelete(selectedIds)}>{txtDelete} ({selectedIds.length})</Button>
           )}
