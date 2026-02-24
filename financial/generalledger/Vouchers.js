@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check
+  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X
 } from 'lucide-react';
 
 const localTranslations = {
@@ -61,6 +61,10 @@ const localTranslations = {
     crossReference: 'Cross Ref.',
     referenceNumber: 'Reference No.',
     headerInfo: 'Voucher Header',
+    noDetail: 'No Detail',
+    searchPlaceholder: 'Search {type}...',
+    notFound: 'No matches found',
+    detailRequiredError: 'Please select detail for "{type}" in row {row}.'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -117,6 +121,10 @@ const localTranslations = {
     crossReference: 'شماره عطف',
     referenceNumber: 'شماره ارجاع',
     headerInfo: 'اطلاعات سربرگ سند',
+    noDetail: 'بدون تفصیل',
+    searchPlaceholder: 'جستجوی {type}...',
+    notFound: 'موردی یافت نشد',
+    detailRequiredError: 'لطفاً تفصیل مربوط به "{type}" را در ردیف {row} مشخص کنید.'
   }
 };
 
@@ -178,93 +186,98 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   );
 };
 
-const SearchableDetailSelect = ({ details, allowedTypes, value, onChange, disabled, placeholder }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange, disabled, t }) => {
+  const [activeType, setActiveType] = useState(null);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
-  const [activeTypeCode, setActiveTypeCode] = useState(null);
-
-  useEffect(() => {
-    if (allowedTypes && allowedTypes.length > 0) {
-      if (!activeTypeCode || !allowedTypes.find(t => t.code === activeTypeCode)) {
-         setActiveTypeCode(allowedTypes[0].code);
-      }
-    } else {
-      setActiveTypeCode(null);
-    }
-  }, [allowedTypes, activeTypeCode]);
-
-  const selectedDetail = details.find(d => String(d.id) === String(value));
-  const displaySelected = selectedDetail ? ((selectedDetail.detail_code ? selectedDetail.detail_code + ' - ' : '') + selectedDetail.title) : '';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false);
+        setActiveType(null);
+        setSearch('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = details.filter(d => 
-    (activeTypeCode ? d.detail_type_code === activeTypeCode : true) &&
-    (d.title.toLowerCase().includes(search.toLowerCase()) || 
-    (d.detail_code && d.detail_code.toLowerCase().includes(search.toLowerCase())))
-  );
-
   if (!allowedTypes || allowedTypes.length === 0) {
-     return <div className="text-slate-300 text-[11px] px-1 h-8 flex items-center">-</div>;
+     return <div className="text-slate-300 text-[11px] px-1 h-8 flex items-center">{t.noDetail}</div>;
   }
 
   return (
-    <div className="relative w-full flex flex-col p-1" ref={wrapperRef}>
-      {allowedTypes.length > 0 && (
-         <div className="flex flex-wrap gap-1 mb-1">
-            {allowedTypes.map(t => (
-               <span 
-                  key={t.code} 
-                  onMouseDown={(e) => { e.preventDefault(); if(!disabled) setActiveTypeCode(t.code); }}
-                  className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer border transition-colors ${activeTypeCode === t.code ? 'bg-indigo-100 text-indigo-700 border-indigo-300 font-bold' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-               >
-                  {t.title}
-               </span>
-            ))}
-         </div>
-      )}
+    <div className="flex flex-wrap gap-1.5 w-full items-center p-1" ref={wrapperRef}>
+       {allowedTypes.map(type => {
+          const selectedId = value[type.code];
+          
+          if (selectedId) {
+             const selectedDetail = allInstances.find(d => String(d.id) === String(selectedId));
+             const display = selectedDetail ? ((selectedDetail.detail_code ? selectedDetail.detail_code + ' - ' : '') + selectedDetail.title) : 'Unknown';
+             return (
+               <div key={type.code} className="flex items-center gap-1 bg-indigo-50 text-indigo-800 text-[11px] px-2 py-1 rounded border border-indigo-200 shadow-sm transition-all hover:shadow-md">
+                 <span className="font-bold truncate max-w-[140px] select-none" title={display}>{display}</span>
+                 {!disabled && (
+                    <X size={12} className="cursor-pointer text-indigo-400 hover:text-red-500 hover:bg-red-50 rounded-full p-0.5 shrink-0 transition-colors" 
+                       onClick={(e) => { 
+                          e.stopPropagation(); 
+                          const newVal = {...value}; 
+                          delete newVal[type.code]; 
+                          onChange(newVal); 
+                       }} 
+                    />
+                 )}
+               </div>
+             )
+          }
 
-      <div className="relative">
-        <input
-          type="text"
-          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-7 px-1 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          value={isOpen ? search : displaySelected}
-          onChange={e => { setSearch(e.target.value); setIsOpen(true); }}
-          onFocus={() => { setIsOpen(true); setSearch(''); }}
-          disabled={disabled}
-          placeholder={placeholder}
-          title={displaySelected}
-        />
-      </div>
-      
-      {isOpen && !disabled && (
-        <div className="absolute z-[60] w-[250px] rtl:right-0 ltr:left-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto custom-scrollbar">
-          {filtered.map(d => (
-            <div
-              key={d.id}
-              className="px-3 py-1.5 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0"
-              onMouseDown={(e) => { e.preventDefault(); onChange(d.id); setIsOpen(false); }}
-            >
-              <div className="font-bold text-slate-800">{d.detail_code ? d.detail_code + ' - ' : ''}{d.title}</div>
-            </div>
-          ))}
-          {filtered.length === 0 && (
-            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">موردی یافت نشد</div>
-          )}
-        </div>
-      )}
+          return (
+             <div key={type.code} className="relative">
+                {activeType === type.code ? (
+                   <div className="relative">
+                      <input 
+                         autoFocus
+                         className="w-[140px] bg-white border border-indigo-400 shadow-sm focus:ring-2 focus:ring-indigo-100 rounded h-7 px-2 outline-none text-[11px] text-slate-800 transition-all"
+                         value={search} 
+                         onChange={e => setSearch(e.target.value)} 
+                         placeholder={t.searchPlaceholder.replace('{type}', type.title)}
+                      />
+                      <div className="absolute z-[70] w-[220px] rtl:right-0 ltr:left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                         {allInstances
+                           .filter(d => d.detail_type_code === type.code && (d.title.includes(search) || (d.detail_code && d.detail_code.includes(search))))
+                           .map(d => (
+                             <div
+                               key={d.id}
+                               className="px-3 py-2 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                               onMouseDown={(e) => { 
+                                  e.preventDefault(); 
+                                  onChange({ ...value, [type.code]: d.id });
+                                  setActiveType(null);
+                                  setSearch('');
+                               }}
+                             >
+                               <div className="font-bold text-slate-800">{d.detail_code ? d.detail_code + ' - ' : ''}{d.title}</div>
+                             </div>
+                         ))}
+                         {allInstances.filter(d => d.detail_type_code === type.code && (d.title.includes(search) || (d.detail_code && d.detail_code.includes(search)))).length === 0 && (
+                            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">{t.notFound}</div>
+                         )}
+                      </div>
+                   </div>
+                ) : (
+                   <button 
+                      onClick={(e) => { e.preventDefault(); if(!disabled) { setActiveType(type.code); setSearch(''); } }} 
+                      className={`bg-white border border-dashed text-[11px] px-2 py-1 rounded transition-colors ${disabled ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`}
+                   >
+                      + {type.title}
+                   </button>
+                )}
+             </div>
+          )
+       })}
     </div>
   );
-};
+}
 
 const formatNum = (num) => {
   if (num === null || num === undefined || num === '') return '';
@@ -430,7 +443,7 @@ const Vouchers = ({ language = 'fa' }) => {
           return { 
              ...item, 
              currency_code: detailsObj.currency_code || '',
-             detail_id: detailsObj.detail_id || '' 
+             details_dict: detailsObj.selected_details || {} 
           };
         });
         setVoucherItems(mappedItems);
@@ -463,7 +476,7 @@ const Vouchers = ({ language = 'fa' }) => {
         id: 'temp_' + Date.now(),
         row_number: 1,
         account_id: '',
-        detail_id: '',
+        details_dict: {},
         debit: 0,
         credit: 0,
         currency_code: defaultCurrency,
@@ -474,6 +487,18 @@ const Vouchers = ({ language = 'fa' }) => {
       }]);
     }
     setView('form');
+  };
+
+  const getValidDetailTypes = (accountId) => {
+     if (!accountId) return [];
+     const account = accounts.find(a => String(a.id) === String(accountId));
+     if (!account || !account.metadata) return [];
+     const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+     const allowedTafsilCodesOrIds = meta.tafsils || [];
+     
+     if (allowedTafsilCodesOrIds.length === 0) return [];
+
+     return detailTypes.filter(dt => allowedTafsilCodesOrIds.some(t => String(dt.id) === String(t) || dt.code === String(t)));
   };
 
   const handleSaveVoucher = async (status) => {
@@ -500,6 +525,18 @@ const Vouchers = ({ language = 'fa' }) => {
                     return;
                 }
             }
+        }
+
+        const allowedDetailTypes = getValidDetailTypes(item.account_id);
+        if (allowedDetailTypes.length > 0) {
+           const dict = item.details_dict || {};
+           for (const type of allowedDetailTypes) {
+               if (!dict[type.code]) {
+                   const errorMsg = t.detailRequiredError.replace('{type}', type.title).replace('{row}', i + 1);
+                   alert(errorMsg);
+                   return;
+               }
+           }
         }
     }
 
@@ -548,7 +585,7 @@ const Vouchers = ({ language = 'fa' }) => {
           tracking_number: item.tracking_number || null,
           tracking_date: item.tracking_date || null,
           quantity: parseNum(item.quantity),
-          details: { currency_code: item.currency_code, detail_id: item.detail_id }
+          details: { currency_code: item.currency_code, selected_details: item.details_dict || {} }
         };
       });
 
@@ -591,7 +628,7 @@ const Vouchers = ({ language = 'fa' }) => {
         if (meta.currency_code) newCurrency = meta.currency_code;
       }
       newItems[index]['currency_code'] = newCurrency;
-      newItems[index]['detail_id'] = '';
+      newItems[index]['details_dict'] = {}; 
     }
 
     setVoucherItems(newItems);
@@ -607,7 +644,7 @@ const Vouchers = ({ language = 'fa' }) => {
       id: newId, 
       row_number: voucherItems.length + 1, 
       account_id: '', 
-      detail_id: '',
+      details_dict: {},
       debit: 0, 
       credit: 0, 
       currency_code: currentLedger?.currency || '',
@@ -633,7 +670,7 @@ const Vouchers = ({ language = 'fa' }) => {
       id: newId, 
       row_number: voucherItems.length + 1, 
       account_id: '', 
-      detail_id: '',
+      details_dict: {},
       debit: diff < 0 ? Math.abs(diff) : 0, 
       credit: diff > 0 ? diff : 0, 
       currency_code: currentLedger?.currency || '',
@@ -681,26 +718,6 @@ const Vouchers = ({ language = 'fa' }) => {
   const getStatusBadge = (status) => {
     const variant = status === 'final' ? 'success' : status === 'reviewed' ? 'info' : status === 'temporary' ? 'warning' : 'neutral';
     return <Badge variant={variant}>{t['status' + status.charAt(0).toUpperCase() + status.slice(1)]}</Badge>;
-  };
-
-  // گرفتن آبجکت‌های مربوط به نوع تفصیل مجاز برای حساب (Chip ها)
-  const getValidDetailTypes = (accountId) => {
-     if (!accountId) return [];
-     const account = accounts.find(a => String(a.id) === String(accountId));
-     if (!account || !account.metadata) return [];
-     const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
-     const allowedTafsilCodesOrIds = meta.tafsils || [];
-     
-     if (allowedTafsilCodesOrIds.length === 0) return [];
-
-     return detailTypes.filter(dt => allowedTafsilCodesOrIds.some(t => String(dt.id) === String(t) || dt.code === String(t)));
-  };
-
-  const getValidDetailInstances = (accountId) => {
-     const allowedTypes = getValidDetailTypes(accountId);
-     if (allowedTypes.length === 0) return [];
-     const allowedTypeCodes = allowedTypes.map(t => t.code);
-     return allDetailInstances.filter(di => allowedTypeCodes.includes(di.detail_type_code));
   };
 
   const columns = [
@@ -807,7 +824,6 @@ const Vouchers = ({ language = 'fa' }) => {
                       if (meta.trackFeature) hasTracking = true;
                   }
 
-                  const validDetails = getValidDetailInstances(item.account_id);
                   const allowedDetailTypes = getValidDetailTypes(item.account_id);
 
                   return (
@@ -833,14 +849,14 @@ const Vouchers = ({ language = 'fa' }) => {
                               </div>
                               <div className="col-span-12 md:col-span-6 lg:col-span-4 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
-                                 <div className={`border rounded min-h-[54px] ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
-                                     <SearchableDetailSelect 
-                                        details={validDetails} 
-                                        allowedTypes={allowedDetailTypes} 
-                                        value={item.detail_id} 
-                                        onChange={(v) => handleItemChange(index, 'detail_id', v)} 
+                                 <div className={`border rounded min-h-[54px] flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
+                                     <MultiDetailSelector 
+                                        allowedTypes={allowedDetailTypes}
+                                        allInstances={allDetailInstances}
+                                        value={item.details_dict || {}} 
+                                        onChange={(v) => handleItemChange(index, 'details_dict', v)} 
                                         disabled={isReadonly || allowedDetailTypes.length === 0} 
-                                        placeholder={t.searchDetail} 
+                                        t={t}
                                      />
                                  </div>
                               </div>
