@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X
+  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X, Layers
 } from 'lucide-react';
 
 const localTranslations = {
@@ -41,7 +41,7 @@ const localTranslations = {
     backToList: 'Back to List',
     confirmDelete: 'Are you sure you want to delete this voucher?',
     statusDraft: 'Draft',
-    statusTemp: 'Temporary',
+    statusTemporary: 'Temporary',
     statusReviewed: 'Reviewed',
     statusFinal: 'Final',
     general: 'General',
@@ -66,7 +66,16 @@ const localTranslations = {
     searchPlaceholder: 'Search {type}...',
     notFound: 'No matches found',
     detailRequiredError: 'Please select detail for "{type}" in row {row}.',
-    subDupError: 'Subsidiary number is duplicate in this fiscal year.'
+    subDupError: 'Subsidiary number is duplicate in this fiscal year.',
+    fromDate: 'From Date',
+    toDate: 'To Date',
+    all: 'All',
+    makeTemporary: 'Change to Temporary',
+    makeDraft: 'Change to Draft',
+    noPeriodsFound: 'No fiscal periods defined for this fiscal year.',
+    dateNotInPeriods: 'Voucher date does not fall within any period of this fiscal year.',
+    periodClosed: 'The fiscal period for this date is closed and you do not have permission to edit/save.',
+    selectedItems: '{count} items selected'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -103,7 +112,7 @@ const localTranslations = {
     backToList: 'بازگشت به فهرست',
     confirmDelete: 'آیا از حذف این سند اطمینان دارید؟',
     statusDraft: 'یادداشت',
-    statusTemp: 'موقت',
+    statusTemporary: 'موقت',
     statusReviewed: 'بررسی شده',
     statusFinal: 'قطعی شده',
     general: 'عمومی',
@@ -128,7 +137,16 @@ const localTranslations = {
     searchPlaceholder: 'جستجوی {type}...',
     notFound: 'موردی یافت نشد',
     detailRequiredError: 'لطفاً تفصیل مربوط به "{type}" را در ردیف {row} مشخص کنید.',
-    subDupError: 'شماره فرعی وارد شده در این سال مالی تکراری است.'
+    subDupError: 'شماره فرعی وارد شده در این سال مالی تکراری است.',
+    fromDate: 'از تاریخ',
+    toDate: 'تا تاریخ',
+    all: 'همه',
+    makeTemporary: 'تبدیل به موقت',
+    makeDraft: 'تبدیل به یادداشت',
+    noPeriodsFound: 'دوره‌های مالی برای این سال تعریف نشده است.',
+    dateNotInPeriods: 'تاریخ سند در محدوده دوره‌های این سال مالی نیست.',
+    periodClosed: 'دوره مالی مربوط به این تاریخ بسته است و شما مجوز ثبت/ویرایش ندارید.',
+    selectedItems: '{count} مورد انتخاب شده'
   }
 };
 
@@ -298,7 +316,7 @@ const Vouchers = ({ language = 'fa' }) => {
   const isRtl = language === 'fa';
   
   const UI = window.UI || {};
-  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, Accordion } = UI;
+  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Accordion } = UI;
   const supabase = window.supabase;
 
   const [view, setView] = useState('list');
@@ -320,7 +338,15 @@ const Vouchers = ({ language = 'fa' }) => {
   const [detailTypes, setDetailTypes] = useState([]);
   const [allDetailInstances, setAllDetailInstances] = useState([]);
   
-  const [searchParams, setSearchParams] = useState({ voucher_number: '', description: '' });
+  const [searchParams, setSearchParams] = useState({ 
+      voucher_number: '', 
+      description: '', 
+      from_date: '', 
+      to_date: '', 
+      status: '', 
+      voucher_type: '', 
+      account_id: '' 
+  });
   const [selectedIds, setSelectedIds] = useState([]);
 
   const [currentVoucher, setCurrentVoucher] = useState(null);
@@ -336,7 +362,7 @@ const Vouchers = ({ language = 'fa' }) => {
   useEffect(() => {
     if (view === 'list') {
       if (contextVals.fiscal_year_id && contextVals.ledger_id) {
-        fetchVouchers();
+        fetchVouchers(searchParams);
       } else {
         setVouchers([]);
       }
@@ -411,19 +437,38 @@ const Vouchers = ({ language = 'fa' }) => {
     }
   };
 
-  const fetchVouchers = async () => {
+  const fetchVouchers = async (paramsObj = searchParams) => {
     if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id) return;
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.schema('gl')
-        .from('vouchers')
+      let query = supabase.schema('gl').from('vouchers')
         .select('*')
         .eq('fiscal_period_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
         .order('voucher_date', { ascending: false })
         .order('voucher_number', { ascending: false });
       
+      if (paramsObj.voucher_number) query = query.eq('voucher_number', paramsObj.voucher_number);
+      if (paramsObj.from_date) query = query.gte('voucher_date', paramsObj.from_date);
+      if (paramsObj.to_date) query = query.lte('voucher_date', paramsObj.to_date);
+      if (paramsObj.status) query = query.eq('status', paramsObj.status);
+      if (paramsObj.voucher_type) query = query.eq('voucher_type', paramsObj.voucher_type);
+      if (paramsObj.description) query = query.ilike('description', `%${paramsObj.description}%`);
+
+      if (paramsObj.account_id) {
+          const { data: viData } = await supabase.schema('gl').from('voucher_items').select('voucher_id').eq('account_id', paramsObj.account_id);
+          if (viData && viData.length > 0) {
+              const vIds = viData.map(v => v.voucher_id);
+              query = query.in('id', vIds);
+          } else {
+              setVouchers([]);
+              setLoading(false);
+              return;
+          }
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setVouchers(data || []);
     } catch (error) {
@@ -431,6 +476,12 @@ const Vouchers = ({ language = 'fa' }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleClearSearch = () => {
+     const cleared = { voucher_number: '', description: '', from_date: '', to_date: '', status: '', voucher_type: '', account_id: '' };
+     setSearchParams(cleared);
+     fetchVouchers(cleared);
   };
 
   const fetchAutoNumbers = async (date, ledgerId, fyId, branchId) => {
@@ -484,6 +535,34 @@ const Vouchers = ({ language = 'fa' }) => {
     }
 
     return { nextDaily, nextCross, nextVoucher, config };
+  };
+
+  const validateFiscalPeriod = async (date, fyId) => {
+    try {
+        const { data: periods } = await supabase.schema('gl').from('fiscal_periods').select('*').eq('fiscal_year_id', fyId);
+        if (!periods || periods.length === 0) return { valid: false, msg: t.noPeriodsFound };
+
+        const period = periods.find(p => date >= p.start_date && date <= p.end_date);
+        if (!period) return { valid: false, msg: t.dateNotInPeriods };
+
+        if (period.status === 'open') return { valid: true };
+
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+        if (userId) {
+            const { data: exc } = await supabase.schema('gl').from('fiscal_period_exceptions')
+                .select('*')
+                .eq('period_id', period.id)
+                .eq('user_id', userId)
+                .eq('is_active', true);
+            if (exc && exc.length > 0) return { valid: true };
+        }
+
+        return { valid: false, msg: t.periodClosed };
+    } catch (err) {
+        console.error('Error validating period:', err);
+        return { valid: false, msg: 'Error validating fiscal period.' };
+    }
   };
 
   const handleOpenForm = async (voucher = null) => {
@@ -577,6 +656,12 @@ const Vouchers = ({ language = 'fa' }) => {
        return;
     }
 
+    const periodCheck = await validateFiscalPeriod(currentVoucher.voucher_date, currentVoucher.fiscal_period_id);
+    if (!periodCheck.valid) {
+        alert(periodCheck.msg);
+        return;
+    }
+
     if (currentVoucher.subsidiary_number && currentVoucher.subsidiary_number.trim() !== '') {
         const query = supabase.schema('gl').from('vouchers')
             .select('id')
@@ -646,7 +731,6 @@ const Vouchers = ({ language = 'fa' }) => {
 
     setLoading(true);
     try {
-      // Helper function to safely send null instead of empty strings for integer DB fields
       const cleanData = (val) => (val === '' ? null : val);
 
       const voucherData = { 
@@ -690,7 +774,6 @@ const Vouchers = ({ language = 'fa' }) => {
         if (error) throw error;
         savedVoucherId = data.id;
 
-        // Update Auto Numbering Metadata
         if (scope !== 'none' && config) {
             const resetYear = meta.resetYear !== false;
             let lastNums = meta.lastNumbers || {};
@@ -752,6 +835,21 @@ const Vouchers = ({ language = 'fa' }) => {
       alert('Error saving voucher: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBulkStatus = async (newStatus) => {
+    if (selectedIds.length === 0) return;
+    setLoading(true);
+    try {
+        const { error } = await supabase.schema('gl').from('vouchers').update({ status: newStatus }).in('id', selectedIds);
+        if (error) throw error;
+        setSelectedIds([]);
+        fetchVouchers();
+    } catch (error) {
+        console.error('Error updating status:', error);
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -879,41 +977,60 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const getStatusBadge = (status) => {
-    const variant = status === 'final' ? 'success' : status === 'reviewed' ? 'info' : status === 'temporary' ? 'warning' : 'neutral';
-    return <Badge variant={variant}>{t['status' + status.charAt(0).toUpperCase() + status.slice(1)]}</Badge>;
+    const config = {
+        'draft': { label: t.statusDraft, bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
+        'temporary': { label: t.statusTemporary, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+        'reviewed': { label: t.statusReviewed, bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+        'final': { label: t.statusFinal, bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+    };
+    const c = config[status] || { label: status, bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' };
+    return <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${c.bg} ${c.text} ${c.border}`}>{c.label}</span>;
   };
 
   const columns = [
     { field: 'voucher_number', header: t.voucherNumber, width: 'w-24', sortable: true },
     { field: 'voucher_date', header: t.date, width: 'w-24', sortable: true },
-    { field: 'voucher_type', header: t.type, width: 'w-32', render: (row) => docTypes.find(d => d.code === row.voucher_type)?.title || row.voucher_type },
     { field: 'status', header: t.status, width: 'w-32', render: (row) => getStatusBadge(row.status) },
+    { field: 'voucher_type', header: t.type, width: 'w-32', render: (row) => docTypes.find(d => d.code === row.voucher_type)?.title || row.voucher_type },
+    { field: 'branch_id', header: t.branch, width: 'w-32', render: (row) => branches.find(b => b.id === row.branch_id)?.title || '-' },
     { field: 'description', header: t.description, width: 'w-64' },
     { field: 'total_debit', header: t.totalDebit, width: 'w-32', render: (row) => formatNum(row.total_debit) },
-    { field: 'total_credit', header: t.totalCredit, width: 'w-32', render: (row) => formatNum(row.total_credit) }
+    { field: 'total_credit', header: t.totalCredit, width: 'w-32', render: (row) => formatNum(row.total_credit) },
+    { field: 'daily_number', header: t.dailyNumber, width: 'w-24' },
+    { field: 'cross_reference', header: t.crossReference, width: 'w-24' }
   ];
+
+  const currentLedgerMeta = useMemo(() => {
+     const ledger = ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
+     return (typeof ledger?.metadata === 'string' ? JSON.parse(ledger.metadata) : ledger?.metadata) || {};
+  }, [ledgers, contextVals.ledger_id]);
+
+  const ledgerStructureCode = useMemo(() => {
+     const ledger = ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
+     return String(ledger?.structure || '').trim();
+  }, [ledgers, contextVals.ledger_id]);
+
+  const validAccountsForLedger = useMemo(() => {
+     const targetStructure = accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
+     const structureId = targetStructure ? String(targetStructure.id) : null;
+     return accounts.filter(a => {
+        const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
+        return String(a.structure_id) === structureId && isSubsidiary;
+     });
+  }, [accounts, accountStructures, ledgerStructureCode]);
+
+  const selectedVouchers = vouchers.filter(v => selectedIds.includes(v.id));
+  const allDraft = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'draft');
+  const allTemp = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'temporary');
 
   if (view === 'form' && currentVoucher) {
     const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
     const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
     const isBalanced = totalDebit === totalCredit;
     const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final';
-
-    const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
-    const currentLedgerMeta = (typeof currentLedger?.metadata === 'string' ? JSON.parse(currentLedger.metadata) : currentLedger?.metadata) || {};
     const isVoucherNoManual = currentLedgerMeta.uniquenessScope === 'none';
-
-    const ledgerStructureCode = String(currentLedger?.structure || '').trim();
-    const targetStructure = accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
-    const structureId = targetStructure ? String(targetStructure.id) : null;
-
     const currentFiscalYearTitle = fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || '';
-    const currentLedgerTitle = currentLedger?.title || '';
-
-    const validAccountsForLedger = accounts.filter(a => {
-        const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
-        return String(a.structure_id) === structureId && isSubsidiary;
-    });
+    const currentLedgerTitle = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || '';
 
     return (
       <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
@@ -1174,18 +1291,60 @@ const Vouchers = ({ language = 'fa' }) => {
         </div>
       </div>
 
-      <FilterSection onSearch={() => {}} onClear={() => setSearchParams({ voucher_number: '', description: '' })} isRtl={isRtl} title={t.search}>
-        <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} />
-        <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
+      <FilterSection 
+         onSearch={() => fetchVouchers(searchParams)} 
+         onClear={handleClearSearch} 
+         isRtl={isRtl} 
+         title={t.search}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full">
+            <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
+            <InputField type="date" label={t.fromDate} value={searchParams.from_date} onChange={e => setSearchParams({...searchParams, from_date: e.target.value})} isRtl={isRtl} />
+            <InputField type="date" label={t.toDate} value={searchParams.to_date} onChange={e => setSearchParams({...searchParams, to_date: e.target.value})} isRtl={isRtl} />
+            
+            <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
+               <option value="">{t.all}</option>
+               <option value="draft">{t.statusDraft}</option>
+               <option value="temporary">{t.statusTemporary}</option>
+               <option value="reviewed">{t.statusReviewed}</option>
+               <option value="final">{t.statusFinal}</option>
+            </SelectField>
+
+            <SelectField label={t.type} value={searchParams.voucher_type} onChange={e => setSearchParams({...searchParams, voucher_type: e.target.value})} isRtl={isRtl}>
+               <option value="">{t.all}</option>
+               {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
+            </SelectField>
+
+            <div className="md:col-span-2 flex flex-col gap-1">
+               <label className="text-[10px] font-bold text-slate-500">{t.account}</label>
+               <div className="border rounded bg-white h-[38px] flex items-center">
+                  <SearchableAccountSelect accounts={validAccountsForLedger} value={searchParams.account_id} onChange={v => setSearchParams({...searchParams, account_id: v})} placeholder={t.searchAccount} />
+               </div>
+            </div>
+
+            <div className="md:col-span-4">
+               <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
+            </div>
+        </div>
       </FilterSection>
+
+      {selectedIds.length > 0 && (
+         <div className="bg-indigo-50 border border-indigo-100 p-2.5 rounded-lg mb-3 flex items-center justify-between animate-in fade-in zoom-in-95 shrink-0">
+            <div className="flex items-center gap-2 text-indigo-800">
+               <Layers size={18} />
+               <span className="text-sm font-bold">{t.selectedItems.replace('{count}', selectedIds.length)}</span>
+            </div>
+            <div className="flex gap-2">
+               {allDraft && <Button variant="primary" size="sm" onClick={() => handleBulkStatus('temporary')}>{t.makeTemporary}</Button>}
+               {allTemp && <Button variant="primary" size="sm" onClick={() => handleBulkStatus('draft')}>{t.makeDraft}</Button>}
+            </div>
+         </div>
+      )}
 
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <DataGrid 
           columns={columns} 
-          data={vouchers.filter(v => 
-            (!searchParams.voucher_number || String(v.voucher_number).includes(searchParams.voucher_number)) && 
-            (!searchParams.description || v.description?.includes(searchParams.description))
-          )} 
+          data={vouchers} 
           selectedIds={selectedIds} 
           onSelectRow={(id, c) => setSelectedIds(c ? [...selectedIds, id] : selectedIds.filter(i => i !== id))} 
           onSelectAll={(c) => setSelectedIds(c ? vouchers.map(v => v.id) : [])} 
