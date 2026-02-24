@@ -1,3 +1,4 @@
+
 /* Filename: financial/generalledger/Vouchers.js */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
@@ -22,6 +23,8 @@ const localTranslations = {
     edit: 'Edit',
     delete: 'Delete',
     branch: 'Branch',
+    selectBranch: 'Select Branch',
+    branchReqError: 'Please select a branch.',
     fiscalYear: 'Fiscal Year',
     ledger: 'Ledger',
     subsidiaryNumber: 'Subsidiary No.',
@@ -76,6 +79,8 @@ const localTranslations = {
     edit: 'ویرایش',
     delete: 'حذف',
     branch: 'شعبه',
+    selectBranch: 'انتخاب شعبه',
+    branchReqError: 'لطفاً شعبه را انتخاب کنید.',
     fiscalYear: 'سال مالی',
     ledger: 'دفتر کل',
     subsidiaryNumber: 'شماره فرعی',
@@ -259,7 +264,7 @@ const Vouchers = ({ language = 'fa' }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
 
-  const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '', branch_id: '' });
+  const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
 
   const [vouchers, setVouchers] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -288,7 +293,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
   useEffect(() => {
     if (view === 'list') {
-      if (contextVals.fiscal_year_id && contextVals.ledger_id && contextVals.branch_id) {
+      if (contextVals.fiscal_year_id && contextVals.ledger_id) {
         fetchVouchers();
       } else {
         setVouchers([]);
@@ -316,12 +321,10 @@ const Vouchers = ({ language = 'fa' }) => {
       if (diRes.data) setAllDetailInstances(diRes.data);
 
       setContextVals(prev => {
-        if (!prev.fiscal_year_id && !prev.ledger_id && !prev.branch_id) {
-          const defaultBranch = brRes.data?.find(b => b.is_default) || brRes.data?.[0];
+        if (!prev.fiscal_year_id && !prev.ledger_id) {
           return {
             fiscal_year_id: fyRes.data?.[0]?.id || '',
-            ledger_id: ledRes.data?.[0]?.id || '',
-            branch_id: defaultBranch?.id || ''
+            ledger_id: ledRes.data?.[0]?.id || ''
           };
         }
         return prev;
@@ -344,8 +347,12 @@ const Vouchers = ({ language = 'fa' }) => {
         setAccounts(processedAccounts);
       }
 
-      const doctypeRes = await supabase.schema('gl').from('doc_types').select('id, code, title').eq('is_active', true);
-      if (doctypeRes.data) setDocTypes(doctypeRes.data);
+      const doctypeRes = await supabase.schema('gl').from('doc_types').select('id, code, title, type').eq('is_active', true);
+      if (doctypeRes.data) {
+         const allowedSysCodes = ['sys_opening', 'sys_general', 'sys_closing', 'sys_close_acc'];
+         const filteredDocTypes = doctypeRes.data.filter(d => d.type === 'user' || allowedSysCodes.includes(d.code));
+         setDocTypes(filteredDocTypes);
+      }
 
       const currRes = await supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true);
       if (currRes.data) setCurrencies(currRes.data);
@@ -356,7 +363,7 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const fetchVouchers = async () => {
-    if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id || !contextVals.branch_id) return;
+    if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id) return;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(contextVals.fiscal_year_id)) return;
 
@@ -367,7 +374,6 @@ const Vouchers = ({ language = 'fa' }) => {
         .select('*')
         .eq('fiscal_period_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
-        .eq('branch_id', contextVals.branch_id)
         .order('voucher_date', { ascending: false })
         .order('voucher_number', { ascending: false });
       
@@ -412,10 +418,11 @@ const Vouchers = ({ language = 'fa' }) => {
       const initialLedgerId = contextVals.ledger_id;
       const currentLedger = ledgers.find(l => String(l.id) === String(initialLedgerId));
       const defaultCurrency = currentLedger?.currency || '';
+      const defaultBranch = branches.find(b => b.is_default) || branches[0];
 
       setCurrentVoucher({
         voucher_date: new Date().toISOString().split('T')[0],
-        voucher_type: docTypes.length > 0 ? docTypes[0].code : 'general',
+        voucher_type: docTypes.length > 0 ? docTypes[0].code : 'sys_general',
         status: 'draft',
         description: '',
         subsidiary_number: '',
@@ -425,7 +432,7 @@ const Vouchers = ({ language = 'fa' }) => {
         reference_number: '',
         fiscal_period_id: contextVals.fiscal_year_id,
         ledger_id: initialLedgerId,
-        branch_id: contextVals.branch_id
+        branch_id: defaultBranch?.id || ''
       });
       setVoucherItems([{
         id: 'temp_' + Date.now(),
@@ -447,6 +454,11 @@ const Vouchers = ({ language = 'fa' }) => {
   const handleSaveVoucher = async (status) => {
     if (!supabase) return;
     
+    if (!currentVoucher.branch_id) {
+       alert(t.branchReqError);
+       return;
+    }
+
     for (let i = 0; i < voucherItems.length; i++) {
         const item = voucherItems[i];
         if (!item.description || !item.account_id) {
@@ -686,7 +698,6 @@ const Vouchers = ({ language = 'fa' }) => {
 
     const currentFiscalYearTitle = fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || '';
     const currentLedgerTitle = currentLedger?.title || '';
-    const currentBranchTitle = branches.find(b => String(b.id) === String(currentVoucher.branch_id))?.title || '';
 
     const validAccountsForLedger = accounts.filter(a => {
         const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
@@ -724,7 +735,10 @@ const Vouchers = ({ language = 'fa' }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <InputField label={t.fiscalYear} value={currentFiscalYearTitle} disabled isRtl={isRtl} />
               <InputField label={t.ledger} value={currentLedgerTitle} disabled isRtl={isRtl} />
-              <InputField label={t.branch} value={currentBranchTitle} disabled isRtl={isRtl} />
+              <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})} disabled={isReadonly} isRtl={isRtl}>
+                 <option value="" disabled>{t.selectBranch}</option>
+                 {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+              </SelectField>
               
               <InputField label={t.voucherNumber} value={currentVoucher.voucher_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               <InputField label={t.dailyNumber} value={currentVoucher.daily_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
@@ -873,9 +887,6 @@ const Vouchers = ({ language = 'fa' }) => {
           </select>
           <select value={contextVals.ledger_id} onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
             {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-          </select>
-          <select value={contextVals.branch_id} onChange={e => setContextVals({...contextVals, branch_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
-            {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
           </select>
         </div>
       </div>
