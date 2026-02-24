@@ -65,7 +65,8 @@ const localTranslations = {
     noDetail: 'No Detail',
     searchPlaceholder: 'Search {type}...',
     notFound: 'No matches found',
-    detailRequiredError: 'Please select detail for "{type}" in row {row}.'
+    detailRequiredError: 'Please select detail for "{type}" in row {row}.',
+    subDupError: 'Subsidiary number is duplicate in this fiscal year.'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -126,7 +127,8 @@ const localTranslations = {
     noDetail: 'بدون تفصیل',
     searchPlaceholder: 'جستجوی {type}...',
     notFound: 'موردی یافت نشد',
-    detailRequiredError: 'لطفاً تفصیل مربوط به "{type}" را در ردیف {row} مشخص کنید.'
+    detailRequiredError: 'لطفاً تفصیل مربوط به "{type}" را در ردیف {row} مشخص کنید.',
+    subDupError: 'شماره فرعی وارد شده در این سال مالی تکراری است.'
   }
 };
 
@@ -404,8 +406,6 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const fetchVouchers = async () => {
     if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id) return;
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(contextVals.fiscal_year_id)) return;
 
     setLoading(true);
     try {
@@ -424,6 +424,37 @@ const Vouchers = ({ language = 'fa' }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchAutoNumbers = async (date, ledgerId, fyId) => {
+    let nextDaily = 1;
+    let nextCross = 1;
+    let nextVoucher = '';
+    let config = null;
+
+    if (date) {
+        const { data } = await supabase.schema('gl').from('vouchers').select('daily_number').eq('voucher_date', date).order('daily_number', { ascending: false }).limit(1);
+        if (data && data.length > 0 && data[0].daily_number) nextDaily = Number(data[0].daily_number) + 1;
+    }
+
+    if (fyId) {
+        const { data } = await supabase.schema('gl').from('vouchers').select('cross_reference').eq('fiscal_period_id', fyId).order('cross_reference', { ascending: false }).limit(1);
+        if (data && data.length > 0 && data[0].cross_reference) nextCross = Number(data[0].cross_reference) + 1;
+    }
+
+    if (ledgerId && fyId) {
+        const { data } = await supabase.schema('gl').from('auto_numbering').select('*').eq('entity_name', 'voucher').eq('ledger_id', ledgerId).eq('fiscal_period_id', fyId).single();
+        if (data) {
+            config = data;
+            const n = Math.max((data.current_number || 0) + 1, data.start_number || 1);
+            const pad = String(n).padStart(data.number_length || 5, '0');
+            nextVoucher = `${data.prefix || ''}${pad}${data.suffix || ''}`;
+        } else {
+            nextVoucher = String(nextCross); // Fallback to cross_reference if no auto numbering setup
+        }
+    }
+
+    return { nextDaily, nextCross, nextVoucher, config };
   };
 
   const handleOpenForm = async (voucher = null) => {
@@ -455,22 +486,27 @@ const Vouchers = ({ language = 'fa' }) => {
         setLoading(false);
       }
     } else {
+      setLoading(true);
       const initialLedgerId = contextVals.ledger_id;
+      const initialFyId = contextVals.fiscal_year_id;
       const currentLedger = ledgers.find(l => String(l.id) === String(initialLedgerId));
       const defaultCurrency = currentLedger?.currency || '';
       const defaultBranch = branches.find(b => b.is_default) || branches[0];
+      const today = new Date().toISOString().split('T')[0];
+
+      const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, initialLedgerId, initialFyId);
 
       setCurrentVoucher({
-        voucher_date: new Date().toISOString().split('T')[0],
+        voucher_date: today,
         voucher_type: docTypes.length > 0 ? docTypes[0].code : 'sys_general',
         status: 'draft',
         description: '',
         subsidiary_number: '',
-        voucher_number: '',
-        daily_number: '',
-        cross_reference: '',
+        voucher_number: nextVoucher,
+        daily_number: nextDaily,
+        cross_reference: nextCross,
         reference_number: '',
-        fiscal_period_id: contextVals.fiscal_year_id,
+        fiscal_period_id: initialFyId,
         ledger_id: initialLedgerId,
         branch_id: defaultBranch?.id || ''
       });
@@ -487,6 +523,7 @@ const Vouchers = ({ language = 'fa' }) => {
         tracking_date: '',
         quantity: ''
       }]);
+      setLoading(false);
     }
     setView('form');
   };
@@ -509,6 +546,21 @@ const Vouchers = ({ language = 'fa' }) => {
     if (!currentVoucher.branch_id) {
        alert(t.branchReqError);
        return;
+    }
+
+    if (currentVoucher.subsidiary_number && currentVoucher.subsidiary_number.trim() !== '') {
+        const query = supabase.schema('gl').from('vouchers')
+            .select('id')
+            .eq('fiscal_period_id', currentVoucher.fiscal_period_id)
+            .eq('subsidiary_number', currentVoucher.subsidiary_number.trim());
+            
+        if (currentVoucher.id) query.neq('id', currentVoucher.id);
+        
+        const { data: subData } = await query;
+        if (subData && subData.length > 0) {
+            alert(t.subDupError);
+            return;
+        }
     }
 
     for (let i = 0; i < voucherItems.length; i++) {
@@ -579,9 +631,20 @@ const Vouchers = ({ language = 'fa' }) => {
         if (error) throw error;
         await supabase.schema('gl').from('voucher_items').delete().eq('voucher_id', savedVoucherId);
       } else {
+        const { nextDaily, nextCross, nextVoucher, config } = await fetchAutoNumbers(voucherData.voucher_date, voucherData.ledger_id, voucherData.fiscal_period_id);
+        
+        voucherData.daily_number = nextDaily;
+        voucherData.cross_reference = nextCross;
+        voucherData.voucher_number = nextVoucher;
+
         const { data, error } = await supabase.schema('gl').from('vouchers').insert([voucherData]).select().single();
         if (error) throw error;
         savedVoucherId = data.id;
+
+        if (config) {
+            const nextVal = Math.max((config.current_number || 0) + 1, config.start_number || 1);
+            await supabase.schema('gl').from('auto_numbering').update({ current_number: nextVal }).eq('id', config.id);
+        }
       }
 
       const itemsToSave = voucherItems.map((item, index) => {
@@ -799,9 +862,17 @@ const Vouchers = ({ language = 'fa' }) => {
               <InputField label={t.dailyNumber} value={currentVoucher.daily_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               <InputField label={t.crossReference} value={currentVoucher.cross_reference || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               
-              <InputField label={t.referenceNumber} value={currentVoucher.reference_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
+              <InputField label={t.referenceNumber} value={currentVoucher.reference_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, reference_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} dir="ltr" className="text-center" />
               <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} dir="ltr" className="text-center" />
-              <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
+              <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => {
+                 const newDate = e.target.value;
+                 setCurrentVoucher({...currentVoucher, voucher_date: newDate});
+                 if (!currentVoucher.id) {
+                     fetchAutoNumbers(newDate, currentVoucher.ledger_id, currentVoucher.fiscal_period_id).then(({nextDaily}) => {
+                         setCurrentVoucher(prev => ({...prev, daily_number: nextDaily}));
+                     });
+                 }
+              }} disabled={isReadonly} isRtl={isRtl} />
               
               <SelectField label={t.type} value={currentVoucher.voucher_type || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} disabled={isReadonly} isRtl={isRtl} >
                 {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
