@@ -462,7 +462,7 @@ const Vouchers = ({ language = 'fa' }) => {
             let lastVoucherNum = 0;
 
             if (scope === 'none') {
-                nextVoucher = ''; // Manual mode
+                nextVoucher = ''; 
             } else if (scope === 'ledger') {
                 if (resetYear) {
                     lastVoucherNum = lastNums[fyId] || 0;
@@ -646,14 +646,22 @@ const Vouchers = ({ language = 'fa' }) => {
 
     setLoading(true);
     try {
+      // Helper function to safely send null instead of empty strings for integer DB fields
+      const cleanData = (val) => (val === '' ? null : val);
+
       const voucherData = { 
         ...currentVoucher, 
         status,
         total_debit: totalDebit,
-        total_credit: totalCredit
+        total_credit: totalCredit,
+        subsidiary_number: cleanData(currentVoucher.subsidiary_number),
+        reference_number: cleanData(currentVoucher.reference_number),
+        voucher_number: cleanData(currentVoucher.voucher_number),
+        daily_number: cleanData(currentVoucher.daily_number),
+        cross_reference: cleanData(currentVoucher.cross_reference),
       };
 
-      let savedVoucherId = currentVoucher.id;
+      let savedVoucherId = voucherData.id;
 
       if (savedVoucherId) {
         const { error } = await supabase.schema('gl').from('vouchers').update(voucherData).eq('id', savedVoucherId);
@@ -719,13 +727,13 @@ const Vouchers = ({ language = 'fa' }) => {
         return {
           voucher_id: savedVoucherId,
           row_number: index + 1,
-          account_id: item.account_id || null,
+          account_id: cleanData(item.account_id),
           debit: parseNum(item.debit),
           credit: parseNum(item.credit),
           description: item.description,
-          tracking_number: item.tracking_number || null,
-          tracking_date: item.tracking_date || null,
-          quantity: parseNum(item.quantity),
+          tracking_number: cleanData(item.tracking_number),
+          tracking_date: cleanData(item.tracking_date),
+          quantity: parseNum(item.quantity) === 0 ? null : parseNum(item.quantity),
           details: { currency_code: item.currency_code, selected_details: item.details_dict || {} }
         };
       });
@@ -804,23 +812,37 @@ const Vouchers = ({ language = 'fa' }) => {
     
     if (diff === 0) return;
 
-    const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
+    const emptyRowIndex = voucherItems.findIndex(item => parseNum(item.debit) === 0 && parseNum(item.credit) === 0);
 
-    const newId = 'temp_' + Date.now();
-    setVoucherItems([...voucherItems, { 
-      id: newId, 
-      row_number: voucherItems.length + 1, 
-      account_id: '', 
-      details_dict: {},
-      debit: diff < 0 ? Math.abs(diff) : 0, 
-      credit: diff > 0 ? diff : 0, 
-      currency_code: currentLedger?.currency || '',
-      description: '', 
-      tracking_number: '', 
-      tracking_date: '',
-      quantity: '' 
-    }]);
-    setFocusedRowId(newId);
+    if (emptyRowIndex !== -1) {
+       const newItems = [...voucherItems];
+       if (diff < 0) {
+           newItems[emptyRowIndex].debit = Math.abs(diff);
+           newItems[emptyRowIndex].credit = 0;
+       } else {
+           newItems[emptyRowIndex].credit = diff;
+           newItems[emptyRowIndex].debit = 0;
+       }
+       setVoucherItems(newItems);
+       setFocusedRowId(newItems[emptyRowIndex].id);
+    } else {
+       const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
+       const newId = 'temp_' + Date.now();
+       setVoucherItems([...voucherItems, { 
+         id: newId, 
+         row_number: voucherItems.length + 1, 
+         account_id: '', 
+         details_dict: {},
+         debit: diff < 0 ? Math.abs(diff) : 0, 
+         credit: diff > 0 ? diff : 0, 
+         currency_code: currentLedger?.currency || '',
+         description: '', 
+         tracking_number: '', 
+         tracking_date: '',
+         quantity: '' 
+       }]);
+       setFocusedRowId(newId);
+    }
   };
 
   const copyDescription = (index) => {
