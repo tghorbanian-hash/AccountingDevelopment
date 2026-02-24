@@ -556,7 +556,9 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const validateFiscalPeriod = async (date, fyId) => {
     try {
-        const { data: periods } = await supabase.schema('gl').from('fiscal_periods').select('*').eq('fiscal_year_id', fyId);
+        const { data: periods, error: pError } = await supabase.schema('gl').from('fiscal_periods').select('*').eq('year_id', fyId);
+        if (pError) throw pError;
+        
         if (!periods || periods.length === 0) return { valid: false, msg: t.noPeriodsFound };
 
         const period = periods.find(p => date >= p.start_date && date <= p.end_date);
@@ -567,12 +569,17 @@ const Vouchers = ({ language = 'fa' }) => {
         const { data: userData } = await supabase.auth.getUser();
         const userId = userData?.user?.id;
         if (userId) {
-            const { data: exc } = await supabase.schema('gl').from('fiscal_period_exceptions')
+            const { data: exc, error: eError } = await supabase.schema('gl').from('fiscal_period_exceptions')
                 .select('*')
                 .eq('period_id', period.id)
-                .eq('user_id', userId)
-                .eq('is_active', true);
-            if (exc && exc.length > 0) return { valid: true };
+                .eq('user_id', userId);
+                
+            if (!eError && exc && exc.length > 0) {
+                const allowedStatuses = exc[0].allowed_statuses || [];
+                if (allowedStatuses.includes(period.status)) {
+                    return { valid: true };
+                }
+            }
         }
 
         return { valid: false, msg: t.periodClosed };
