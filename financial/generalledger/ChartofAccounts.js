@@ -370,7 +370,6 @@ const CustomTreeNode = ({ node, level, selectedId, onSelect, expandedKeys, onTog
   );
 };
 
-
 // --- SUB-COMPONENT: STRUCTURE LIST VIEW ---
 
 const StructureList = ({ 
@@ -501,7 +500,6 @@ const StructureList = ({
   );
 };
 
-
 const AccountTreeView = ({ 
   structure, onBack, treeData, fetchTreeData, isRtl, t, 
   canCreate, canEdit, canDelete, supabase, currencies, detailTypes 
@@ -519,13 +517,6 @@ const AccountTreeView = ({
   const [treeSearchTerm, setTreeSearchTerm] = useState('');
 
   const fileInputRef = useRef(null);
-
-  const getParentCode = (node) => {
-    if (!node) return '';
-    if (node.level === 'group') return node.code;
-    if (node.level === 'general') return node.fullCode;
-    return '';
-  };
 
   const handleCreate = (level) => {
     if (level !== 'group' && !selectedNode) return;
@@ -564,7 +555,6 @@ const AccountTreeView = ({
     return null;
   };
 
-  // بررسی تکراری بودن کد کامل حساب در فرانت‌اند
   const checkDuplicateCode = (nodes, fullCd, excludeId) => {
       for (const n of nodes) {
           const nFull = n.dynamicFullCode || n.fullCode || n.code;
@@ -604,7 +594,6 @@ const AccountTreeView = ({
     
     let fullCode = formData.level === 'group' ? formData.code : (parentFullCode + formData.code);
 
-    // بررسی تکراری نبودن کد قبل از ارسال به بک‌اند
     if (checkDuplicateCode(treeData, fullCode, formData.id)) {
         return alert(isRtl ? "این کد حساب قبلاً ثبت شده و تکراری است." : "This account code already exists and is duplicate.");
     }
@@ -631,8 +620,8 @@ const AccountTreeView = ({
            qtyFeature: formData.qtyFeature,
            qtyMandatory: formData.qtyMandatory,
            natureControl: formData.natureControl,
-           tafsils: formData.tafsils,
-           descriptions: formData.descriptions
+           tafsils: formData.tafsils || [],
+           descriptions: formData.descriptions || []
        }
     };
 
@@ -703,7 +692,6 @@ const AccountTreeView = ({
      setExpandedKeys(newSet);
   };
 
-  // --- CSV Import / Export Handlers ---
   const handleDownloadTemplate = () => {
      const header = isRtl 
         ? "کد گروه,عنوان گروه,کد کل,عنوان کل,کد معین,عنوان معین,نوع حساب (دائم/موقت/انتظامی),ماهیت حساب (بدهکار/بستانکار/مهم نیست)\n"
@@ -838,7 +826,6 @@ const AccountTreeView = ({
      e.target.value = ''; 
   };
 
-
   const flattenSubsidiariesWithPaths = (nodes, parentPath = '') => {
      let result = [];
      nodes.forEach(node => {
@@ -870,7 +857,6 @@ const AccountTreeView = ({
       setMode('view');
   };
 
-  // --- Search & Filter Tree Logic ---
   const filteredTreeData = useMemo(() => {
       if (!treeSearchTerm) return treeData;
       const term = treeSearchTerm.toLowerCase();
@@ -898,7 +884,6 @@ const AccountTreeView = ({
       return filterNodes(treeData);
   }, [treeData, treeSearchTerm]);
 
-  // Auto-expand nodes when searching
   useEffect(() => {
       if (treeSearchTerm) {
           const ids = new Set();
@@ -912,7 +897,6 @@ const AccountTreeView = ({
           setExpandedKeys(ids);
       }
   }, [treeSearchTerm, filteredTreeData]);
-
 
   const activeTabs = formData.level === 'subsidiary' 
       ? [{ id: 'info', label: isRtl ? 'اطلاعات اصلی' : 'General Info', icon: FileText }, { id: 'tafsil', label: isRtl ? 'تفصیل‌ها' : 'Detailed Accts', icon: List }, { id: 'desc', label: isRtl ? 'شرح‌های استاندارد' : 'Descriptions', icon: FileDigit }] 
@@ -1124,7 +1108,6 @@ const AccountTreeView = ({
     </div>
   );
 };
-
 
 // --- ROOT COMPONENT ---
 

@@ -1,4 +1,3 @@
-
 /* Filename: financial/generalledger/Vouchers.js */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
@@ -179,10 +178,21 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
   );
 };
 
-const SearchableDetailSelect = ({ details, value, onChange, disabled, placeholder }) => {
+const SearchableDetailSelect = ({ details, allowedTypes, value, onChange, disabled, placeholder }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
+  const [activeTypeCode, setActiveTypeCode] = useState(null);
+
+  useEffect(() => {
+    if (allowedTypes && allowedTypes.length > 0) {
+      if (!activeTypeCode || !allowedTypes.find(t => t.code === activeTypeCode)) {
+         setActiveTypeCode(allowedTypes[0].code);
+      }
+    } else {
+      setActiveTypeCode(null);
+    }
+  }, [allowedTypes, activeTypeCode]);
 
   const selectedDetail = details.find(d => String(d.id) === String(value));
   const displaySelected = selectedDetail ? ((selectedDetail.detail_code ? selectedDetail.detail_code + ' - ' : '') + selectedDetail.title) : '';
@@ -198,20 +208,35 @@ const SearchableDetailSelect = ({ details, value, onChange, disabled, placeholde
   }, []);
 
   const filtered = details.filter(d => 
-    d.title.toLowerCase().includes(search.toLowerCase()) || 
-    (d.detail_code && d.detail_code.toLowerCase().includes(search.toLowerCase()))
+    (activeTypeCode ? d.detail_type_code === activeTypeCode : true) &&
+    (d.title.toLowerCase().includes(search.toLowerCase()) || 
+    (d.detail_code && d.detail_code.toLowerCase().includes(search.toLowerCase())))
   );
 
-  if (details.length === 0) {
+  if (!allowedTypes || allowedTypes.length === 0) {
      return <div className="text-slate-300 text-[11px] px-1 h-8 flex items-center">-</div>;
   }
 
   return (
-    <div className="relative w-full" ref={wrapperRef}>
+    <div className="relative w-full flex flex-col p-1" ref={wrapperRef}>
+      {allowedTypes.length > 0 && (
+         <div className="flex flex-wrap gap-1 mb-1">
+            {allowedTypes.map(t => (
+               <span 
+                  key={t.code} 
+                  onMouseDown={(e) => { e.preventDefault(); if(!disabled) setActiveTypeCode(t.code); }}
+                  className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer border transition-colors ${activeTypeCode === t.code ? 'bg-indigo-100 text-indigo-700 border-indigo-300 font-bold' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+               >
+                  {t.title}
+               </span>
+            ))}
+         </div>
+      )}
+
       <div className="relative">
         <input
           type="text"
-          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-1 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-7 px-1 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           value={isOpen ? search : displaySelected}
           onChange={e => { setSearch(e.target.value); setIsOpen(true); }}
           onFocus={() => { setIsOpen(true); setSearch(''); }}
@@ -222,7 +247,7 @@ const SearchableDetailSelect = ({ details, value, onChange, disabled, placeholde
       </div>
       
       {isOpen && !disabled && (
-        <div className="absolute z-[60] w-[250px] rtl:right-0 ltr:left-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto custom-scrollbar">
+        <div className="absolute z-[60] w-[250px] rtl:right-0 ltr:left-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto custom-scrollbar">
           {filtered.map(d => (
             <div
               key={d.id}
@@ -658,7 +683,8 @@ const Vouchers = ({ language = 'fa' }) => {
     return <Badge variant={variant}>{t['status' + status.charAt(0).toUpperCase() + status.slice(1)]}</Badge>;
   };
 
-  const getValidDetailInstances = (accountId) => {
+  // گرفتن آبجکت‌های مربوط به نوع تفصیل مجاز برای حساب (Chip ها)
+  const getValidDetailTypes = (accountId) => {
      if (!accountId) return [];
      const account = accounts.find(a => String(a.id) === String(accountId));
      if (!account || !account.metadata) return [];
@@ -667,11 +693,13 @@ const Vouchers = ({ language = 'fa' }) => {
      
      if (allowedTafsilCodesOrIds.length === 0) return [];
 
-     const allowedTypeCodes = allowedTafsilCodesOrIds.map(t => {
-        const type = detailTypes.find(dt => String(dt.id) === String(t) || dt.code === String(t));
-        return type ? type.code : null;
-     }).filter(Boolean);
+     return detailTypes.filter(dt => allowedTafsilCodesOrIds.some(t => String(dt.id) === String(t) || dt.code === String(t)));
+  };
 
+  const getValidDetailInstances = (accountId) => {
+     const allowedTypes = getValidDetailTypes(accountId);
+     if (allowedTypes.length === 0) return [];
+     const allowedTypeCodes = allowedTypes.map(t => t.code);
      return allDetailInstances.filter(di => allowedTypeCodes.includes(di.detail_type_code));
   };
 
@@ -780,6 +808,7 @@ const Vouchers = ({ language = 'fa' }) => {
                   }
 
                   const validDetails = getValidDetailInstances(item.account_id);
+                  const allowedDetailTypes = getValidDetailTypes(item.account_id);
 
                   return (
                      <div 
@@ -798,27 +827,34 @@ const Vouchers = ({ language = 'fa' }) => {
                            <div className="flex-1 p-2 grid grid-cols-12 gap-x-3 gap-y-2">
                               <div className="col-span-12 md:col-span-6 lg:col-span-4 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
-                                 <div className={`border rounded ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
+                                 <div className={`border rounded flex items-center h-[54px] ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
                                     <SearchableAccountSelect accounts={validAccountsForLedger} value={item.account_id} onChange={(v) => handleItemChange(index, 'account_id', v)} disabled={isReadonly} placeholder={t.searchAccount} />
                                  </div>
                               </div>
                               <div className="col-span-12 md:col-span-6 lg:col-span-4 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
-                                 <div className={`border rounded ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${validDetails.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
-                                     <SearchableDetailSelect details={validDetails} value={item.detail_id} onChange={(v) => handleItemChange(index, 'detail_id', v)} disabled={isReadonly || validDetails.length === 0} placeholder={t.searchDetail} />
+                                 <div className={`border rounded min-h-[54px] ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
+                                     <SearchableDetailSelect 
+                                        details={validDetails} 
+                                        allowedTypes={allowedDetailTypes} 
+                                        value={item.detail_id} 
+                                        onChange={(v) => handleItemChange(index, 'detail_id', v)} 
+                                        disabled={isReadonly || allowedDetailTypes.length === 0} 
+                                        placeholder={t.searchDetail} 
+                                     />
                                  </div>
                               </div>
 
                               <div className="col-span-6 md:col-span-3 lg:col-span-2 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
-                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
+                                 <input type="text" className={`w-full border rounded h-8 mt-auto px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
                                      const raw = e.target.value.replace(/,/g, '');
                                      if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
                                  }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                               </div>
                               <div className="col-span-6 md:col-span-3 lg:col-span-2 flex flex-col gap-1">
                                  <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
-                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
+                                 <input type="text" className={`w-full border rounded h-8 mt-auto px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
                                      const raw = e.target.value.replace(/,/g, '');
                                      if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
                                  }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
