@@ -14,6 +14,7 @@ const AutoNumbering = ({ t, isRtl }) => {
   // --- States ---
   const [activeTab, setActiveTab] = useState('details'); 
   const [fiscalYears, setFiscalYears] = useState([]);
+  const [branches, setBranches] = useState([]);
   
   // Details State
   const [detailSettings, setDetailSettings] = useState([]);
@@ -24,7 +25,7 @@ const AutoNumbering = ({ t, isRtl }) => {
   // Docs State (Ledgers)
   const [docSettings, setDocSettings] = useState([]);
   const [editingDoc, setEditingDoc] = useState(null);
-  const [docFormData, setDocFormData] = useState({ lastNumbers: {} });
+  const [docFormData, setDocFormData] = useState({});
   const [showDocModal, setShowDocModal] = useState(false);
 
   // View Numbers State
@@ -61,6 +62,10 @@ const AutoNumbering = ({ t, isRtl }) => {
       // Fetch Fiscal Years for multi-record display
       const { data: fyData } = await supabase.schema('gl').from('fiscal_years').select('id, title').order('code', { ascending: false });
       if (fyData) setFiscalYears(fyData);
+
+      // Fetch Branches for branch-scope display
+      const { data: brData } = await supabase.schema('gen').from('branches').select('id, title').eq('is_active', true).order('title');
+      if (brData) setBranches(brData);
 
       // Fetch Ledgers
       const { data: ledgersData, error } = await supabase.schema('gl').from('ledgers').select('*').order('title');
@@ -132,7 +137,7 @@ const AutoNumbering = ({ t, isRtl }) => {
   // --- Handlers: Docs (Ledgers) ---
   const openDocModal = (item) => {
     setEditingDoc(item);
-    setDocFormData({ ...item, lastNumbers: { ...(item.lastNumbers || {}) } });
+    setDocFormData({ resetYear: item.resetYear, uniquenessScope: item.uniquenessScope });
     setShowDocModal(true);
   };
 
@@ -141,8 +146,8 @@ const AutoNumbering = ({ t, isRtl }) => {
         const payloadMeta = {
             ...(editingDoc.metadata || {}),
             resetYear: docFormData.resetYear,
-            uniquenessScope: docFormData.uniquenessScope,
-            lastNumbers: docFormData.lastNumbers || {}
+            uniquenessScope: docFormData.uniquenessScope
+            // We intentionally do NOT modify lastNumbers here
         };
 
         const { error } = await supabase.schema('gl').from('ledgers').update({ metadata: payloadMeta }).eq('id', editingDoc.id);
@@ -245,7 +250,7 @@ const AutoNumbering = ({ t, isRtl }) => {
                    width: 'w-48', 
                    render: r => (
                       <Badge variant="primary" icon={ShieldCheck}>
-                         {r.uniquenessScope === 'none' ? (isRtl ? 'بدون کنترل' : 'None') : (t[`an_scope_${r.uniquenessScope}`] || (isRtl && r.uniquenessScope === 'branch' ? 'دفتر و شعبه' : isRtl && r.uniquenessScope === 'ledger' ? 'دفتر کل' : r.uniquenessScope))}
+                         {r.uniquenessScope === 'none' ? (isRtl ? 'بدون کنترل (دستی)' : 'None (Manual)') : (t[`an_scope_${r.uniquenessScope}`] || (isRtl && r.uniquenessScope === 'branch' ? 'دفتر و شعبه' : isRtl && r.uniquenessScope === 'ledger' ? 'دفتر کل' : r.uniquenessScope))}
                       </Badge>
                    )
                 },
@@ -254,7 +259,7 @@ const AutoNumbering = ({ t, isRtl }) => {
              isRtl={isRtl}
              actions={(row) => (
                 <div className="flex gap-1 justify-center">
-                   <Button variant="ghost" size="iconSm" icon={Hash} onClick={() => openNumbersModal(row)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" title={isRtl ? 'مشاهده شماره‌ها' : 'View Numbers'}/>
+                   <Button variant="ghost" size="iconSm" icon={Hash} onClick={() => openNumbersModal(row)} className="text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50" title={isRtl ? 'مشاهده شماره‌ها' : 'View Numbers'}/>
                    <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => openDocModal(row)} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" title={isRtl ? 'ویرایش تنظیمات' : 'Edit Settings'}/>
                 </div>
              )}
@@ -269,18 +274,18 @@ const AutoNumbering = ({ t, isRtl }) => {
          size="sm"
          footer={<><Button variant="outline" onClick={() => setShowDocModal(false)}>{t.btn_cancel || (isRtl ? 'انصراف' : 'Cancel')}</Button><Button variant="primary" onClick={saveDoc}>{t.btn_save || (isRtl ? 'ذخیره' : 'Save')}</Button></>}
        >
-          <div className="flex flex-col gap-4">
-             <div className="flex items-center gap-2 p-2 bg-indigo-50 rounded border border-indigo-100 text-indigo-900">
-                <Settings size={16} className="shrink-0"/>
-                <span className="font-bold text-xs">{editingDoc?.title}</span>
+          <div className="flex flex-col gap-5">
+             <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-indigo-900">
+                <Settings size={20} className="shrink-0"/>
+                <span className="font-bold">{editingDoc?.title}</span>
              </div>
 
-             <div className="space-y-1.5">
+             <div className="space-y-2">
                 <label className="text-[11px] font-bold text-slate-600">{t.an_unique_scope || (isRtl ? 'دامنه تولید و کنترل شماره' : 'Numbering Scope')}</label>
                 <div className="flex flex-wrap gap-2">
                    {['none', 'branch', 'ledger'].map(scope => {
                       let label = scope;
-                      if (scope === 'none') label = isRtl ? 'بدون کنترل' : 'None';
+                      if (scope === 'none') label = isRtl ? 'بدون کنترل (دستی)' : 'None (Manual)';
                       else if (scope === 'branch') label = isRtl ? 'دفتر و شعبه' : 'Ledger & Branch';
                       else if (scope === 'ledger') label = isRtl ? 'دفتر کل' : 'Ledger Only';
 
@@ -297,14 +302,14 @@ const AutoNumbering = ({ t, isRtl }) => {
                 </div>
              </div>
 
-             <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded mt-2">
-                <label htmlFor="resetYearCheck" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
-                   {t.an_reset_year || (isRtl ? 'ریست شماره‌گذاری در سال مالی جدید' : 'Reset numbering in new fiscal year')}
+             <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-lg">
+                <label htmlFor="resetYearCheck" className="text-sm font-bold text-slate-700 select-none cursor-pointer">
+                   {t.an_reset_year || (isRtl ? 'ریست شماره در سال جدید' : 'Reset numbering in new FY')}
                 </label>
                 <input 
                    type="checkbox" 
                    id="resetYearCheck"
-                   className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                   className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
                    checked={docFormData.resetYear} 
                    onChange={e => setDocFormData({...docFormData, resetYear: e.target.checked})}
                 />
@@ -312,11 +317,11 @@ const AutoNumbering = ({ t, isRtl }) => {
           </div>
        </Modal>
 
-       {/* View Last Generated Numbers Modal */}
+       {/* View Last Generated Numbers Modal (Read-Only) */}
        <Modal
          isOpen={showNumbersModal}
          onClose={() => setShowNumbersModal(false)}
-         title={isRtl ? 'آخرین شماره‌های صادر شده' : 'Last Issued Numbers'}
+         title={isRtl ? 'آخرین شماره‌های تولید شده' : 'Last Generated Numbers'}
          size="sm"
          footer={<Button variant="outline" onClick={() => setShowNumbersModal(false)}>{isRtl ? 'بستن' : 'Close'}</Button>}
        >
@@ -327,35 +332,62 @@ const AutoNumbering = ({ t, isRtl }) => {
              </div>
 
              {viewingDocNumbers?.uniquenessScope === 'none' ? (
-                <div className="p-4 text-center text-slate-500 bg-slate-50 rounded border border-slate-100 text-xs">
-                   {isRtl ? 'شماره‌گذاری برای این دفتر در حالت "بدون کنترل" است.' : 'Numbering for this ledger is set to "None".'}
+                <div className="p-6 text-center text-slate-500 bg-slate-50 rounded border border-slate-100 text-sm">
+                   {isRtl ? 'شماره‌گذاری برای این دفتر به صورت دستی تنظیم شده است.' : 'Numbering for this ledger is set to manual.'}
                 </div>
              ) : (
-                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden max-h-[350px] overflow-y-auto custom-scrollbar">
                    <table className="w-full text-xs text-right">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 sticky top-0 z-10 shadow-sm">
                          <tr>
                             <th className="p-2.5 font-bold">{isRtl ? 'سال مالی' : 'Fiscal Year'}</th>
+                            {viewingDocNumbers?.uniquenessScope === 'branch' && <th className="p-2.5 font-bold">{isRtl ? 'شعبه' : 'Branch'}</th>}
                             <th className="p-2.5 font-bold w-32">{isRtl ? 'آخرین شماره' : 'Last Number'}</th>
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                          {fiscalYears.map(fy => {
-                             const lastNum = viewingDocNumbers?.lastNumbers?.[fy.id];
-                             return (
-                                <tr key={fy.id} className="hover:bg-slate-50 transition-colors">
-                                   <td className="p-2.5 text-slate-700 font-medium">{fy.title}</td>
-                                   <td className="p-2.5">
-                                      <Badge variant="neutral" className="font-mono bg-slate-100 px-2 py-0.5 text-[11px]">
-                                         {lastNum || '0'}
-                                      </Badge>
-                                   </td>
-                                </tr>
-                             );
+                             const fyNumbers = viewingDocNumbers?.lastNumbers?.[fy.id];
+
+                             if (viewingDocNumbers?.uniquenessScope === 'branch') {
+                                 return (
+                                     <React.Fragment key={fy.id}>
+                                         <tr className="bg-slate-50 border-b border-slate-200">
+                                             <td colSpan="3" className="p-2 font-bold text-indigo-700 text-center text-[11px]">{fy.title}</td>
+                                         </tr>
+                                         {branches.map(br => {
+                                             const brNum = (typeof fyNumbers === 'object' && fyNumbers !== null) ? fyNumbers[br.id] : null;
+                                             return (
+                                                 <tr key={`${fy.id}_${br.id}`} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-2.5 text-slate-400">↳</td>
+                                                    <td className="p-2.5 text-slate-700 font-medium">{br.title}</td>
+                                                    <td className="p-2.5">
+                                                       <Badge variant="neutral" className="font-mono bg-white border-slate-200 px-2 py-0.5 text-[11px]">
+                                                          {brNum || '0'}
+                                                       </Badge>
+                                                    </td>
+                                                 </tr>
+                                             );
+                                         })}
+                                     </React.Fragment>
+                                 );
+                             } else {
+                                 const num = (typeof fyNumbers === 'object') ? '0' : fyNumbers;
+                                 return (
+                                    <tr key={fy.id} className="hover:bg-slate-50 transition-colors">
+                                       <td className="p-2.5 text-slate-700 font-medium">{fy.title}</td>
+                                       <td className="p-2.5">
+                                          <Badge variant="neutral" className="font-mono bg-slate-100 px-2 py-0.5 text-[11px]">
+                                             {num || '0'}
+                                          </Badge>
+                                       </td>
+                                    </tr>
+                                 );
+                             }
                          })}
                          {fiscalYears.length === 0 && (
                             <tr>
-                               <td colSpan="2" className="p-4 text-center text-slate-400 italic">
+                               <td colSpan={viewingDocNumbers?.uniquenessScope === 'branch' ? 3 : 2} className="p-4 text-center text-slate-400 italic">
                                   {isRtl ? 'سال مالی یافت نشد' : 'No fiscal years'}
                                </td>
                             </tr>
