@@ -837,6 +837,9 @@ const Vouchers = ({ language = 'fa' }) => {
                   }
 
                   const allowedDetailTypes = getValidDetailTypes(item.account_id);
+                  const hasDetails = allowedDetailTypes.length > 0;
+                  const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
+                  const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
 
                   return (
                      <div 
@@ -852,85 +855,85 @@ const Vouchers = ({ language = 'fa' }) => {
                               )}
                            </div>
                            
-                           <div className="flex-1 p-2 grid grid-cols-12 gap-x-3 gap-y-2">
-                              {/* --- ROW 1: Account, Debit, Credit, Currency --- */}
-                              <div className="col-span-12 lg:col-span-4 flex flex-col gap-1">
-                                 <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
-                                 <div className={`border rounded h-8 flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
-                                    <SearchableAccountSelect accounts={validAccountsForLedger} value={item.account_id} onChange={(v) => handleItemChange(index, 'account_id', v)} disabled={isReadonly} placeholder={t.searchAccount} />
+                           <div className="flex-1 p-2 flex flex-col gap-1.5">
+                              {/* --- ROW 1 --- */}
+                              <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
+                                 <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
+                                    <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
+                                    <div className={`border rounded h-8 flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
+                                       <SearchableAccountSelect accounts={validAccountsForLedger} value={item.account_id} onChange={(v) => handleItemChange(index, 'account_id', v)} disabled={isReadonly} placeholder={t.searchAccount} />
+                                    </div>
                                  </div>
-                              </div>
-                              <div className="col-span-6 lg:col-span-3 flex flex-col gap-1">
-                                 <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
-                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
-                                     const raw = e.target.value.replace(/,/g, '');
-                                     if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
-                                 }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                              </div>
-                              <div className="col-span-6 lg:col-span-3 flex flex-col gap-1">
-                                 <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
-                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
-                                     const raw = e.target.value.replace(/,/g, '');
-                                     if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
-                                 }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                              </div>
-                              <div className="col-span-12 lg:col-span-2 flex flex-col gap-1">
-                                 <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
-                                 <select 
-                                    className={`w-full border rounded h-8 px-1 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
-                                    value={item.currency_code || ''}
-                                    onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
-                                    disabled={isReadonly}
-                                    onFocus={() => setFocusedRowId(item.id)}
-                                 >
-                                    <option value="">-</option>
-                                    {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
-                                 </select>
-                              </div>
-
-                              {/* --- ROW 2: Description, Detail --- */}
-                              <div className="col-span-12 lg:col-span-4 flex flex-col gap-1 mt-1">
-                                 <div className="flex justify-between items-center">
-                                     <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
-                                     {!isReadonly && index > 0 && (
-                                         <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
-                                     )}
+                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                    <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
+                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
+                                        const raw = e.target.value.replace(/,/g, '');
+                                        if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
+                                    }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                                  </div>
-                                 <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                              </div>
-                              <div className="col-span-12 lg:col-span-8 flex flex-col gap-1 mt-1">
-                                 <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
-                                 <div className={`border rounded min-h-8 h-auto flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
-                                     <MultiDetailSelector 
-                                        allowedTypes={allowedDetailTypes}
-                                        allInstances={allDetailInstances}
-                                        value={item.details_dict || {}} 
-                                        onChange={(v) => handleItemChange(index, 'details_dict', v)} 
-                                        disabled={isReadonly || allowedDetailTypes.length === 0} 
-                                        t={t}
-                                     />
+                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                    <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
+                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
+                                        const raw = e.target.value.replace(/,/g, '');
+                                        if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
+                                    }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
+                                 </div>
+                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                    <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
+                                    <select 
+                                       className={`w-full border rounded h-8 px-1 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
+                                       value={item.currency_code || ''}
+                                       onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
+                                       disabled={isReadonly}
+                                       onFocus={() => setFocusedRowId(item.id)}
+                                    >
+                                       <option value="">-</option>
+                                       {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
+                                    </select>
+                                 </div>
+                                 <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
+                                    <div className="flex justify-between items-center">
+                                        <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
+                                        {!isReadonly && index > 0 && (
+                                            <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
+                                        )}
+                                    </div>
+                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                                  </div>
                               </div>
 
-                              {/* --- ROW 3: Conditional (Tracking & Quantity) --- */}
-                              {(isFocused || hasTracking || item.tracking_number || item.tracking_date || hasQuantity || item.quantity) && (
-                                  <div className="col-span-12 grid grid-cols-12 gap-3 mt-1 p-2 bg-slate-50/80 rounded border border-slate-100">
-                                      <div className={`col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
-                                         <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
-                                         <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => setFocusedRowId(item.id)} />
-                                      </div>
-                                      <div className={`col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
-                                         <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
-                                         <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => setFocusedRowId(item.id)} />
-                                      </div>
-                                      <div className={`col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
-                                         <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
-                                         <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={formatNum(item.quantity)} onChange={(e) => {
-                                             const raw = e.target.value.replace(/,/g, '');
-                                             if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
-                                         }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => setFocusedRowId(item.id)} />
-                                      </div>
-                                  </div>
+                              {/* --- ROW 2 (Conditional) --- */}
+                              {showRow2 && (
+                                 <div className="grid grid-cols-12 gap-x-3 gap-y-2 p-2 bg-slate-50/80 rounded border border-slate-100 mt-0.5">
+                                    <div className="col-span-12 lg:col-span-6 flex flex-col gap-1">
+                                       <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
+                                       <div className={`border rounded min-h-8 flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
+                                           <MultiDetailSelector 
+                                              allowedTypes={allowedDetailTypes}
+                                              allInstances={allDetailInstances}
+                                              value={item.details_dict || {}} 
+                                              onChange={(v) => handleItemChange(index, 'details_dict', v)} 
+                                              disabled={isReadonly || allowedDetailTypes.length === 0} 
+                                              t={t}
+                                           />
+                                       </div>
+                                    </div>
+                                    <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                       <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
+                                       <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => setFocusedRowId(item.id)} />
+                                    </div>
+                                    <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                       <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
+                                       <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => setFocusedRowId(item.id)} />
+                                    </div>
+                                    <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
+                                       <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
+                                       <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={formatNum(item.quantity)} onChange={(e) => {
+                                           const raw = e.target.value.replace(/,/g, '');
+                                           if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
+                                       }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => setFocusedRowId(item.id)} />
+                                    </div>
+                                 </div>
                               )}
                            </div>
                         </div>
