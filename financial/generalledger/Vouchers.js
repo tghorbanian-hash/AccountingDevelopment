@@ -757,6 +757,9 @@ const Vouchers = ({ language = 'fa' }) => {
     try {
       const cleanData = (val) => (val === '' ? null : val);
 
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUserId = authData?.user?.id || null;
+
       const voucherData = { 
         ...currentVoucher, 
         status,
@@ -769,6 +772,9 @@ const Vouchers = ({ language = 'fa' }) => {
         cross_reference: cleanData(currentVoucher.cross_reference),
       };
 
+      if (status === 'reviewed') voucherData.reviewed_by = currentUserId;
+      if (status === 'final') voucherData.approved_by = currentUserId;
+
       let savedVoucherId = voucherData.id;
 
       if (savedVoucherId) {
@@ -780,6 +786,7 @@ const Vouchers = ({ language = 'fa' }) => {
         
         voucherData.daily_number = nextDaily;
         voucherData.cross_reference = nextCross;
+        voucherData.created_by = currentUserId;
         
         const meta = config?.metadata || {};
         const scope = meta.uniquenessScope || 'ledger';
@@ -866,7 +873,14 @@ const Vouchers = ({ language = 'fa' }) => {
     if (selectedIds.length === 0) return;
     setLoading(true);
     try {
-        const { error } = await supabase.schema('gl').from('vouchers').update({ status: newStatus }).in('id', selectedIds);
+        const { data: authData } = await supabase.auth.getUser();
+        const currentUserId = authData?.user?.id || null;
+        
+        let updatePayload = { status: newStatus };
+        if (newStatus === 'reviewed') updatePayload.reviewed_by = currentUserId;
+        if (newStatus === 'final') updatePayload.approved_by = currentUserId;
+
+        const { error } = await supabase.schema('gl').from('vouchers').update(updatePayload).in('id', selectedIds);
         if (error) throw error;
         setSelectedIds([]);
         fetchVouchers();
