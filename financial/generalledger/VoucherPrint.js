@@ -129,18 +129,32 @@ const VoucherPrint = ({ voucherId, onClose }) => {
        const { data: vData } = await supabase.schema('gl').from('vouchers').select('*').eq('id', voucherId).single();
        if (!vData) throw new Error('Voucher not found');
 
+       // دریافت اطلاعات پایه و کاربران درگیر در سند
+       const userIds = [vData.created_by, vData.reviewed_by, vData.approved_by].filter(Boolean);
+       
        const [ledRes, brRes, currRes, usersRes] = await Promise.all([
           supabase.schema('gl').from('ledgers').select('title').eq('id', vData.ledger_id).single(),
           vData.branch_id ? supabase.schema('gen').from('branches').select('title').eq('id', vData.branch_id).single() : { data: { title: '-' } },
           supabase.schema('gen').from('currencies').select('id, code, title'),
-          supabase.schema('gen').from('users').select('id, full_name, username')
+          userIds.length > 0 ? supabase.schema('gen').from('users').select('id, party_id, full_name').in('id', userIds) : { data: [] }
        ]);
+
+       // استخراج نام‌های واقعی از جدول Parties بر اساس party_id کاربران
+       const partyIds = (usersRes.data || []).map(u => u.party_id).filter(Boolean);
+       let partyMap = new Map();
+       if (partyIds.length > 0) {
+          const { data: pData } = await supabase.schema('gen').from('parties').select('id, name').in('id', partyIds);
+          (pData || []).forEach(p => partyMap.set(p.id, p.name));
+       }
+
+       const userToNameMap = new Map();
+       (usersRes.data || []).forEach(u => {
+          const realName = partyMap.get(u.party_id) || u.full_name || '---';
+          userToNameMap.set(u.id, realName);
+       });
 
        const currMap = new Map();
        (currRes.data || []).forEach(c => currMap.set(c.code, c.title));
-
-       const userMap = new Map();
-       (usersRes.data || []).forEach(u => userMap.set(u.id, u.full_name || u.username));
 
        const { data: itemsData } = await supabase.schema('gl').from('voucher_items').select('*').eq('voucher_id', voucherId).order('row_number');
 
@@ -175,18 +189,14 @@ const VoucherPrint = ({ voucherId, onClose }) => {
            };
        });
 
-       const creatorId = vData.creator_id || vData.created_by;
-       const reviewerId = vData.reviewer_id || vData.reviewed_by;
-       const approverId = vData.approver_id || vData.approved_by;
-
        setData({
            voucher: vData,
            items: mappedItems,
            ledgerTitle: ledRes.data?.title || (isRtl ? 'نامشخص' : 'Unknown'),
            branchTitle: brRes.data?.title || (isRtl ? 'نامشخص' : 'Unknown'),
-           creatorName: userMap.get(creatorId) || '',
-           reviewerName: userMap.get(reviewerId) || '',
-           approverName: userMap.get(approverId) || ''
+           creatorName: userToNameMap.get(vData.created_by) || '',
+           reviewerName: userToNameMap.get(vData.reviewed_by) || '',
+           approverName: userToNameMap.get(vData.approved_by) || ''
        });
     } catch (err) {
        console.error("Print fetch error:", err);
