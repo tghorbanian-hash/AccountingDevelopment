@@ -386,7 +386,7 @@ const App = () => {
       KpiDashboard, UserManagement, GeneralWorkspace, ComponentShowcase, LoginPage, 
       Roles, Parties, UserProfile, OrganizationInfo, CurrencySettings, CostCenters, 
       Projects, Branches, OrgChart, Ledgers, Details, FiscalPeriods, DocTypes, 
-      AutoNumbering, ChartofAccounts, Vouchers 
+      AutoNumbering, ChartofAccounts, Vouchers, VoucherReview
     } = window;
 
     if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error: UserProfile Component Not Loaded</div>;
@@ -404,6 +404,7 @@ const App = () => {
     if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
     if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
     if (activeId === 'doc_list') return Vouchers ? <Vouchers language={lang} /> : <div className="p-4 text-red-500">Error: Vouchers Component Not Loaded</div>;
+    if (activeId === 'doc_review') return VoucherReview ? <VoucherReview language={lang} /> : <div className="p-4 text-red-500">Error: VoucherReview Component Not Loaded</div>;
     if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
     if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Roles Component Not Loaded</div>;
     if (activeId === 'workspace_gen') return GeneralWorkspace ? <GeneralWorkspace t={t} isRtl={isRtl} /> : <div>Loading...</div>;
@@ -455,7 +456,6 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      {/* Sidebar: overflow-visible allowed to show tooltips */}
       <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-50 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative`}>
         <div className="bg-indigo-700 w-10 h-10 rounded-xl text-white mb-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
           <BarChart3 size={20} strokeWidth={2.5} />
@@ -471,7 +471,7 @@ const App = () => {
               <button 
                 key={mod.id} 
                 onClick={() => setActiveModuleId(mod.id)}
-                title={moduleName} // Added native title attribute for native tooltip
+                title={moduleName} 
                 className={`
                   relative w-10 h-10 rounded-xl transition-all flex items-center justify-center shrink-0 group
                   ${isActive 
@@ -485,7 +485,6 @@ const App = () => {
                   <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>
                 )}
 
-                {/* Styled CSS Tooltip (might be hidden by container overflow, native title provides fallback) */}
                 <div className={`
                   absolute ${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 
                   bg-slate-900 text-white text-[11px] py-1.5 px-3 rounded-md opacity-0 invisible 
@@ -568,7 +567,6 @@ const App = () => {
            </div>
 
            <div className="flex items-center gap-3">
-              {/* Documentation Buttons */}
               <button 
                 onClick={() => openDocs('user')} 
                 className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors"
@@ -577,7 +575,6 @@ const App = () => {
                 <Book size={18} />
               </button>
               
-              {/* CHANGE: Always visible now */}
               <button 
                 onClick={() => openDocs('dev')} 
                 className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
@@ -610,7 +607,6 @@ const App = () => {
         </div>
       </main>
 
-      {/* Documentation Modal: Loaded from window if available */}
       {PageDocumentation && (
         <PageDocumentation 
           isOpen={isDocModalOpen}
