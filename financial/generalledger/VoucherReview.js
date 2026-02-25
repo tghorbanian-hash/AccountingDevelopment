@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, Search, Scale, Copy, Check, X, Printer, CheckSquare
+  Save, FileText, CheckCircle, FileWarning, Filter, Search, Scale, Copy, Check, X, Printer, CheckSquare, Plus, Eye, RotateCcw
 } from 'lucide-react';
 
 const localTranslations = {
@@ -19,7 +19,8 @@ const localTranslations = {
     totalCredit: 'Total Credit',
     amount: 'Voucher Amount',
     actions: 'Actions',
-    edit: 'Edit / View',
+    edit: 'Edit',
+    view: 'View',
     delete: 'Delete',
     print: 'Print',
     printVoucher: 'Print Voucher',
@@ -40,6 +41,7 @@ const localTranslations = {
     balance: 'Balance Voucher',
     saveTemp: 'Save as Temporary',
     saveReviewed: 'Save as Reviewed',
+    revertToTemp: 'Revert to Temporary',
     backToList: 'Back to List',
     confirmDelete: 'Are you sure you want to delete this voucher?',
     statusTemporary: 'Temporary',
@@ -90,7 +92,8 @@ const localTranslations = {
     totalCredit: 'جمع بستانکار',
     amount: 'مبلغ سند',
     actions: 'عملیات',
-    edit: 'ویرایش / مشاهده',
+    edit: 'ویرایش',
+    view: 'مشاهده',
     delete: 'حذف',
     print: 'چاپ',
     printVoucher: 'چاپ سند حسابداری',
@@ -111,6 +114,7 @@ const localTranslations = {
     balance: 'تراز کردن سند',
     saveTemp: 'ذخیره به عنوان موقت',
     saveReviewed: 'تایید و ذخیره (بررسی شده)',
+    revertToTemp: 'برگشت به موقت',
     backToList: 'بازگشت به فهرست',
     confirmDelete: 'آیا از حذف این سند اطمینان دارید؟',
     statusTemporary: 'موقت',
@@ -876,6 +880,9 @@ const VoucherReview = ({ language = 'fa' }) => {
     const isVoucherNoManual = currentLedgerMeta.uniquenessScope === 'none';
     const currentFiscalYearTitle = fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || '';
     const currentLedgerTitle = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || '';
+    
+    // شناسایی وضعیت فقط-خواندنی
+    const isReadonly = currentVoucher.status === 'reviewed';
 
     return (
       <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
@@ -883,13 +890,19 @@ const VoucherReview = ({ language = 'fa' }) => {
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => { setView('list'); setCurrentVoucher(null); setVoucherItems([]); }} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
             <div className="h-6 w-px bg-slate-200 mx-1"></div>
-            <h2 className="text-lg font-bold text-slate-800">{t.edit}</h2>
+            <h2 className="text-lg font-bold text-slate-800">{isReadonly ? t.view : t.edit}</h2>
             {getStatusBadge(currentVoucher.status)}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => handlePrint(currentVoucher)} icon={Printer}>{t.print}</Button>
-            <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={Save}>{t.saveTemp}</Button>
-            <Button variant="primary" onClick={() => handleSaveVoucher('reviewed')} icon={CheckCircle}>{t.saveReviewed}</Button>
+            {isReadonly ? (
+              <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={RotateCcw}>{t.revertToTemp}</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={Save}>{t.saveTemp}</Button>
+                <Button variant="primary" onClick={() => handleSaveVoucher('reviewed')} icon={CheckCircle}>{t.saveReviewed}</Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -905,7 +918,7 @@ const VoucherReview = ({ language = 'fa' }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <InputField label={t.fiscalYear} value={currentFiscalYearTitle} disabled isRtl={isRtl} />
               <InputField label={t.ledger} value={currentLedgerTitle} disabled isRtl={isRtl} />
-              <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})} isRtl={isRtl}>
+              <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})} disabled={isReadonly} isRtl={isRtl}>
                  <option value="" disabled>{t.selectBranch}</option>
                  {branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
               </SelectField>
@@ -914,24 +927,24 @@ const VoucherReview = ({ language = 'fa' }) => {
                  label={t.voucherNumber} 
                  value={currentVoucher.voucher_number || ''} 
                  onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_number: e.target.value})}
-                 disabled={!isVoucherNoManual} 
+                 disabled={isReadonly || !isVoucherNoManual} 
                  isRtl={isRtl} 
                  dir="ltr" 
-                 className={`text-center ${!isVoucherNoManual ? 'bg-slate-50' : 'bg-white'}`} 
+                 className={`text-center ${(!isVoucherNoManual || isReadonly) ? 'bg-slate-50' : 'bg-white'}`} 
               />
               <InputField label={t.dailyNumber} value={currentVoucher.daily_number || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               <InputField label={t.crossReference} value={currentVoucher.cross_reference || '-'} disabled isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
               
               <InputField label={t.referenceNumber} value={currentVoucher.reference_number || '-'} disabled={true} isRtl={isRtl} dir="ltr" className="text-center bg-slate-50" />
-              <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
-              <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} isRtl={isRtl} />
+              <InputField label={t.subsidiaryNumber} value={currentVoucher.subsidiary_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, subsidiary_number: e.target.value})} disabled={isReadonly} isRtl={isRtl} dir="ltr" className="text-center" />
+              <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_date: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
               
-              <SelectField label={t.type} value={currentVoucher.voucher_type || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} isRtl={isRtl} >
+              <SelectField label={t.type} value={currentVoucher.voucher_type || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_type: e.target.value})} disabled={isReadonly} isRtl={isRtl} >
                 {docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
               </SelectField>
 
               <div className="md:col-span-2 lg:col-span-2">
-                  <InputField label={t.description} value={currentVoucher.description || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})} isRtl={isRtl} />
+                  <InputField label={t.description} value={currentVoucher.description || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, description: e.target.value})} disabled={isReadonly} isRtl={isRtl} />
               </div>
             </div>
           </Accordion>
@@ -939,10 +952,12 @@ const VoucherReview = ({ language = 'fa' }) => {
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
             <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
               <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
-              <div className="flex gap-2">
-                 <Button variant="outline" size="sm" onClick={globalBalance} icon={Scale}>{t.balance}</Button>
-                 <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>
-              </div>
+              {!isReadonly && (
+                 <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={globalBalance} icon={Scale}>{t.balance}</Button>
+                    <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>
+                 </div>
+              )}
             </div>
             
             <div className="flex-1 overflow-auto custom-scrollbar p-2 bg-slate-100">
@@ -971,7 +986,9 @@ const VoucherReview = ({ language = 'fa' }) => {
                         <div className="flex flex-col md:flex-row gap-0">
                            <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg">
                               <span className="text-xs font-bold text-slate-400 mb-2">{index + 1}</span>
-                              <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
+                              {!isReadonly && (
+                                <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
+                              )}
                            </div>
                            
                            <div className="flex-1 p-2 flex flex-col gap-1.5">
@@ -983,8 +1000,9 @@ const VoucherReview = ({ language = 'fa' }) => {
                                           accounts={validAccountsForLedger} 
                                           value={item.account_id} 
                                           onChange={(v) => handleItemChange(index, 'account_id', v)} 
+                                          disabled={isReadonly}
                                           placeholder={t.searchAccount} 
-                                          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors cursor-pointer`}
+                                          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors ${isReadonly ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                                        />
                                     </div>
                                  </div>
@@ -993,14 +1011,14 @@ const VoucherReview = ({ language = 'fa' }) => {
                                     <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
                                         const raw = e.target.value.replace(/,/g, '');
                                         if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
-                                    }} onFocus={() => setFocusedRowId(item.id)} />
+                                    }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                                  </div>
                                  <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
                                     <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
                                     <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
                                         const raw = e.target.value.replace(/,/g, '');
                                         if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
-                                    }} onFocus={() => setFocusedRowId(item.id)} />
+                                    }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                                  </div>
                                  <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
                                     <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
@@ -1008,6 +1026,7 @@ const VoucherReview = ({ language = 'fa' }) => {
                                        className={`w-full border rounded h-8 px-1 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
                                        value={item.currency_code || ''}
                                        onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
+                                       disabled={isReadonly}
                                        onFocus={() => setFocusedRowId(item.id)}
                                     >
                                        <option value="">-</option>
@@ -1017,11 +1036,11 @@ const VoucherReview = ({ language = 'fa' }) => {
                                  <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
                                     <div className="flex justify-between items-center">
                                         <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
-                                        {index > 0 && (
+                                        {!isReadonly && index > 0 && (
                                             <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
                                         )}
                                     </div>
-                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} onFocus={() => setFocusedRowId(item.id)} />
+                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
                                  </div>
                               </div>
 
@@ -1035,25 +1054,25 @@ const VoucherReview = ({ language = 'fa' }) => {
                                               allInstances={allDetailInstances}
                                               value={item.details_dict || {}} 
                                               onChange={(v) => handleItemChange(index, 'details_dict', v)} 
-                                              disabled={allowedDetailTypes.length === 0} 
+                                              disabled={isReadonly || allowedDetailTypes.length === 0} 
                                               t={t}
                                            />
                                        </div>
                                     </div>
                                     <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
                                        <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
-                                       <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={!hasTracking && !item.tracking_number} onFocus={() => setFocusedRowId(item.id)} />
+                                       <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => setFocusedRowId(item.id)} />
                                     </div>
                                     <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
                                        <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
-                                       <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={!hasTracking && !item.tracking_date} onFocus={() => setFocusedRowId(item.id)} />
+                                       <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => setFocusedRowId(item.id)} />
                                     </div>
                                     <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
                                        <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
                                        <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={formatNum(item.quantity)} onChange={(e) => {
                                            const raw = e.target.value.replace(/,/g, '');
                                            if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
-                                       }} disabled={!hasQuantity && !item.quantity} onFocus={() => setFocusedRowId(item.id)} />
+                                       }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => setFocusedRowId(item.id)} />
                                     </div>
                                  </div>
                               )}
@@ -1168,7 +1187,13 @@ const VoucherReview = ({ language = 'fa' }) => {
           actions={(r) => (
             <div className="flex gap-1 justify-center">
               <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => handlePrint(r)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
-              <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r)} title={t.edit} />
+              <Button 
+                variant="ghost" 
+                size="iconSm" 
+                icon={r.status === 'reviewed' ? Eye : Edit} 
+                onClick={() => handleOpenForm(r)} 
+                title={r.status === 'reviewed' ? t.view : t.edit} 
+              />
               <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} title={t.delete} />
             </div>
           )}
