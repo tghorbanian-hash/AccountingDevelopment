@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, Search, Scale, Copy, Check, X, Printer, CheckSquare, Plus, Eye, RotateCcw
+  Save, FileText, CheckCircle, FileWarning, Filter, Search, Scale, Copy, Check, X, Printer, CheckSquare, Plus, Eye, RotateCcw, ListOrdered
 } from 'lucide-react';
 
 const localTranslations = {
@@ -77,7 +77,17 @@ const localTranslations = {
     noPeriodsFound: 'No fiscal periods defined for this fiscal year.',
     dateNotInPeriods: 'Voucher date does not fall within any period of this fiscal year.',
     periodClosed: 'The fiscal period for this date is closed and you do not have permission to edit/save.',
-    selectedItems: '{count} items selected'
+    selectedItems: '{count} items selected',
+    sortVouchers: 'Sort Vouchers',
+    bulkSort: 'Bulk Date Range Sort',
+    singleSort: 'Shift Single Voucher',
+    targetDailyNumber: 'New Daily Number',
+    applySort: 'Apply Sort',
+    sortSuccess: 'Sorting applied successfully.',
+    sortError: 'Error during sorting operation.',
+    sortDesc: 'Manage and reorder the daily numbers of vouchers.',
+    bulkSortDesc: 'Select a date range to sequentially reorder all daily numbers day-by-day starting from 1.',
+    singleSortDesc: 'Assign a new daily number to this voucher. Other vouchers on the same day will automatically shift.'
   },
   fa: {
     title: 'بررسی اسناد',
@@ -150,7 +160,17 @@ const localTranslations = {
     noPeriodsFound: 'دوره‌های مالی برای این سال تعریف نشده است.',
     dateNotInPeriods: 'تاریخ سند در محدوده دوره‌های این سال مالی نیست.',
     periodClosed: 'دوره مالی مربوط به این تاریخ بسته است و شما مجوز ثبت/ویرایش ندارید.',
-    selectedItems: '{count} مورد انتخاب شده'
+    selectedItems: '{count} مورد انتخاب شده',
+    sortVouchers: 'مرتب‌سازی اسناد',
+    bulkSort: 'مرتب‌سازی بازه زمانی',
+    singleSort: 'جابجایی سند (تکی)',
+    targetDailyNumber: 'شماره روزانه جدید',
+    applySort: 'اعمال مرتب‌سازی',
+    sortSuccess: 'مرتب‌سازی با موفقیت انجام شد.',
+    sortError: 'خطا در عملیات مرتب‌سازی.',
+    sortDesc: 'در این بخش می‌توانید شماره روزانه اسناد را مرتب کنید.',
+    bulkSortDesc: 'با انتخاب بازه زمانی، شماره روزانه تمامی اسناد ثبت شده در آن روزها به ترتیب از ۱ مرتب می‌شوند.',
+    singleSortDesc: 'با تعیین شماره روزانه جدید، این سند جابجا شده و شماره سایر اسنادِ آن روز به صورت خودکار شیفت پیدا می‌کند.'
   }
 };
 
@@ -337,6 +357,17 @@ const VoucherReview = ({ language = 'fa' }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
   const [voucherToPrint, setVoucherToPrint] = useState(null);
+
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [sortTab, setSortTab] = useState('bulk');
+  const [sortParams, setSortParams] = useState({
+      fromDate: '',
+      toDate: '',
+      singleVoucherId: null,
+      singleVoucherDate: '',
+      singleVoucherNo: '',
+      targetDailyNumber: ''
+  });
 
   const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
 
@@ -824,6 +855,126 @@ const VoucherReview = ({ language = 'fa' }) => {
     setShowDeleteModal(true);
   };
 
+  const openBulkSort = () => {
+      setSortTab('bulk');
+      setSortParams({ ...sortParams, fromDate: '', toDate: '' });
+      setShowSortModal(true);
+  };
+
+  const openSingleSort = (voucher) => {
+      setSortTab('single');
+      setSortParams({ 
+          ...sortParams, 
+          singleVoucherId: voucher.id, 
+          singleVoucherDate: voucher.voucher_date,
+          singleVoucherNo: voucher.voucher_number || voucher.id.slice(0,8),
+          targetDailyNumber: voucher.daily_number 
+      });
+      setShowSortModal(true);
+  };
+
+  const handleBulkSort = async () => {
+      if (!sortParams.fromDate || !sortParams.toDate) return alert(t.reqFields);
+      setLoading(true);
+      try {
+          const { data, error } = await supabase.schema('gl').from('vouchers')
+              .select('id, voucher_date, daily_number, created_at')
+              .eq('ledger_id', contextVals.ledger_id)
+              .eq('fiscal_period_id', contextVals.fiscal_year_id)
+              .gte('voucher_date', sortParams.fromDate)
+              .lte('voucher_date', sortParams.toDate)
+              .order('voucher_date', { ascending: true })
+              .order('daily_number', { ascending: true })
+              .order('created_at', { ascending: true });
+
+          if (error) throw error;
+
+          const byDate = {};
+          data.forEach(v => {
+              if (!byDate[v.voucher_date]) byDate[v.voucher_date] = [];
+              byDate[v.voucher_date].push(v);
+          });
+
+          const updates = [];
+          for (const date in byDate) {
+              byDate[date].forEach((v, idx) => {
+                  const newDaily = idx + 1;
+                  if (v.daily_number !== newDaily) {
+                      updates.push({ id: v.id, daily_number: newDaily });
+                  }
+              });
+          }
+
+          const batchSize = 50;
+          for (let i = 0; i < updates.length; i += batchSize) {
+              const batch = updates.slice(i, i + batchSize);
+              await Promise.all(batch.map(u => 
+                  supabase.schema('gl').from('vouchers').update({ daily_number: u.daily_number }).eq('id', u.id)
+              ));
+          }
+
+          alert(t.sortSuccess);
+          setShowSortModal(false);
+          fetchVouchers();
+      } catch (err) {
+          console.error(err);
+          alert(t.sortError);
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  const handleSingleSort = async () => {
+      if (!sortParams.singleVoucherId || !sortParams.targetDailyNumber) return alert(t.reqFields);
+      
+      setLoading(true);
+      try {
+          const { data, error } = await supabase.schema('gl').from('vouchers')
+              .select('id, voucher_date, daily_number, created_at')
+              .eq('ledger_id', contextVals.ledger_id)
+              .eq('fiscal_period_id', contextVals.fiscal_year_id)
+              .eq('voucher_date', sortParams.singleVoucherDate)
+              .order('daily_number', { ascending: true })
+              .order('created_at', { ascending: true });
+          
+          if (error) throw error;
+
+          let arr = data.filter(v => v.id !== sortParams.singleVoucherId);
+          const insertIndex = Math.max(0, parseInt(sortParams.targetDailyNumber, 10) - 1);
+          
+          arr.splice(insertIndex, 0, { 
+              id: sortParams.singleVoucherId, 
+              daily_number: parseInt(sortParams.targetDailyNumber, 10), 
+              voucher_date: sortParams.singleVoucherDate 
+          });
+
+          const updates = [];
+          arr.forEach((v, idx) => {
+              const newDaily = idx + 1;
+              if (v.daily_number !== newDaily) {
+                  updates.push({ id: v.id, daily_number: newDaily });
+              }
+          });
+
+          const batchSize = 50;
+          for (let i = 0; i < updates.length; i += batchSize) {
+              const batch = updates.slice(i, i + batchSize);
+              await Promise.all(batch.map(u => 
+                  supabase.schema('gl').from('vouchers').update({ daily_number: u.daily_number }).eq('id', u.id)
+              ));
+          }
+
+          alert(t.sortSuccess);
+          setShowSortModal(false);
+          fetchVouchers();
+      } catch (err) {
+          console.error(err);
+          alert(t.sortError);
+      } finally {
+          setLoading(false);
+      }
+  };
+
   const getStatusBadge = (status) => {
     const config = {
         'temporary': { label: t.statusTemporary, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
@@ -881,7 +1032,6 @@ const VoucherReview = ({ language = 'fa' }) => {
     const currentFiscalYearTitle = fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || '';
     const currentLedgerTitle = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || '';
     
-    // شناسایی وضعیت فقط-خواندنی
     const isReadonly = currentVoucher.status === 'reviewed';
 
     return (
@@ -1131,6 +1281,7 @@ const VoucherReview = ({ language = 'fa' }) => {
             <p className="text-xs text-slate-500 font-medium mt-1">{t.subtitle}</p>
           </div>
         </div>
+        <Button variant="outline" icon={ListOrdered} onClick={openBulkSort}>{t.sortVouchers}</Button>
       </div>
 
       <FilterSection 
@@ -1186,6 +1337,7 @@ const VoucherReview = ({ language = 'fa' }) => {
           }
           actions={(r) => (
             <div className="flex gap-1 justify-center">
+              <Button variant="ghost" size="iconSm" icon={ListOrdered} onClick={() => openSingleSort(r)} title={t.singleSort} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
               <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => handlePrint(r)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
               <Button 
                 variant="ghost" 
@@ -1213,6 +1365,34 @@ const VoucherReview = ({ language = 'fa' }) => {
                 <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
              </div>
          )}
+      </Modal>
+
+      <Modal isOpen={showSortModal} onClose={() => setShowSortModal(false)} title={t.sortVouchers} size="md">
+         <div className="p-4 flex flex-col gap-4">
+             <div className="flex bg-slate-100 p-1 rounded-lg">
+                <button onClick={() => setSortTab('bulk')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${sortTab === 'bulk' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>{t.bulkSort}</button>
+                <button onClick={() => setSortTab('single')} disabled={!sortParams.singleVoucherId} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${sortTab === 'single' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'} ${!sortParams.singleVoucherId ? 'opacity-50 cursor-not-allowed' : ''}`}>{t.singleSort}</button>
+             </div>
+             
+             {sortTab === 'bulk' ? (
+                 <div className="flex flex-col gap-4">
+                     <p className="text-xs text-slate-500">{t.bulkSortDesc}</p>
+                     <InputField type="date" label={t.fromDate} value={sortParams.fromDate} onChange={e => setSortParams({...sortParams, fromDate: e.target.value})} isRtl={isRtl} />
+                     <InputField type="date" label={t.toDate} value={sortParams.toDate} onChange={e => setSortParams({...sortParams, toDate: e.target.value})} isRtl={isRtl} />
+                     <Button variant="primary" className="w-full justify-center mt-2" onClick={handleBulkSort} disabled={loading}>{t.applySort}</Button>
+                 </div>
+             ) : (
+                 <div className="flex flex-col gap-4">
+                     <p className="text-xs text-slate-500">{t.singleSortDesc}</p>
+                     <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 flex flex-col gap-1">
+                        <div className="text-xs font-bold text-indigo-800">{t.voucherNumber}: <span className="dir-ltr">{sortParams.singleVoucherNo}</span></div>
+                        <div className="text-xs text-indigo-600">{t.date}: <span className="dir-ltr">{sortParams.singleVoucherDate}</span></div>
+                     </div>
+                     <InputField type="number" label={t.targetDailyNumber} value={sortParams.targetDailyNumber} onChange={e => setSortParams({...sortParams, targetDailyNumber: e.target.value})} isRtl={isRtl} dir="ltr" />
+                     <Button variant="primary" className="w-full justify-center mt-2" onClick={handleSingleSort} disabled={loading}>{t.applySort}</Button>
+                 </div>
+             )}
+         </div>
       </Modal>
     </div>
   );
