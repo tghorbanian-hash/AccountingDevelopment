@@ -106,7 +106,6 @@ const VoucherPrint = ({ voucherId, onClose }) => {
            position: absolute; left: 0; top: 0; width: 100%; 
            padding: 0; background: white; margin: 0;
            box-sizing: border-box;
-           direction: ${isRtl ? 'rtl' : 'ltr'};
         }
         .no-print { display: none !important; }
         .print-border { border: 1px solid #000 !important; }
@@ -121,7 +120,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
     fetchData();
     
     return () => document.head.removeChild(style);
-  }, [voucherId, isRtl]);
+  }, [voucherId]);
 
   const fetchData = async () => {
     if (!supabase || !voucherId) return;
@@ -238,8 +237,24 @@ const VoucherPrint = ({ voucherId, onClose }) => {
        </div>
 
        <div id="printable-voucher" className="p-4 md:p-6 bg-white text-black">
-           <div className={`flex items-start justify-between border-b-2 border-slate-800 pb-4 mb-4 print-border-b ${isRtl ? 'flex-row' : 'flex-row-reverse'}`}>
-               <div className={`w-1/3 flex flex-col gap-1 text-xs ${isRtl ? 'items-end' : 'items-start'}`}>
+           <div className="flex items-start justify-between border-b-2 border-slate-800 pb-4 mb-4 print-border-b">
+               <div className="w-1/3 flex flex-col gap-1 text-xs">
+                   <div><span className="font-bold">{t.financialLedger}</span> {ledgerTitle}</div>
+                   <div><span className="font-bold">{t.branch}</span> {branchTitle}</div>
+                   <div className="flex items-center gap-1">
+                       <span className="font-bold">{t.voucherDate}</span> 
+                       <span className="font-mono dir-ltr inline-block">{voucher.voucher_date}</span>
+                   </div>
+               </div>
+               
+               <div className="w-1/3 text-center flex flex-col gap-2 items-center">
+                   <h1 className="text-xl font-black tracking-tight">{t.documentTitle}</h1>
+                   <div className="text-sm font-black text-slate-700 px-3 py-0.5 bg-slate-100 border border-slate-300 rounded print-bg-gray">
+                       {getStatusText(voucher.status)}
+                   </div>
+               </div>
+               
+               <div className="w-1/3 flex flex-col gap-1 text-xs items-end">
                    <div className="flex items-center gap-1">
                        <span className="font-bold">{t.voucherNumber}</span> 
                        <span className="font-mono dir-ltr inline-block text-[13px] font-bold">{voucher.voucher_number || '-'}</span>
@@ -255,22 +270,6 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                    <div className="flex items-center gap-1">
                        <span className="font-bold">{t.subsidiaryNumber}</span> 
                        <span className="font-mono dir-ltr inline-block">{voucher.subsidiary_number || '-'}</span>
-                   </div>
-               </div>
-               
-               <div className="w-1/3 text-center flex flex-col gap-2 items-center">
-                   <h1 className="text-xl font-black tracking-tight">{t.documentTitle}</h1>
-                   <div className="text-sm font-black text-slate-700 px-3 py-0.5 bg-slate-100 border border-slate-300 rounded print-bg-gray">
-                       {getStatusText(voucher.status)}
-                   </div>
-               </div>
-               
-               <div className={`w-1/3 flex flex-col gap-1 text-xs ${isRtl ? 'items-start' : 'items-end'}`}>
-                   <div><span className="font-bold">{t.financialLedger}</span> {ledgerTitle}</div>
-                   <div><span className="font-bold">{t.branch}</span> {branchTitle}</div>
-                   <div className="flex items-center gap-1">
-                       <span className="font-bold">{t.voucherDate}</span> 
-                       <span className="font-mono dir-ltr inline-block">{voucher.voucher_date}</span>
                    </div>
                </div>
            </div>
