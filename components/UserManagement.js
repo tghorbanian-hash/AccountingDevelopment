@@ -15,7 +15,6 @@ const UserManagement = ({ t, isRtl }) => {
 
   if (!Button) return <div className="p-4">Loading UI...</div>;
 
-  // --- INTERNAL COMPONENT: MULTI-SELECT WITH SEARCH ---
   const MultiSelect = ({ options, value = [], onChange, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -64,14 +63,12 @@ const UserManagement = ({ t, isRtl }) => {
     );
   };
 
-  // --- DB STATES ---
   const [partiesList, setPartiesList] = useState([]);
   const [rolesList, setRolesList] = useState([]);
   const [users, setUsers] = useState([]);
   const [globalRolePermissions, setGlobalRolePermissions] = useState({});
   const [allSystemForms, setAllSystemForms] = useState([]);
 
-  // --- UI STATES ---
   const [selectedRows, setSelectedRows] = useState([]);
   const [filterValues, setFilterValues] = useState({ username: '', roleIds: [], isActive: 'all' });
   const [appliedFilters, setAppliedFilters] = useState({ username: '', roleIds: [], isActive: 'all' });
@@ -93,7 +90,6 @@ const UserManagement = ({ t, isRtl }) => {
   const [roleSearchTerm, setRoleSearchTerm] = useState('');
   const [isRoleSearchOpen, setIsRoleSearchOpen] = useState(false);
 
-  // --- FETCH DATA ---
   useEffect(() => {
     fetchData();
   }, [isRtl]);
@@ -197,7 +193,6 @@ const UserManagement = ({ t, isRtl }) => {
     }
   }, [effectivePermissions]);
 
-  // --- HANDLERS ---
   const handleCreate = () => {
     setEditingUser(null);
     setUserFormData({ username: '', partyId: '', userType: t.sysUser || (isRtl ? 'کاربر سیستم' : 'System User'), isActive: true, password: '' });
@@ -235,16 +230,15 @@ const UserManagement = ({ t, isRtl }) => {
           hashedPassword = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
       }
 
-      // **BUG FIX**: Make sure we cast partyId to UUID
-      const { error } = await supabase.schema('gen').rpc('create_user_with_hash', {
-        p_username: userFormData.username, 
-        p_password: hashedPassword, 
-        p_full_name: fullName,
-        p_user_type: userFormData.userType, 
-        p_email: '', 
-        p_is_active: userFormData.isActive, 
-        p_party_id: userFormData.partyId || null
-      });
+      const { error } = await supabase.schema('gen').from('users').insert([{
+        username: userFormData.username,
+        password_hash: hashedPassword,
+        full_name: fullName,
+        user_type: userFormData.userType,
+        email: '',
+        is_active: userFormData.isActive,
+        party_id: userFormData.partyId || null
+      }]);
       
       if (error) {
          console.error(error);
@@ -272,10 +266,9 @@ const UserManagement = ({ t, isRtl }) => {
            hashedPassword = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92';
         }
 
-        const { error } = await supabase.schema('gen').rpc('reset_user_password', {
-           p_user_id: user.id,
-           p_new_password: hashedPassword
-        });
+        const { error } = await supabase.schema('gen').from('users').update({
+           password_hash: hashedPassword
+        }).eq('id', user.id);
 
         if (error) {
            console.error(error);
@@ -383,7 +376,6 @@ const UserManagement = ({ t, isRtl }) => {
   const formSearchResults = useMemo(() => formSearchTerm ? allSystemForms.filter(f => f.fullPath.includes(formSearchTerm)) : [], [formSearchTerm, allSystemForms]);
   const roleSearchResults = useMemo(() => rolesList.filter(r => !assignedRoles.includes(r.id) && r.title.toLowerCase().includes(roleSearchTerm.toLowerCase())), [roleSearchTerm, assignedRoles, rolesList]);
 
-  // --- COLUMNS & OPTIONS ---
   const columns = [
     { header: t.id || (isRtl ? 'شناسه' : 'ID'), field: 'id', width: 'w-16', render: (r) => <span className="text-[10px] text-slate-400 font-mono truncate w-12 inline-block">{r.id.split('-')[0]}</span> },
     { header: t.username || (isRtl ? 'نام کاربری' : 'Username'), field: 'username', width: 'w-32', sortable: true },
@@ -431,8 +423,6 @@ const UserManagement = ({ t, isRtl }) => {
      'status': { label: t.dsStatus || (isRtl ? 'وضعیت' : 'Status'), options: [{value:'موقت', label: t.dsStatusTemp || (isRtl ? 'موقت' : 'Temp')}, {value:'قطعی', label: t.dsStatusFinal || (isRtl ? 'قطعی' : 'Final')}] }
   };
 
-  // --- RENDERING ---
-  
   return (
     <div className={`flex flex-col h-full bg-slate-50/50 p-4 overflow-hidden ${isRtl ? 'font-vazir' : 'font-sans'}`}>
       <div className="flex items-center justify-between mb-4 shrink-0">
