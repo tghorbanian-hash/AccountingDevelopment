@@ -314,7 +314,7 @@ const TreeView = ({ data, onSelectNode, selectedNodeId, renderNodeContent, isRtl
          <Search size={14} className={`absolute top-1/2 -translate-y-1/2 text-slate-400 ${isRtl ? 'right-2.5' : 'left-2.5'}`}/>
          {searchTerm && <button onClick={() => setSearchTerm('')} className={`absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 ${isRtl ? 'left-2' : 'right-2'}`}><X size={12}/></button>}
       </div>
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-1 min-h-0">
          {filteredData.length > 0 ? renderTree(filteredData) : <div className="text-center p-4 text-slate-400 text-xs">{isRtl ? 'موردی یافت نشد.' : 'No items found.'}</div>}
       </div>
     </div>

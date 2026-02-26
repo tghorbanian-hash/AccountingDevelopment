@@ -455,13 +455,13 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <aside className={`bg-white w-[72px] flex flex-col items-center py-4 shrink-0 z-50 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative`}>
+    <div className="h-screen w-full bg-slate-50 flex overflow-hidden">
+      <aside className={`bg-white w-[72px] h-full flex flex-col items-center py-4 shrink-0 z-50 border-${isRtl ? 'l' : 'r'} border-slate-200 shadow-sm relative`}>
         <div className="bg-indigo-700 w-10 h-10 rounded-xl text-white mb-6 shadow-lg shadow-indigo-500/30 flex items-center justify-center shrink-0">
           <BarChart3 size={20} strokeWidth={2.5} />
         </div>
         
-        <div className="flex-1 flex flex-col gap-3 items-center w-full px-2 overflow-y-auto no-scrollbar overflow-x-visible">
+        <div className="flex-1 flex flex-col gap-3 items-center w-full px-2 overflow-y-auto no-scrollbar overflow-x-visible min-h-0">
           {menuData.map(mod => {
              const isActive = activeModuleId === mod.id;
              const IconComponent = mod.icon || Circle;
@@ -513,6 +513,7 @@ const App = () => {
         bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 
         flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)]
         ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}
+        h-full
       `}>
         <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 bg-slate-50/30">
            <h2 className="text-sm font-black text-slate-800 truncate leading-tight">
@@ -520,7 +521,7 @@ const App = () => {
            </h2>
         </div>
         
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           {TreeMenu ? (
             <TreeMenu 
               items={currentModule.children || []} 
@@ -549,7 +550,7 @@ const App = () => {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50 relative">
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50 relative">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-20">
            <div className="flex items-center gap-4">
              <button 
@@ -602,7 +603,7 @@ const App = () => {
            </div>
         </header>
 
-        <div className="flex-1 overflow-hidden relative p-0">
+        <div className="flex-1 overflow-hidden relative p-0 min-h-0">
            {renderContent()}
         </div>
       </main>
