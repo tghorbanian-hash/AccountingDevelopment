@@ -93,7 +93,9 @@ const localTranslations = {
     base: 'Base',
     copyRow: 'Copy Row',
     summary: 'Voucher Summary',
-    copyVoucher: 'Copy Voucher'
+    copyVoucher: 'Copy Voucher',
+    balanced: 'Balanced',
+    unbalanced: 'Unbalanced'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -181,7 +183,9 @@ const localTranslations = {
     base: 'مبنا',
     copyRow: 'کپی ردیف',
     summary: 'خلاصه سند',
-    copyVoucher: 'کپی سند'
+    copyVoucher: 'کپی سند',
+    balanced: 'تراز',
+    unbalanced: 'اختلاف'
   }
 };
 
@@ -289,14 +293,14 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
 };
 
 const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange, disabled, t }) => {
-  const [activeType, setActiveType] = useState(null);
-  const [search, setSearch] = useState('');
+  const [activeType, useState] = React.useState(null);
+  const [search, setSearch] = React.useState('');
   const wrapperRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setActiveType(null);
+        useState(null);
         setSearch('');
       }
     };
@@ -354,7 +358,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
                                onMouseDown={(e) => { 
                                   e.preventDefault(); 
                                   onChange({ ...value, [type.code]: d.id });
-                                  setActiveType(null);
+                                  useState(null);
                                   setSearch('');
                                }}
                              >
@@ -368,7 +372,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
                    </div>
                 ) : (
                    <button 
-                      onClick={(e) => { e.preventDefault(); if(!disabled) { setActiveType(type.code); setSearch(''); } }} 
+                      onClick={(e) => { e.preventDefault(); if(!disabled) { useState(type.code); setSearch(''); } }} 
                       className={`bg-white border border-dashed text-[11px] px-2 py-0.5 rounded transition-colors ${disabled ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`}
                    >
                       + {type.title}
@@ -400,30 +404,30 @@ const Vouchers = ({ language = 'fa' }) => {
   const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, Accordion } = UI;
   const supabase = window.supabase;
 
-  const [view, setView] = useState('list');
-  const [loading, setLoading] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [voucherToDelete, setVoucherToDelete] = useState(null);
-  const [currencyModalIndex, setCurrencyModalIndex] = useState(null);
+  const [view, setView] = React.useState('list');
+  const [loading, setLoading] = React.useState(false);
+  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+  const [voucherToDelete, setVoucherToDelete] = React.useState(null);
+  const [currencyModalIndex, setCurrencyModalIndex] = React.useState(null);
   
-  const [voucherToPrint, setVoucherToPrint] = useState(null);
+  const [voucherToPrint, setVoucherToPrint] = React.useState(null);
 
-  const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
+  const [contextVals, setContextVals] = React.useState({ fiscal_year_id: '', ledger_id: '' });
 
-  const [vouchers, setVouchers] = useState([]);
-  const [accounts, setAccounts] = useState([]);
-  const [accountStructures, setAccountStructures] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [fiscalYears, setFiscalYears] = useState([]);
-  const [ledgers, setLedgers] = useState([]);
-  const [docTypes, setDocTypes] = useState([]);
-  const [currencies, setCurrencies] = useState([]);
-  const [currencyGlobals, setCurrencyGlobals] = useState(null);
+  const [vouchers, setVouchers] = React.useState([]);
+  const [accounts, setAccounts] = React.useState([]);
+  const [accountStructures, setAccountStructures] = React.useState([]);
+  const [branches, setBranches] = React.useState([]);
+  const [fiscalYears, setFiscalYears] = React.useState([]);
+  const [ledgers, setLedgers] = React.useState([]);
+  const [docTypes, setDocTypes] = React.useState([]);
+  const [currencies, setCurrencies] = React.useState([]);
+  const [currencyGlobals, setCurrencyGlobals] = React.useState(null);
   
-  const [detailTypes, setDetailTypes] = useState([]);
-  const [allDetailInstances, setAllDetailInstances] = useState([]);
+  const [detailTypes, setDetailTypes] = React.useState([]);
+  const [allDetailInstances, setAllDetailInstances] = React.useState([]);
   
-  const [searchParams, setSearchParams] = useState({ 
+  const [searchParams, setSearchParams] = React.useState({ 
       voucher_number: '', 
       description: '', 
       from_date: '', 
@@ -432,13 +436,13 @@ const Vouchers = ({ language = 'fa' }) => {
       voucher_type: '', 
       account_id: '' 
   });
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedIds, setSelectedIds] = React.useState([]);
 
-  const [currentVoucher, setCurrentVoucher] = useState(null);
-  const [voucherItems, setVoucherItems] = useState([]);
+  const [currentVoucher, setCurrentVoucher] = React.useState(null);
+  const [voucherItems, setVoucherItems] = React.useState([]);
   
-  const [focusedRowId, setFocusedRowId] = useState(null);
-  const [isHeaderOpen, setIsHeaderOpen] = useState(true);
+  const [focusedRowId, setFocusedRowId] = React.useState(null);
+  const [isHeaderOpen, setIsHeaderOpen] = React.useState(true);
 
   useEffect(() => {
     fetchLookups();
@@ -694,7 +698,7 @@ const Vouchers = ({ language = 'fa' }) => {
           };
         });
         setVoucherItems(mappedItems);
-        if (mappedItems.length > 0) setFocusedRowId(mappedItems[0].id);
+        setFocusedRowId(null);
       } catch (error) {
         console.error('Error fetching items:', error);
       } finally {
@@ -787,7 +791,7 @@ const Vouchers = ({ language = 'fa' }) => {
           setVoucherItems(mappedItems);
           setView('form');
           setIsHeaderOpen(true);
-          if (mappedItems.length > 0) setFocusedRowId(mappedItems[0].id);
+          setFocusedRowId(null);
       } catch (err) {
           console.error('Error copying voucher:', err);
       } finally {
@@ -1450,7 +1454,7 @@ const Vouchers = ({ language = 'fa' }) => {
           <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4">
             
             {/* --- Main Items List (Left/Main) --- */}
-            <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0">
+            <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0" onClick={() => setFocusedRowId(null)}>
                 <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
                   <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
                   {!isReadonly && (
@@ -1485,29 +1489,58 @@ const Vouchers = ({ language = 'fa' }) => {
 
                       // Compact View Mode
                       if (!isEditing) {
+                          const hasForeignCurrency = item.currency_code !== currentLedger?.currency || parseNum(item.op_rate) !== 1 || parseNum(item.rep1_rate) !== 1;
+                          const hasTrackingData = item.tracking_number || item.tracking_date;
+                          const hasQuantityData = item.quantity && parseNum(item.quantity) > 0;
+
                           return (
                               <div
                                   key={item.id}
-                                  className={`flex items-center gap-3 p-2 bg-white border-b border-slate-100 cursor-pointer transition-colors text-[11px] group ${isFocused ? 'ring-1 ring-indigo-200 shadow-sm z-10 relative' : 'hover:bg-indigo-50/40'}`}
-                                  onClick={() => handleItemFocus(item.id)}
+                                  className={`flex items-center gap-2 p-2 bg-white border-b border-slate-100 cursor-pointer transition-colors text-[11px] group ${isFocused ? 'ring-1 ring-indigo-200 shadow-sm z-10 relative' : 'hover:bg-indigo-50/40'}`}
+                                  onClick={(e) => { e.stopPropagation(); handleItemFocus(item.id); }}
                               >
-                                  <div className="w-8 text-center font-bold text-slate-400 group-hover:text-indigo-500">{item.row_number}</div>
-                                  <div className="flex-1 flex flex-col gap-1 overflow-hidden">
-                                      <div className="flex items-center gap-2 truncate">
-                                          <span className="font-bold text-slate-700">{accountDisplay}</span>
-                                          {detailsDisplay && <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 truncate max-w-[150px]">{detailsDisplay}</span>}
+                                  <div className="w-6 text-center font-bold text-slate-400 group-hover:text-indigo-500 shrink-0">{item.row_number}</div>
+                                  
+                                  <div className="flex-1 flex items-center gap-2 overflow-hidden min-w-0">
+                                      <div className="flex items-center gap-1.5 shrink-0 max-w-[40%]">
+                                          <span className="font-bold text-slate-700 truncate" title={accountDisplay}>{accountDisplay}</span>
+                                          {detailsDisplay && <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100 truncate max-w-[120px]" title={detailsDisplay}>{detailsDisplay}</span>}
                                       </div>
-                                      <div className="text-slate-500 truncate text-[10px]">{item.description || '-'}</div>
+                                      
+                                      <div className="text-slate-500 truncate flex-1 min-w-[50px]" title={item.description || '-'}>{item.description || '-'}</div>
+                                      
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                          {hasTrackingData && (
+                                              <div className="flex items-center gap-1 bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 text-[9px]" title={`${t.trackingNumber}: ${item.tracking_number} - ${t.trackingDate}: ${item.tracking_date}`}>
+                                                  <FileText size={10} />
+                                                  <span className="max-w-[80px] truncate">{item.tracking_number || '-'} {item.tracking_date ? `(${item.tracking_date})` : ''}</span>
+                                              </div>
+                                          )}
+                                          {hasQuantityData && (
+                                              <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 text-[9px]" title={`${t.quantity}: ${item.quantity}`}>
+                                                  <Layers size={10} />
+                                                  <span>{formatNum(item.quantity)}</span>
+                                              </div>
+                                          )}
+                                          {hasForeignCurrency && (
+                                              <div className="flex items-center gap-1 bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 text-[9px]" title={t.currencyConversions}>
+                                                  <Coins size={10} />
+                                              </div>
+                                          )}
+                                      </div>
                                   </div>
-                                  <div className="w-24 flex flex-col items-end justify-center">
-                                      <span className="text-[9px] text-slate-400">{t.debit}</span>
-                                      <span className={`font-bold dir-ltr ${parseNum(item.debit) > 0 ? 'text-indigo-700' : 'text-slate-400'}`}>{formatNum(item.debit) || '-'}</span>
+                                  
+                                  <div className="flex items-center gap-3 shrink-0 px-1">
+                                      <div className="w-20 flex flex-col items-end justify-center">
+                                          <span className="text-[8px] text-slate-400 uppercase leading-none">{t.debit}</span>
+                                          <span className={`font-bold dir-ltr text-[11px] ${parseNum(item.debit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>{formatNum(item.debit) || '-'}</span>
+                                      </div>
+                                      <div className="w-20 flex flex-col items-end justify-center">
+                                          <span className="text-[8px] text-slate-400 uppercase leading-none">{t.credit}</span>
+                                          <span className={`font-bold dir-ltr text-[11px] ${parseNum(item.credit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>{formatNum(item.credit) || '-'}</span>
+                                      </div>
+                                      <div className="w-10 text-center text-slate-500 font-bold bg-slate-50 rounded py-0.5 border border-slate-100 text-[9px]">{getCurrencyTitle(item.currency_code)}</div>
                                   </div>
-                                  <div className="w-24 flex flex-col items-end justify-center">
-                                      <span className="text-[9px] text-slate-400">{t.credit}</span>
-                                      <span className={`font-bold dir-ltr ${parseNum(item.credit) > 0 ? 'text-indigo-700' : 'text-slate-400'}`}>{formatNum(item.credit) || '-'}</span>
-                                  </div>
-                                  <div className="w-12 text-center text-slate-500 font-bold bg-slate-50 rounded py-1 border border-slate-100">{getCurrencyTitle(item.currency_code)}</div>
                               </div>
                           );
                       }
@@ -1517,6 +1550,7 @@ const Vouchers = ({ language = 'fa' }) => {
                          <div 
                             key={item.id} 
                             className={`mb-2 bg-white rounded-lg border transition-all duration-200 border-indigo-400 shadow-md ring-1 ring-indigo-100`}
+                            onClick={(e) => e.stopPropagation()}
                          >
                             <div className="flex flex-col md:flex-row gap-0">
                                <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg">
@@ -1633,17 +1667,21 @@ const Vouchers = ({ language = 'fa' }) => {
             </div>
 
             {/* --- Totals Sidebar (Right) --- */}
-            <div className="w-full lg:w-[280px] shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto custom-scrollbar">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                        <Layers size={16} className="text-indigo-500"/>
+            <div className="w-full lg:w-[220px] shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto custom-scrollbar">
+                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-10">
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                        <Layers size={14} className="text-indigo-500"/>
                         {t.summary}
                     </h3>
+                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${isBalanced ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-red-700 bg-red-50 border-red-100'}`}>
+                        {isBalanced ? <CheckCircle size={12}/> : <FileWarning size={12}/>}
+                        <span className="font-bold text-[10px] dir-ltr">{isBalanced ? t.balanced : formatNum(Math.abs(totalDebit - totalCredit))}</span>
+                    </div>
                 </div>
                 
-                <div className="flex flex-col gap-4 p-4 text-xs">
+                <div className="flex flex-col gap-3 p-3 text-xs">
                    {/* Base Currency Total */}
-                   <div className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                   <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                            <span className="uppercase tracking-wider">{t.base}</span>
                            <Badge variant="indigo" size="sm">{getCurrencyTitle(currentLedger?.currency)}</Badge>
@@ -1654,7 +1692,7 @@ const Vouchers = ({ language = 'fa' }) => {
                    
                    {/* Operating Currency Total */}
                    {currencyGlobals?.op_currency && (
-                       <div className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                                <span className="uppercase tracking-wider">{t.opCurrency}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.op_currency)}</Badge>
@@ -1666,7 +1704,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
                    {/* Reporting Currency 1 Total */}
                    {currencyGlobals?.rep1_currency && (
-                       <div className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                                <span className="uppercase tracking-wider">{t.rep1Currency}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep1_currency)}</Badge>
@@ -1678,7 +1716,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
                    {/* Reporting Currency 2 Total */}
                    {currencyGlobals?.rep2_currency && (
-                       <div className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                                <span className="uppercase tracking-wider">{t.rep2Currency}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep2_currency)}</Badge>
@@ -1687,20 +1725,6 @@ const Vouchers = ({ language = 'fa' }) => {
                            <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(rep2TotalCredit)}</span></div>
                        </div>
                    )}
-                </div>
-
-                <div className="mt-auto p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col">
-                  <div className={`flex flex-col gap-2 p-3 rounded-lg border ${isBalanced ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-red-700 bg-red-50 border-red-100'}`}>
-                     <div className="flex items-center gap-2">
-                        {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
-                        <span className="font-bold text-[13px]">{isBalanced ? (t.alreadyBalanced || 'Balanced') : 'Unbalanced'}</span>
-                     </div>
-                     {!isBalanced && (
-                        <div className="text-[14px] font-black dir-ltr text-right mt-1">
-                            {formatNum(Math.abs(totalDebit - totalCredit))}
-                        </div>
-                     )}
-                  </div>
                 </div>
             </div>
 
