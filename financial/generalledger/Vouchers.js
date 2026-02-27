@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, FileText, CheckCircle, FileWarning, Filter, 
-  Copy, Printer, Paperclip, DownloadCloud, FileSpreadsheet
+  Copy, Printer, Paperclip, DownloadCloud, FileSpreadsheet, Lock
 } from 'lucide-react';
 
 const Vouchers = ({ language = 'fa' }) => {
-  const { localTranslations, getStatusBadge, processCSVImport, generateCSVTemplate } = window.VoucherUtils || {};
+  const { localTranslations, getStatusBadge, processCSVImport, generateCSVTemplate, getUserPermissions } = window.VoucherUtils || {};
   const VoucherForm = window.VoucherForm;
   
   const t = localTranslations ? (localTranslations[language] || localTranslations['en']) : {};
@@ -17,6 +17,10 @@ const Vouchers = ({ language = 'fa' }) => {
   const supabase = window.supabase;
 
   const fileInputRef = useRef(null);
+
+  // --- Security States ---
+  const [permissions, setPermissions] = useState(null);
+  const [accessLoading, setAccessLoading] = useState(true);
 
   // --- Main States ---
   const [view, setView] = useState('list');
@@ -52,24 +56,32 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const lookups = useMemo(() => ({
       accounts, accountStructures, branches, fiscalYears, ledgers, 
-      docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances
-  }), [accounts, accountStructures, branches, fiscalYears, ledgers, docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances]);
+      docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances,
+      permissions // تزریق پرمیشن‌ها به لوکاپ‌ها برای استفاده در فرم
+  }), [accounts, accountStructures, branches, fiscalYears, ledgers, docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances, permissions]);
 
-  // --- Effects ---
+  // --- Initialization & Security ---
   useEffect(() => {
-    fetchLookups();
+    const init = async () => {
+        setAccessLoading(true);
+        const perms = await getUserPermissions(supabase, 'vouchers');
+        setPermissions(perms);
+        setAccessLoading(false);
+        fetchLookups(perms);
+    };
+    init();
   }, []);
 
   useEffect(() => {
-    if (view === 'list' && contextVals.fiscal_year_id && contextVals.ledger_id) {
+    if (view === 'list' && contextVals.fiscal_year_id && contextVals.ledger_id && permissions) {
         fetchVouchers(searchParams);
     } else if (view === 'list') {
         setVouchers([]);
     }
-  }, [view, contextVals]);
+  }, [view, contextVals, permissions]);
 
   // --- Fetch Methods ---
-  const fetchLookups = async () => {
+  const fetchLookups = async (perms) => {
     if (!supabase) return;
     
     const safeFetch = async (query) => {
@@ -95,24 +107,51 @@ const Vouchers = ({ language = 'fa' }) => {
         safeFetch(supabase.schema('gen').from('currency_globals').select('*').limit(1))
     ]);
 
-    if (brData) setBranches(brData.filter(b => b.is_active !== false));
+    // سطح ۳: فیلتر کردن اطلاعات پایه بر اساس دسترسی کاربر
+    if (brData) {
+        const filteredBranches = (perms && perms.allowed_branches && perms.allowed_branches.length > 0)
+            ? brData.filter(b => perms.allowed_branches.includes(b.id))
+            : brData;
+        setBranches(filteredBranches.filter(b => b.is_active !== false));
+    }
+
     if (fyData) setFiscalYears(fyData);
-    if (ledData) setLedgers(ledData);
+
+    if (ledData) {
+        const filteredLedgers = (perms && perms.allowed_ledgers && perms.allowed_ledgers.length > 0)
+            ? ledData.filter(l => perms.allowed_ledgers.includes(String(l.id)))
+            : ledData;
+        setLedgers(filteredLedgers);
+    }
+
     if (structData) setAccountStructures(structData);
     if (dtData) setDetailTypes(dtData);
     if (diData) setAllDetailInstances(diData);
     if (currGlobalsData && currGlobalsData.length > 0) setCurrencyGlobals(currGlobalsData[0]);
 
     setContextVals(prev => {
+        const initialLedger = (perms && perms.allowed_ledgers && perms.allowed_ledgers.length > 0)
+            ? ledData?.find(l => perms.allowed_ledgers.includes(String(l.id)))
+            : ledData?.[0];
+            
         if (!prev.fiscal_year_id && !prev.ledger_id) {
-            return { fiscal_year_id: fyData?.[0]?.id || '', ledger_id: ledData?.[0]?.id || '' };
+            return { 
+                fiscal_year_id: fyData?.[0]?.id || '', 
+                ledger_id: initialLedger?.id || '' 
+            };
         }
         return prev;
     });
 
     if (doctypeData) {
         const allowedSysCodes = ['sys_opening', 'sys_general', 'sys_closing', 'sys_close_acc'];
-        setDocTypes(doctypeData.filter(d => d.type === 'user' || allowedSysCodes.includes(d.code)));
+        let baseDocTypes = doctypeData.filter(d => d.type === 'user' || allowedSysCodes.includes(d.code));
+        
+        // سطح ۳: فیلتر انواع سند
+        if (perms && perms.allowed_doctypes && perms.allowed_doctypes.length > 0) {
+            baseDocTypes = baseDocTypes.filter(d => perms.allowed_doctypes.includes(d.code));
+        }
+        setDocTypes(baseDocTypes);
     }
 
     if (currData) setCurrencies(currData);
@@ -134,7 +173,7 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const fetchVouchers = async (paramsObj = searchParams) => {
-    if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id) return;
+    if (!supabase || !contextVals.fiscal_year_id || !contextVals.ledger_id || !permissions) return;
     setLoading(true);
     try {
       let query = supabase.schema('gl').from('vouchers')
@@ -144,6 +183,14 @@ const Vouchers = ({ language = 'fa' }) => {
         .order('voucher_date', { ascending: false })
         .order('voucher_number', { ascending: false });
       
+      // سطح ۳: محدود سازی دیتا در کوئری اصلی
+      if (permissions.allowed_branches && permissions.allowed_branches.length > 0) {
+          query = query.in('branch_id', permissions.allowed_branches);
+      }
+      if (permissions.allowed_doctypes && permissions.allowed_doctypes.length > 0) {
+          query = query.in('voucher_type', permissions.allowed_doctypes);
+      }
+
       if (paramsObj.voucher_number) query = query.eq('voucher_number', paramsObj.voucher_number);
       if (paramsObj.from_date) query = query.gte('voucher_date', paramsObj.from_date);
       if (paramsObj.to_date) query = query.lte('voucher_date', paramsObj.to_date);
@@ -180,12 +227,20 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const handleOpenForm = (voucher = null, copy = false) => {
+    if (!voucher && !permissions?.actions.includes('create')) {
+        alert(t.accessDenied);
+        return;
+    }
     setCurrentVoucherId(voucher ? voucher.id : null);
     setIsCopying(copy);
     setView('form');
   };
 
   const handleBulkStatus = async (newStatus) => {
+    if (!permissions?.actions.includes('status_change')) {
+        alert(t.accessDenied);
+        return;
+    }
     if (selectedIds.length === 0) return;
     setLoading(true);
     try {
@@ -221,12 +276,14 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const promptDelete = (voucher) => {
+    if (!permissions?.actions.includes('delete')) return;
     if (voucher.status === 'reviewed' || voucher.status === 'final') return;
     setVoucherToDelete(voucher);
     setShowDeleteModal(true);
   };
 
   const handleImportCSV = async (e) => {
+     if (!permissions?.actions.includes('import')) return;
      const file = e.target.files[0];
      if (!file) return;
      setLoading(true);
@@ -244,19 +301,16 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   // --- Computed Data ---
-  const ledgerStructureCode = useMemo(() => {
-     const ledger = ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
-     return String(ledger?.structure || '').trim();
-  }, [ledgers, contextVals.ledger_id]);
-
   const validAccountsForLedger = useMemo(() => {
-     const targetStructure = accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
+     const ledger = ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
+     const ledgerStructure = String(ledger?.structure || '').trim();
+     const targetStructure = accountStructures.find(s => String(s.code).trim() === ledgerStructure);
      const structureId = targetStructure ? String(targetStructure.id) : null;
      return accounts.filter(a => {
         const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
         return String(a.structure_id) === structureId && isSubsidiary;
      }).map(a => ({ value: a.id, label: `${a.full_code} - ${a.title}`, subLabel: a.path }));
-  }, [accounts, accountStructures, ledgerStructureCode]);
+  }, [accounts, accountStructures, ledgers, contextVals.ledger_id]);
 
   const selectedVouchers = vouchers.filter(v => selectedIds.includes(v.id));
   const allDraft = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'draft');
@@ -281,6 +335,14 @@ const Vouchers = ({ language = 'fa' }) => {
   ];
 
   // --- Render View Routing ---
+  if (accessLoading) {
+      return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-indigo-600 gap-4"><Lock className="animate-pulse" size={48}/><p className="font-bold">{isRtl ? 'در حال بررسی دسترسی‌ها...' : 'Checking permissions...'}</p></div>;
+  }
+
+  if (!permissions?.actions.includes('view')) {
+      return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4"><Lock size={64}/><h2 className="text-xl font-black">{isRtl ? 'عدم دسترسی' : 'Access Denied'}</h2><p>{isRtl ? 'شما مجوز مشاهده این صفحه را ندارید.' : 'You do not have permission to view this page.'}</p></div>;
+  }
+
   if (view === 'form') {
       return (
           <VoucherForm 
@@ -328,11 +390,17 @@ const Vouchers = ({ language = 'fa' }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-            <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleImportCSV} />
-            <Button variant="ghost" size="sm" icon={DownloadCloud} onClick={() => generateCSVTemplate(isRtl)} title={t.downloadTemplate} />
-            <Button variant="ghost" size="sm" icon={FileSpreadsheet} onClick={() => fileInputRef.current?.click()} title={t.importCSV} className="text-emerald-600 hover:bg-emerald-50" />
-            <div className="h-6 w-px bg-slate-200 mx-1"></div>
-            <Button variant="primary" size="default" onClick={() => handleOpenForm(null, false)} icon={Plus}>{t.newVoucher}</Button>
+            {permissions.actions.includes('import') && (
+                <>
+                  <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleImportCSV} />
+                  <Button variant="ghost" size="sm" icon={DownloadCloud} onClick={() => generateCSVTemplate(isRtl)} title={t.downloadTemplate} />
+                  <Button variant="ghost" size="sm" icon={FileSpreadsheet} onClick={() => fileInputRef.current?.click()} title={t.importCSV} className="text-emerald-600 hover:bg-emerald-50" />
+                  <div className="h-6 w-px bg-slate-200 mx-1"></div>
+                </>
+            )}
+            {permissions.actions.includes('create') && (
+                <Button variant="primary" size="default" onClick={() => handleOpenForm(null, false)} icon={Plus}>{t.newVoucher}</Button>
+            )}
         </div>
       </div>
 
@@ -386,17 +454,31 @@ const Vouchers = ({ language = 'fa' }) => {
           isLoading={loading} 
           bulkActions={
              <>
-               {allDraft && <Button variant="secondary" size="sm" onClick={() => handleBulkStatus('temporary')} icon={CheckCircle}>{t.makeTemporary}</Button>}
-               {allTemp && <Button variant="secondary" size="sm" onClick={() => handleBulkStatus('draft')} icon={FileText}>{t.makeDraft}</Button>}
+               {permissions.actions.includes('status_change') && (
+                   <>
+                     {allDraft && <Button variant="secondary" size="sm" onClick={() => handleBulkStatus('temporary')} icon={CheckCircle}>{t.makeTemporary}</Button>}
+                     {allTemp && <Button variant="secondary" size="sm" onClick={() => handleBulkStatus('draft')} icon={FileText}>{t.makeDraft}</Button>}
+                   </>
+               )}
              </>
           }
           actions={(r) => (
             <div className="flex gap-1 justify-center">
-              <Button variant="ghost" size="iconSm" icon={Paperclip} onClick={() => setVoucherForAttachments(r)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
-              <Button variant="ghost" size="iconSm" icon={Copy} onClick={() => handleOpenForm(r, true)} title={t.copyVoucher} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50" />
-              <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => setVoucherToPrint(r)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
-              <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r, false)} />
-              <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} />
+              {permissions.actions.includes('attach') && (
+                <Button variant="ghost" size="iconSm" icon={Paperclip} onClick={() => setVoucherForAttachments(r)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
+              )}
+              {permissions.actions.includes('create') && (
+                <Button variant="ghost" size="iconSm" icon={Copy} onClick={() => handleOpenForm(r, true)} title={t.copyVoucher} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50" />
+              )}
+              {permissions.actions.includes('print') && (
+                <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => setVoucherToPrint(r)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
+              )}
+              {permissions.actions.includes('edit') && (
+                <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r, false)} />
+              )}
+              {permissions.actions.includes('delete') && (
+                <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} />
+              )}
             </div>
           )}
         />
@@ -417,7 +499,6 @@ const Vouchers = ({ language = 'fa' }) => {
          )}
       </Modal>
 
-      {/* مودال ضمائم به اندازه md تغییر یافت */}
       <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
          {voucherForAttachments && window.VoucherAttachments ? (
              <window.VoucherAttachments voucherId={voucherForAttachments.id} onClose={() => setVoucherForAttachments(null)} />
@@ -428,7 +509,6 @@ const Vouchers = ({ language = 'fa' }) => {
              </div>
          )}
       </Modal>
-
     </div>
   );
 };

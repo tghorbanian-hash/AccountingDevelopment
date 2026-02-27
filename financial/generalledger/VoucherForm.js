@@ -16,6 +16,14 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const { formatNumber, parseNumber } = UI.utils || { formatNumber: (v)=>v, parseNumber: (v)=>v };
   const supabase = window.supabase;
 
+  // --- Security Check ---
+  // دریافت پرمیشن‌ها از props که توسط Vouchers.js پاس داده شده
+  const perms = lookups.permissions;
+  const canEdit = perms?.actions.includes('edit');
+  const canCreate = perms?.actions.includes('create');
+  const canPrint = perms?.actions.includes('print');
+  const canAttach = perms?.actions.includes('attach');
+
   // --- States ---
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [voucherItems, setVoucherItems] = useState([]);
@@ -27,11 +35,29 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
-  // --- Computed Lookups for Form ---
+  // --- Computed Lookups for Form (With Data Scoping) ---
   const ledgerStructureCode = useMemo(() => {
      const ledger = lookups.ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
      return String(ledger?.structure || '').trim();
   }, [lookups.ledgers, contextVals.ledger_id]);
+
+  // سطح ۳: فیلتر کردن شعب بر اساس دسترسی
+  const filteredBranches = useMemo(() => {
+      const allBranches = lookups.branches;
+      if (perms?.allowed_branches && perms.allowed_branches.length > 0) {
+          return allBranches.filter(b => perms.allowed_branches.includes(b.id));
+      }
+      return allBranches;
+  }, [lookups.branches, perms]);
+
+  // سطح ۳: فیلتر کردن دفاتر بر اساس دسترسی
+  const filteredLedgers = useMemo(() => {
+      const allLedgers = lookups.ledgers;
+      if (perms?.allowed_ledgers && perms.allowed_ledgers.length > 0) {
+          return allLedgers.filter(l => perms.allowed_ledgers.includes(String(l.id)));
+      }
+      return allLedgers;
+  }, [lookups.ledgers, perms]);
 
   const validAccountsOptions = useMemo(() => {
      const targetStructure = lookups.accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
@@ -113,7 +139,9 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         const initialFyId = contextVals.fiscal_year_id;
         const currentLedger = lookups.ledgers.find(l => String(l.id) === String(initialLedgerId));
         const defaultCurrency = currentLedger?.currency || '';
-        const defaultBranch = lookups.branches.find(b => b.is_default) || lookups.branches[0];
+        
+        // انتخاب شعبه پیش‌فرض بر اساس دسترسی
+        const defaultBranch = filteredBranches.find(b => b.is_default) || filteredBranches[0];
         const today = new Date().toISOString().split('T')[0];
 
         const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, initialLedgerId, initialFyId, defaultBranch?.id, supabase);
@@ -156,7 +184,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     };
 
     initializeForm();
-  }, [voucherId, isCopy, contextVals]);
+  }, [voucherId, isCopy, contextVals, filteredBranches]);
 
   // --- Helpers ---
   const getValidDetailTypes = (accountId) => {
@@ -383,6 +411,11 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
 
   const handleSaveVoucher = async (status) => {
     if (!supabase) return;
+
+    // کنترل سطح ۲: آیا اجازه ویرایش یا ایجاد دارد؟
+    const isNew = !currentVoucher.id || isCopy;
+    if (isNew && !canCreate) { alert(t.accessDenied); return; }
+    if (!isNew && !canEdit) { alert(t.accessDenied); return; }
     
     if (!currentVoucher.branch_id) {
        alert(t.branchReqError);
@@ -560,7 +593,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   });
 
   const isBalanced = totalDebit === totalCredit;
-  const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final';
+  const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final' || (!canEdit && currentVoucher.id && !isCopy);
   const isVoucherNoManual = currentLedgerMeta.uniquenessScope === 'none';
   const currentFiscalYearTitle = lookups.fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || '';
   const currentLedgerTitle = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || '';
@@ -589,8 +622,8 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         <div className="flex items-center gap-2">
           {currentVoucher.id && !isCopy && (
             <>
-              <Button variant="ghost" size="icon" icon={Paperclip} onClick={() => setVoucherForAttachments(currentVoucher)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
-              <Button variant="ghost" size="icon" icon={Printer} onClick={() => setVoucherToPrint(currentVoucher)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
+              {canAttach && <Button variant="ghost" size="icon" icon={Paperclip} onClick={() => setVoucherForAttachments(currentVoucher)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />}
+              {canPrint && <Button variant="ghost" size="icon" icon={Printer} onClick={() => setVoucherToPrint(currentVoucher)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />}
               <div className="h-6 w-px bg-slate-200 mx-1"></div>
             </>
           )}
@@ -615,7 +648,12 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         >
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4" onClick={(e) => e.stopPropagation()}>
             <InputField label={t.fiscalYear} value={currentFiscalYearTitle} disabled isRtl={isRtl} />
-            <InputField label={t.ledger} value={currentLedgerTitle} disabled isRtl={isRtl} />
+            
+            <SelectField label={t.ledger} value={currentVoucher.ledger_id || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, ledger_id: e.target.value})} disabled={isReadonly} isRtl={isRtl}>
+               <option value="" disabled>{isRtl ? 'انتخاب دفتر' : 'Select Ledger'}</option>
+               {filteredLedgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+            </SelectField>
+
             <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => {
                 const newBranch = e.target.value;
                 setCurrentVoucher({...currentVoucher, branch_id: newBranch});
@@ -626,7 +664,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                 }
             }} disabled={isReadonly} isRtl={isRtl}>
                <option value="" disabled>{t.selectBranch}</option>
-               {lookups.branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+               {filteredBranches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
             </SelectField>
             
             <InputField label={t.voucherNumber} value={currentVoucher.voucher_number || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, voucher_number: e.target.value})} disabled={isReadonly || !isVoucherNoManual} isRtl={isRtl} dir="ltr" className={`text-center ${!isVoucherNoManual ? 'bg-slate-50' : 'bg-white'}`} />
@@ -964,7 +1002,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
          )}
       </Modal>
 
-      {/* مودال ضمائم به اندازه md تغییر یافت */}
       <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
          {voucherForAttachments && window.VoucherAttachments ? (
              <window.VoucherAttachments voucherId={voucherForAttachments.id} onClose={() => setVoucherForAttachments(null)} />

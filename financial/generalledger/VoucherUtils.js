@@ -101,6 +101,7 @@ const localTranslations = {
     importSuccess: 'Import completed successfully.',
     importError: 'Error importing data. Please check the file format.',
     emptyFile: 'The selected file is empty or invalid.',
+    accessDenied: 'You do not have permission for this action.',
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -201,6 +202,7 @@ const localTranslations = {
     importSuccess: 'ورود اطلاعات با موفقیت انجام شد.',
     importError: 'خطا در ورود اطلاعات. لطفاً فرمت فایل را بررسی کنید.',
     emptyFile: 'فایل انتخاب شده خالی یا نامعتبر است.',
+    accessDenied: 'شما دسترسی لازم برای این عملیات را ندارید.',
   }
 };
 
@@ -500,6 +502,65 @@ const processCSVImport = async (file, contextVals, lookups, supabase, t) => {
     });
 };
 
+/**
+ * سطح ۳: دریافت دسترسی‌های ۳ سطحی کاربر از دیتابیس
+ * @param {object} supabase - کلاینت سوپابیس
+ * @param {string} resourceCode - کد منبع (مثلاً 'vouchers')
+ */
+const getUserPermissions = async (supabase, resourceCode = 'vouchers') => {
+    try {
+        const { data: authData } = await supabase.auth.getUser();
+        const userId = authData?.user?.id;
+        if (!userId) return null;
+
+        // دریافت نقش‌های کاربر
+        const { data: userRoles } = await supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', userId);
+        const roleIds = userRoles?.map(r => r.role_id) || [];
+
+        // دریافت پرمیشن‌ها برای کاربر یا نقش‌های او
+        let query = supabase.schema('gen').from('permissions').select('*').eq('resource_code', resourceCode);
+        
+        if (roleIds.length > 0) {
+            query = query.or(`user_id.eq.${userId},role_id.in.(${roleIds.join(',')})`);
+        } else {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data: perms, error } = await query;
+        if (error) throw error;
+
+        // ادغام پرمیشن‌ها (اگر کاربر چندین نقش داشته باشد)
+        const combined = {
+            actions: new Set(),
+            allowed_branches: [],
+            allowed_ledgers: [],
+            allowed_doctypes: []
+        };
+
+        perms.forEach(p => {
+            // سطح ۲: عملیات
+            const actions = Array.isArray(p.actions) ? p.actions : (typeof p.actions === 'string' ? JSON.parse(p.actions) : []);
+            actions.forEach(a => combined.actions.add(a));
+
+            // سطح ۳: دیتای مجاز
+            const scopes = p.data_scopes || {};
+            if (scopes.allowed_branches) combined.allowed_branches.push(...scopes.allowed_branches);
+            if (scopes.allowed_ledgers) combined.allowed_ledgers.push(...scopes.allowed_ledgers);
+            if (scopes.allowed_doctypes) combined.allowed_doctypes.push(...scopes.allowed_doctypes);
+        });
+
+        return {
+            actions: Array.from(combined.actions),
+            allowed_branches: [...new Set(combined.allowed_branches)],
+            allowed_ledgers: [...new Set(combined.allowed_ledgers)],
+            allowed_doctypes: [...new Set(combined.allowed_doctypes)]
+        };
+    } catch (err) {
+        console.error('Error fetching permissions:', err);
+        return null;
+    }
+};
+
 window.VoucherUtils = {
     localTranslations,
     getStatusBadge,
@@ -508,6 +569,7 @@ window.VoucherUtils = {
     fetchAutoNumbers,
     validateFiscalPeriod,
     generateCSVTemplate,
-    processCSVImport
+    processCSVImport,
+    getUserPermissions
 };
 export default window.VoucherUtils;
