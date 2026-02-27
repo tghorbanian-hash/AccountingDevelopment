@@ -1,5 +1,5 @@
 /* Filename: components/UIComponents.js */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Loader2, ChevronDown, ChevronRight, Search, X, 
   Check, Filter, Settings, ChevronLeft,
@@ -8,6 +8,24 @@ import {
   Maximize2, Minimize2, FolderOpen, Folder, FileText,
   AlertCircle, ArrowRight, ArrowUp, ArrowDown, Info
 } from 'lucide-react';
+
+// --- UTILITIES ---
+export const formatNumber = (num) => {
+  if (num === null || num === undefined || num === '') return '';
+  const parsed = Number(num);
+  return isNaN(parsed) ? '' : parsed.toLocaleString('en-US', { maximumFractionDigits: 6 });
+};
+
+export const parseNumber = (str) => {
+  if (str === null || str === undefined) return 0;
+  const raw = String(str).replace(/,/g, '');
+  return isNaN(raw) || raw === '' ? 0 : parseFloat(raw);
+};
+
+export const normalizePersian = (str) => {
+  if (!str) return '';
+  return String(str).replace(/[يِي]/g, 'ی').replace(/[كک]/g, 'ک').replace(/[إأآا]/g, 'ا').toLowerCase();
+};
 
 // --- ENTERPRISE THEME TOKENS ---
 const THEME = {
@@ -97,6 +115,78 @@ const InputField = ({ label, icon: Icon, isRtl, className = '', ...props }) => {
   );
 };
 
+const NumberInput = ({ label, value, onChange, isRtl, min, max, inline = false, disabled = false, className = '', ...props }) => {
+  const [val, setVal] = useState(value !== undefined && value !== null ? formatNumber(value) : '');
+
+  useEffect(() => {
+    if (document.activeElement !== document.getElementById(`numinput-${label}`)) {
+      setVal(value !== undefined && value !== null ? formatNumber(value) : '');
+    }
+  }, [value, label]);
+
+  const handleBlur = (e) => {
+    let num = parseNumber(e.target.value);
+    if (min !== undefined && num < min) num = min;
+    if (max !== undefined && num > max) num = max;
+    setVal(formatNumber(num));
+    if (onChange && num !== value) {
+      onChange(num);
+    }
+  };
+
+  const handleChange = (e) => {
+    setVal(e.target.value);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.target.blur();
+    }
+  };
+
+  if (inline) {
+    return (
+      <input 
+        id={`numinput-${label}`}
+        type="text" 
+        className={`w-8 text-center bg-transparent border-b border-dashed border-slate-300 outline-none text-[11px] font-bold text-slate-500 hover:border-indigo-400 focus:border-indigo-500 focus:text-indigo-700 transition-colors ${className}`} 
+        value={val} 
+        onChange={handleChange} 
+        onBlur={handleBlur} 
+        onKeyDown={handleKeyDown} 
+        disabled={disabled}
+        {...props}
+      />
+    );
+  }
+
+  return (
+    <div className={`w-full ${className}`}>
+      {label && <label className="block text-[11px] font-bold text-slate-600 mb-1">{label}</label>}
+      <div className="relative group">
+        <input 
+          id={`numinput-${label}`}
+          type="text"
+          value={val}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          className={`
+            w-full ${THEME.colors.surface} border ${THEME.colors.border}
+            ${THEME.metrics.radius} ${THEME.metrics.inputHeight} px-2
+            outline-none dir-ltr text-right
+            focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+            transition-all text-[12px] text-slate-800 placeholder:text-slate-400
+            ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}
+          `}
+          {...props}
+        />
+      </div>
+    </div>
+  );
+};
+
 const SelectField = ({ label, children, isRtl, className = '', ...props }) => (
   <div className={`w-full ${className}`}>
     {label && <label className="block text-[11px] font-bold text-slate-600 mb-1">{label}</label>}
@@ -108,6 +198,7 @@ const SelectField = ({ label, children, isRtl, className = '', ...props }) => (
           ${THEME.metrics.radius} ${THEME.metrics.inputHeight} pl-2 pr-8 appearance-none
           outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
           transition-all text-[12px] text-slate-800 cursor-pointer hover:border-slate-300
+          ${props.disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}
         `}
       >
         {children}
@@ -118,6 +209,170 @@ const SelectField = ({ label, children, isRtl, className = '', ...props }) => (
     </div>
   </div>
 );
+
+const SearchableSelect = ({ options = [], value, onChange, disabled, placeholder, className, onFocus, isRtl, renderOption }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef(null);
+
+  const selectedOpt = options.find(o => String(o.value) === String(value));
+  const displaySelected = selectedOpt ? selectedOpt.label : '';
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const normalizedSearch = normalizePersian(search);
+  const filteredOptions = options.filter(o => {
+      const matchLabel = o.label ? normalizePersian(o.label).includes(normalizedSearch) : false;
+      const matchSub = o.subLabel ? normalizePersian(o.subLabel).includes(normalizedSearch) : false;
+      return matchLabel || matchSub;
+  });
+
+  return (
+    <div className="relative w-full h-full flex items-center" ref={wrapperRef}>
+      <div className="relative w-full h-full flex items-center">
+        <input
+          type="text"
+          className={className || `w-full bg-white border border-slate-300 hover:border-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-md h-8 px-2 outline-none text-[12px] text-slate-800 transition-all ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'cursor-pointer'}`}
+          value={isOpen ? search : displaySelected}
+          onChange={e => { setSearch(e.target.value); setIsOpen(true); }}
+          onFocus={() => { setIsOpen(true); setSearch(''); if (onFocus) onFocus(); }}
+          disabled={disabled}
+          placeholder={placeholder}
+          title={displaySelected}
+        />
+        {!isOpen && !disabled && (
+           <ChevronDown size={14} className={`absolute text-slate-400 pointer-events-none ${isRtl ? 'left-2' : 'right-2'}`} />
+        )}
+      </div>
+      
+      {isOpen && !disabled && (
+        <div className={`absolute z-[60] w-[300px] ${isRtl ? 'right-0' : 'left-0'} top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-56 overflow-y-auto custom-scrollbar`}>
+          {filteredOptions.map(opt => (
+            <div
+              key={opt.value}
+              className="px-3 py-1.5 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0"
+              onMouseDown={(e) => { e.preventDefault(); onChange(opt.value); setIsOpen(false); }}
+            >
+              {renderOption ? renderOption(opt) : (
+                 <>
+                   <div className={`font-bold text-slate-800 ${isRtl ? 'text-right' : 'text-left'}`}>{opt.label}</div>
+                   {opt.subLabel && <div className="text-slate-500 truncate mt-0.5 text-[10px]">{opt.subLabel}</div>}
+                 </>
+              )}
+            </div>
+          ))}
+          {filteredOptions.length === 0 && (
+            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">{isRtl ? 'موردی یافت نشد' : 'No items found'}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MultiTagSelect = ({ categories = [], options = [], value = {}, onChange, disabled, isRtl, placeholderText = '', notFoundText = '' }) => {
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef(null);
+
+  const txtSearch = placeholderText || (isRtl ? 'جستجو...' : 'Search...');
+  const txtNotFound = notFoundText || (isRtl ? 'موردی یافت نشد' : 'No matches found');
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setActiveCategory(null);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (!categories || categories.length === 0) {
+     return <div className="text-slate-300 text-[11px] px-2 h-8 flex items-center">-</div>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5 w-full items-center p-1 px-1.5" ref={wrapperRef}>
+       {categories.map(cat => {
+          const selectedId = value[cat.code];
+          
+          if (selectedId) {
+             const selectedOpt = options.find(o => String(o.id) === String(selectedId));
+             const display = selectedOpt ? selectedOpt.label : 'Unknown';
+             return (
+               <div key={cat.code} className="flex items-center gap-1 bg-indigo-50 text-indigo-800 text-[11px] px-2 py-0.5 rounded border border-indigo-200 shadow-sm transition-all hover:shadow-md">
+                 <span className="font-bold truncate max-w-[140px] select-none" title={display}>{display}</span>
+                 {!disabled && (
+                    <X size={12} className="cursor-pointer text-indigo-400 hover:text-red-500 hover:bg-red-50 rounded-full p-0.5 shrink-0 transition-colors" 
+                       onClick={(e) => { 
+                          e.stopPropagation(); 
+                          const newVal = {...value}; 
+                          delete newVal[cat.code]; 
+                          onChange(newVal); 
+                       }} 
+                    />
+                 )}
+               </div>
+             )
+          }
+
+          return (
+             <div key={cat.code} className="relative">
+                {activeCategory === cat.code ? (
+                   <div className="relative">
+                      <input 
+                         autoFocus
+                         className="w-[140px] bg-white border border-indigo-400 shadow-sm focus:ring-2 focus:ring-indigo-100 rounded h-6 px-2 outline-none text-[11px] text-slate-800 transition-all"
+                         value={search} 
+                         onChange={e => setSearch(e.target.value)} 
+                         placeholder={`${txtSearch} ${cat.title}`}
+                      />
+                      <div className={`absolute z-[70] w-[220px] ${isRtl ? 'right-0' : 'left-0'} top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto custom-scrollbar`}>
+                         {options
+                           .filter(o => String(o.category_code) === String(cat.code) && normalizePersian(o.label).includes(normalizePersian(search)))
+                           .map(o => (
+                             <div
+                               key={o.id}
+                               className="px-3 py-2 text-[11px] hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                               onMouseDown={(e) => { 
+                                  e.preventDefault(); 
+                                  onChange({ ...value, [cat.code]: o.id });
+                                  setActiveCategory(null);
+                                  setSearch('');
+                               }}
+                             >
+                               <div className="font-bold text-slate-800">{o.label}</div>
+                             </div>
+                         ))}
+                         {options.filter(o => String(o.category_code) === String(cat.code) && normalizePersian(o.label).includes(normalizePersian(search))).length === 0 && (
+                            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">{txtNotFound}</div>
+                         )}
+                      </div>
+                   </div>
+                ) : (
+                   <button 
+                      onClick={(e) => { e.preventDefault(); if(!disabled) { setActiveCategory(cat.code); setSearch(''); } }} 
+                      className={`bg-white border border-dashed text-[11px] px-2 py-0.5 rounded transition-colors ${disabled ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`}
+                   >
+                      + {cat.title}
+                   </button>
+                )}
+             </div>
+          )
+       })}
+    </div>
+  );
+};
 
 const Toggle = ({ checked, onChange, label, disabled }) => (
   <div 
@@ -145,6 +400,8 @@ const Badge = ({ children, variant = 'neutral', className='' }) => {
     info: 'bg-blue-50 text-blue-700 border-blue-200',
     neutral: 'bg-slate-100 text-slate-600 border-slate-200',
     purple: 'bg-purple-50 text-purple-700 border-purple-200',
+    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    slate: 'bg-slate-100 text-slate-700 border-slate-300',
   };
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0 rounded-md text-[11px] font-bold border ${styles[variant] || styles.neutral} ${className}`}>
@@ -153,9 +410,8 @@ const Badge = ({ children, variant = 'neutral', className='' }) => {
   );
 };
 
-// --- NEW COMPONENTS FOR ROLES & ACCESS ---
+// --- GENERIC COMPONENTS ---
 
-// 1. ToggleChip
 const ToggleChip = ({ label, checked, onClick, colorClass = "green" }) => {
   const styles = {
     green: checked 
@@ -181,7 +437,6 @@ const ToggleChip = ({ label, checked, onClick, colorClass = "green" }) => {
   );
 };
 
-// 2. SelectionGrid
 const SelectionGrid = ({ items, selectedIds = [], onToggle, columns = 4 }) => {
   const gridCols = { 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4', 6: 'grid-cols-6' };
   
@@ -208,15 +463,12 @@ const SelectionGrid = ({ items, selectedIds = [], onToggle, columns = 4 }) => {
   );
 };
 
-// 3. TreeView
 const TreeView = ({ data, onSelectNode, selectedNodeId, renderNodeContent, isRtl, searchPlaceholder }) => {
   const [expandedNodes, setExpandedNodes] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Default placeholder based on language
   const defaultPlaceholder = searchPlaceholder || (isRtl ? "جستجو..." : "Search...");
 
-  // Filtering Logic
   const filteredData = useMemo(() => {
     if (!searchTerm) return data;
     const filterNodes = (nodes) => {
@@ -234,7 +486,6 @@ const TreeView = ({ data, onSelectNode, selectedNodeId, renderNodeContent, isRtl
     return filterNodes(data);
   }, [data, searchTerm, isRtl]);
 
-  // Auto Expand on Search
   useEffect(() => {
     if (searchTerm) {
       const allIds = {};
@@ -321,14 +572,9 @@ const TreeView = ({ data, onSelectNode, selectedNodeId, renderNodeContent, isRtl
   );
 };
 
-
-// --- EXISTING COMPLEX COMPONENTS ---
-
-// 2. FILTER SECTION
 const FilterSection = ({ children, onSearch, onClear, isRtl, title }) => {
   const [isOpen, setIsOpen] = useState(true);
 
-  // Defaults based on isRtl
   const defaultTitle = title || (isRtl ? "فیلترهای پیشرفته" : "Advanced Filters");
   const clearLabel = isRtl ? "پاک کردن" : "Clear";
   const searchLabel = isRtl ? "اعمال فیلتر" : "Apply Filter";
@@ -363,7 +609,6 @@ const FilterSection = ({ children, onSearch, onClear, isRtl, title }) => {
   );
 };
 
-// 3. DATA GRID
 const DataGrid = ({ 
   columns, 
   data = [], 
@@ -387,7 +632,6 @@ const DataGrid = ({
   const [expandedGroups, setExpandedGroups] = useState({});
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-  // Translations
   const txtSearch = isRtl ? "جستجو..." : "Search...";
   const txtLoading = isRtl ? "در حال بارگذاری..." : "Loading...";
   const txtNoData = isRtl ? "اطلاعاتی یافت نشد." : "No records found.";
@@ -658,7 +902,6 @@ const DataGrid = ({
   );
 };
 
-// 4. TREE MENU
 const TreeMenu = ({ items, activeId, onSelect, isRtl }) => {
   const renderNode = (item) => (
      <div className={`w-1.5 h-1.5 rounded-full transition-colors ${activeId === item.id ? 'bg-indigo-600 scale-125' : 'bg-slate-300'}`}></div>
@@ -702,8 +945,6 @@ const LOV = ({ label, placeholder, isRtl }) => (
     </div>
   </div>
 );
-
-// 5. NEW GENERIC COMPONENTS (For DRY Compliance)
 
 const SideMenu = ({ items, activeId, onChange, title, isRtl, className = '' }) => {
   return (
@@ -864,4 +1105,14 @@ const GlobalContextFilter = ({ fields = [], values = {}, onChange, onConfirm, is
   );
 };
 
-window.UI = { Button, InputField, SelectField, Toggle, Badge, DataGrid, FilterSection, TreeMenu, TreeView, SelectionGrid, ToggleChip, Modal, DatePicker, LOV, SideMenu, Accordion, Callout, GlobalContextFilter, THEME };
+window.UI = { 
+  Button, InputField, NumberInput, SelectField, SearchableSelect, MultiTagSelect, 
+  Toggle, Badge, DataGrid, FilterSection, TreeMenu, TreeView, SelectionGrid, 
+  ToggleChip, Modal, DatePicker, LOV, SideMenu, Accordion, Callout, GlobalContextFilter, THEME 
+};
+
+window.UI.utils = {
+  formatNumber,
+  parseNumber,
+  normalizePersian
+};
