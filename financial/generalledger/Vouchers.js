@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
   Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X, Layers, Printer,
-  Coins, Calculator, CopyPlus, PanelRightClose, PanelRightOpen
+  Coins, Calculator, CopyPlus, PanelRightClose, PanelRightOpen,
+  Paperclip, DownloadCloud, FileSpreadsheet
 } from 'lucide-react';
 
 const localTranslations = {
@@ -25,6 +26,7 @@ const localTranslations = {
     delete: 'Delete',
     print: 'Print',
     printVoucher: 'Print Voucher',
+    attachments: 'Attachments',
     branch: 'Branch',
     selectBranch: 'Select Branch',
     branchReqError: 'Please select a branch.',
@@ -100,6 +102,11 @@ const localTranslations = {
     summaryOp: 'OP Cur',
     summaryRep1: 'Rep 1 Cur',
     summaryRep2: 'Rep 2 Cur',
+    downloadTemplate: 'Download CSV Template',
+    importCSV: 'Import CSV',
+    importSuccess: 'Import completed successfully.',
+    importError: 'Error importing data. Please check the file format.',
+    emptyFile: 'The selected file is empty or invalid.',
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -119,6 +126,7 @@ const localTranslations = {
     delete: 'حذف',
     print: 'چاپ',
     printVoucher: 'چاپ سند حسابداری',
+    attachments: 'اسناد مثبته',
     branch: 'شعبه',
     selectBranch: 'انتخاب شعبه',
     branchReqError: 'لطفاً شعبه را انتخاب کنید.',
@@ -194,6 +202,11 @@ const localTranslations = {
     summaryOp: 'عملیاتی',
     summaryRep1: 'گزارشگری ۱',
     summaryRep2: 'گزارشگری ۲',
+    downloadTemplate: 'دانلود نمونه فایل اکسل',
+    importCSV: 'ورود اطلاعات از اکسل',
+    importSuccess: 'ورود اطلاعات با موفقیت انجام شد.',
+    importError: 'خطا در ورود اطلاعات. لطفاً فرمت فایل را بررسی کنید.',
+    emptyFile: 'فایل انتخاب شده خالی یا نامعتبر است.',
   }
 };
 
@@ -208,6 +221,22 @@ const calcConv = (amount, rate, isReverse) => {
     const numRate = parseFloat(rate);
     if (isNaN(numAmt) || isNaN(numRate) || numRate === 0) return 0;
     return isReverse ? (numAmt / numRate) : (numAmt * numRate);
+};
+
+const csvToArray = (text) => {
+    let p = '', row = [''], ret = [row], i = 0, r = 0, s = !0, l;
+    for (l of text) {
+        if ('"' === l) {
+            if (s && l === p) row[i] += l;
+            s = !s;
+        } else if (',' === l && s) l = row[++i] = '';
+        else if ('\n' === l && s) {
+            if ('\r' === p) row[i] = row[i].slice(0, -1);
+            row = ret[++r] = [l = '']; i = 0;
+        } else row[i] += l;
+        p = l;
+    }
+    return ret.filter(r => r.length > 1 || r[0] !== '');
 };
 
 const RowNumberInput = ({ value, onChangeRow, max }) => {
@@ -412,6 +441,8 @@ const Vouchers = ({ language = 'fa' }) => {
   const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, Accordion } = UI;
   const supabase = window.supabase;
 
+  const fileInputRef = useRef(null);
+
   const [view, setView] = useState('list');
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -419,6 +450,7 @@ const Vouchers = ({ language = 'fa' }) => {
   const [currencyModalIndex, setCurrencyModalIndex] = useState(null);
   
   const [voucherToPrint, setVoucherToPrint] = useState(null);
+  const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
   const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
 
@@ -1312,6 +1344,187 @@ const Vouchers = ({ language = 'fa' }) => {
     setShowDeleteModal(true);
   };
 
+  const handleDownloadTemplate = () => {
+     const header = isRtl 
+        ? "شناسه گروه (برای اقلام یک سند),تاریخ,شماره سند,شماره روزانه,شرح سربرگ,کد معین,بدهکار,بستانکار,شرح قلم,ارز\n"
+        : "Group_ID,Date,Voucher_Number,Daily_Number,Header_Description,Account_Code,Debit,Credit,Item_Description,Currency_Code\n";
+     const sample = isRtl
+        ? "1,2025-10-10,,,سند آزمایشی,1101,1000,0,بابت خرید,IRR\n1,2025-10-10,,,سند آزمایشی,2101,0,1000,بابت خرید,IRR\n"
+        : "1,2025-10-10,,,Test Voucher,1101,1000,0,For Purchase,USD\n1,2025-10-10,,,Test Voucher,2101,0,1000,For Purchase,USD\n";
+     
+     const blob = new Blob(['\ufeff' + header + sample], { type: 'text/csv;charset=utf-8;' }); 
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a');
+     a.href = url;
+     a.download = `Voucher_Import_Template.csv`;
+     a.click();
+     URL.revokeObjectURL(url);
+  };
+
+  const handleImportCSV = async (e) => {
+     const file = e.target.files[0];
+     if (!file) return;
+
+     setLoading(true);
+     const reader = new FileReader();
+     reader.onload = async (event) => {
+         try {
+             const text = event.target.result;
+             const rows = csvToArray(text);
+             if (rows.length < 2) throw new Error(t.emptyFile);
+
+             const { data: authData } = await supabase.auth.getUser();
+             const currentUserId = authData?.user?.id || null;
+             const defaultBranch = branches.find(b => b.is_default) || branches[0];
+             const branchId = defaultBranch?.id;
+
+             if (!contextVals.fiscal_year_id || !contextVals.ledger_id) {
+                 throw new Error(isRtl ? 'لطفاً ابتدا سال مالی و دفتر کل را انتخاب کنید.' : 'Please select fiscal year and ledger first.');
+             }
+
+             const groups = {};
+             for (let i = 1; i < rows.length; i++) {
+                 const row = rows[i];
+                 if (row.length < 10) continue;
+                 const groupId = row[0]?.trim();
+                 if (!groupId) continue;
+                 
+                 if (!groups[groupId]) groups[groupId] = [];
+                 groups[groupId].push({
+                     date: row[1]?.trim(),
+                     voucherNumber: row[2]?.trim(),
+                     dailyNumber: row[3]?.trim(),
+                     headerDesc: row[4]?.trim(),
+                     accountCode: row[5]?.trim(),
+                     debit: parseNum(row[6]),
+                     credit: parseNum(row[7]),
+                     itemDesc: row[8]?.trim(),
+                     currency: row[9]?.trim()
+                 });
+             }
+
+             const accountMap = new Map();
+             accounts.forEach(a => accountMap.set(a.full_code, a));
+
+             for (const [groupId, groupRows] of Object.entries(groups)) {
+                 const firstRow = groupRows[0];
+                 const voucherDate = firstRow.date || new Date().toISOString().split('T')[0];
+                 
+                 let voucherNumber = firstRow.voucherNumber;
+                 let dailyNumber = firstRow.dailyNumber;
+                 let crossRef = '';
+
+                 const { nextDaily, nextCross, nextVoucher, config } = await fetchAutoNumbers(voucherDate, contextVals.ledger_id, contextVals.fiscal_year_id, branchId);
+                 
+                 if (!voucherNumber) voucherNumber = nextVoucher;
+                 if (!dailyNumber) dailyNumber = nextDaily;
+                 crossRef = nextCross;
+
+                 let totalDebit = 0;
+                 let totalCredit = 0;
+                 groupRows.forEach(r => {
+                     totalDebit += r.debit;
+                     totalCredit += r.credit;
+                 });
+
+                 const voucherData = {
+                     voucher_date: voucherDate,
+                     voucher_type: docTypes.length > 0 ? docTypes[0].code : 'sys_general',
+                     status: 'draft',
+                     description: firstRow.headerDesc || '',
+                     voucher_number: voucherNumber,
+                     daily_number: dailyNumber,
+                     cross_reference: crossRef,
+                     fiscal_period_id: contextVals.fiscal_year_id,
+                     ledger_id: contextVals.ledger_id,
+                     branch_id: branchId,
+                     total_debit: totalDebit,
+                     total_credit: totalCredit,
+                     created_by: currentUserId
+                 };
+
+                 const { data: vData, error: vError } = await supabase.schema('gl').from('vouchers').insert([voucherData]).select().single();
+                 if (vError) throw vError;
+
+                 const savedVoucherId = vData.id;
+
+                 if (config && config.metadata && config.metadata.uniquenessScope && config.metadata.uniquenessScope !== 'none') {
+                     const scope = config.metadata.uniquenessScope;
+                     const resetYear = config.metadata.resetYear !== false;
+                     let lastNums = config.metadata.lastNumbers || {};
+                     const fyId = contextVals.fiscal_year_id;
+                     const bId = branchId;
+                     const savedVoucherNum = Number(voucherNumber); 
+
+                     if (scope === 'ledger') {
+                         if (resetYear) lastNums[fyId] = savedVoucherNum;
+                         else lastNums.global = savedVoucherNum;
+                     } else if (scope === 'branch') {
+                         if (resetYear) {
+                             if (!lastNums[fyId]) lastNums[fyId] = {};
+                             lastNums[fyId][bId] = savedVoucherNum;
+                         } else {
+                             lastNums[bId] = savedVoucherNum;
+                         }
+                     }
+
+                     const { data: latestLedger } = await supabase.schema('gl').from('ledgers').select('metadata').eq('id', contextVals.ledger_id).single();
+                     if (latestLedger) {
+                        const latestMeta = (typeof latestLedger.metadata === 'string' ? JSON.parse(latestLedger.metadata) : latestLedger.metadata) || {};
+                        await supabase.schema('gl').from('ledgers').update({
+                            metadata: { ...latestMeta, lastNumbers: lastNums }
+                        }).eq('id', contextVals.ledger_id);
+                     }
+                 }
+
+                 const itemsToSave = groupRows.map((item, index) => {
+                     const acc = accountMap.get(item.accountCode);
+                     let itemCurrency = item.currency;
+                     if (!itemCurrency && acc && acc.metadata) {
+                         const meta = typeof acc.metadata === 'string' ? JSON.parse(acc.metadata) : acc.metadata;
+                         if (meta.currencyFeature && meta.currency_code) {
+                              itemCurrency = meta.currency_code;
+                         }
+                     }
+                     if (!itemCurrency) {
+                         const ledger = ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
+                         itemCurrency = ledger?.currency || '';
+                     }
+
+                     return {
+                         voucher_id: savedVoucherId,
+                         row_number: index + 1,
+                         account_id: acc ? acc.id : null,
+                         debit: item.debit,
+                         credit: item.credit,
+                         description: item.itemDesc || firstRow.headerDesc || '',
+                         details: { currency_code: itemCurrency, selected_details: {} },
+                         op_rate: 1, op_is_reverse: false, op_debit: item.debit, op_credit: item.credit,
+                         rep1_rate: 1, rep1_is_reverse: false, rep1_debit: item.debit, rep1_credit: item.credit,
+                         rep2_rate: 1, rep2_is_reverse: false, rep2_debit: item.debit, rep2_credit: item.credit
+                     };
+                 });
+
+                 if (itemsToSave.length > 0) {
+                     const { error: itemsError } = await supabase.schema('gl').from('voucher_items').insert(itemsToSave);
+                     if (itemsError) throw itemsError;
+                 }
+             }
+
+             alert(t.importSuccess);
+             fetchVouchers();
+
+         } catch (err) {
+             console.error(err);
+             alert(t.importError + '\n' + (err.message || ''));
+         } finally {
+             setLoading(false);
+         }
+     };
+     reader.readAsText(file, 'UTF-8');
+     e.target.value = ''; 
+  };
+
   const getStatusBadge = (status) => {
     const config = {
         'draft': { label: t.statusDraft, bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
@@ -1400,7 +1613,10 @@ const Vouchers = ({ language = 'fa' }) => {
           </div>
           <div className="flex items-center gap-2">
             {currentVoucher.id && (
-               <Button variant="outline" onClick={() => handlePrint(currentVoucher)} icon={Printer}>{t.print}</Button>
+               <>
+                 <Button variant="outline" onClick={() => setVoucherForAttachments(currentVoucher)} icon={Paperclip}>{t.attachments}</Button>
+                 <Button variant="outline" onClick={() => handlePrint(currentVoucher)} icon={Printer}>{t.print}</Button>
+               </>
             )}
             {!isReadonly && (
               <>
@@ -1939,6 +2155,13 @@ const Vouchers = ({ language = 'fa' }) => {
             <p className="text-xs text-slate-500 font-medium mt-1">{t.subtitle}</p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+            <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleImportCSV} />
+            <Button variant="ghost" size="sm" icon={DownloadCloud} onClick={handleDownloadTemplate} title={t.downloadTemplate} />
+            <Button variant="ghost" size="sm" icon={FileSpreadsheet} onClick={() => fileInputRef.current?.click()} title={t.importCSV} className="text-emerald-600 hover:bg-emerald-50" />
+            <div className="h-6 w-px bg-slate-200 mx-1"></div>
+            <Button variant="primary" size="default" onClick={() => handleOpenForm()} icon={Plus}>{t.newVoucher}</Button>
+        </div>
       </div>
 
       <FilterSection 
@@ -1984,7 +2207,6 @@ const Vouchers = ({ language = 'fa' }) => {
           selectedIds={selectedIds} 
           onSelectRow={(id, c) => setSelectedIds(c ? [...selectedIds, id] : selectedIds.filter(i => i !== id))} 
           onSelectAll={(c) => setSelectedIds(c ? vouchers.map(v => v.id) : [])} 
-          onCreate={() => handleOpenForm()} 
           onDelete={(ids) => { setVoucherToDelete(vouchers.find(v => v.id === ids[0])); setShowDeleteModal(true); }} 
           onDoubleClick={(r) => handleOpenForm(r)} 
           isRtl={isRtl} 
@@ -1997,6 +2219,7 @@ const Vouchers = ({ language = 'fa' }) => {
           }
           actions={(r) => (
             <div className="flex gap-1 justify-center">
+              <Button variant="ghost" size="iconSm" icon={Paperclip} onClick={() => setVoucherForAttachments(r)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
               <Button variant="ghost" size="iconSm" icon={Copy} onClick={() => handleCopyVoucher(r)} title={t.copyVoucher} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50" />
               <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => handlePrint(r)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
               <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r)} />
@@ -2017,6 +2240,17 @@ const Vouchers = ({ language = 'fa' }) => {
              <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
                 <FileWarning size={48} className="text-amber-400" />
                 <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
+             </div>
+         )}
+      </Modal>
+
+      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="lg">
+         {voucherForAttachments && window.VoucherAttachments ? (
+             <window.VoucherAttachments voucherId={voucherForAttachments.id} onClose={() => setVoucherForAttachments(null)} />
+         ) : (
+             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                <FileWarning size={48} className="text-amber-400" />
+                <p>{isRtl ? 'کامپوننت ضمائم یافت نشد. لطفاً فایل VoucherAttachments.js را در پروژه قرار دهید.' : 'Attachments component not found. Please include VoucherAttachments.js.'}</p>
              </div>
          )}
       </Modal>
