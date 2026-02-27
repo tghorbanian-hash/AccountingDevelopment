@@ -341,6 +341,7 @@ const Vouchers = ({ language = 'fa' }) => {
          onClear={handleClearSearch} 
          isRtl={isRtl} 
          title={t.search}
+         defaultOpen={false}
       >
         <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
         <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
@@ -416,7 +417,8 @@ const Vouchers = ({ language = 'fa' }) => {
          )}
       </Modal>
 
-      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="lg">
+      {/* مودال ضمائم به اندازه md تغییر یافت */}
+      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
          {voucherForAttachments && window.VoucherAttachments ? (
              <window.VoucherAttachments voucherId={voucherForAttachments.id} onClose={() => setVoucherForAttachments(null)} />
          ) : (
@@ -426,6 +428,7 @@ const Vouchers = ({ language = 'fa' }) => {
              </div>
          )}
       </Modal>
+
     </div>
   );
 };

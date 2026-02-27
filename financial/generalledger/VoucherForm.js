@@ -964,7 +964,8 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
          )}
       </Modal>
 
-      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="lg">
+      {/* مودال ضمائم به اندازه md تغییر یافت */}
+      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
          {voucherForAttachments && window.VoucherAttachments ? (
              <window.VoucherAttachments voucherId={voucherForAttachments.id} onClose={() => setVoucherForAttachments(null)} />
          ) : (
