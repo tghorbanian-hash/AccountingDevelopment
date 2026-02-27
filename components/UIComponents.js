@@ -572,8 +572,8 @@ const TreeView = ({ data, onSelectNode, selectedNodeId, renderNodeContent, isRtl
   );
 };
 
-const FilterSection = ({ children, onSearch, onClear, isRtl, title }) => {
-  const [isOpen, setIsOpen] = useState(true);
+const FilterSection = ({ children, onSearch, onClear, isRtl, title, defaultOpen = false }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const defaultTitle = title || (isRtl ? "فیلترهای پیشرفته" : "Advanced Filters");
   const clearLabel = isRtl ? "پاک کردن" : "Clear";

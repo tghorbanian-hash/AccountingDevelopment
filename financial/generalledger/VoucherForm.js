@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ArrowRight, ArrowLeft, Save, CheckCircle, FileText, Scale, Plus, 
-  PanelRightClose, PanelRightOpen, Coins, CopyPlus, Trash2, Copy, Layers, FileWarning, Calculator, X
+  PanelRightClose, PanelRightOpen, Coins, CopyPlus, Trash2, Copy, Layers, FileWarning, Calculator, X,
+  Printer, Paperclip
 } from 'lucide-react';
 
 const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, language = 'fa' }) => {
@@ -23,6 +24,8 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const [isHeaderOpen, setIsHeaderOpen] = useState(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
   const [currencyModalIndex, setCurrencyModalIndex] = useState(null);
+  const [voucherToPrint, setVoucherToPrint] = useState(null);
+  const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
   // --- Computed Lookups for Form ---
   const ledgerStructureCode = useMemo(() => {
@@ -584,6 +587,13 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
           {currentVoucher.id && getStatusBadgeUI(currentVoucher.status)}
         </div>
         <div className="flex items-center gap-2">
+          {currentVoucher.id && !isCopy && (
+            <>
+              <Button variant="ghost" size="icon" icon={Paperclip} onClick={() => setVoucherForAttachments(currentVoucher)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
+              <Button variant="ghost" size="icon" icon={Printer} onClick={() => setVoucherToPrint(currentVoucher)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
+              <div className="h-6 w-px bg-slate-200 mx-1"></div>
+            </>
+          )}
           {!isReadonly && (
             <>
               <Button variant="outline" onClick={() => handleSaveVoucher('draft')} icon={Save}>{t.saveDraft}</Button>
@@ -941,6 +951,30 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
               </div>
           </Modal>
       )}
+
+      {/* Attachments & Print Modals */}
+      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
+         {voucherToPrint && window.VoucherPrint ? (
+             <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
+         ) : (
+             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                <FileWarning size={48} className="text-amber-400" />
+                <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
+             </div>
+         )}
+      </Modal>
+
+      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="lg">
+         {voucherForAttachments && window.VoucherAttachments ? (
+             <window.VoucherAttachments voucherId={voucherForAttachments.id} onClose={() => setVoucherForAttachments(null)} />
+         ) : (
+             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                <FileWarning size={48} className="text-amber-400" />
+                <p>{isRtl ? 'کامپوننت ضمائم یافت نشد. لطفاً فایل VoucherAttachments.js را در پروژه قرار دهید.' : 'Attachments component not found. Please include VoucherAttachments.js.'}</p>
+             </div>
+         )}
+      </Modal>
+
     </div>
   );
 };
