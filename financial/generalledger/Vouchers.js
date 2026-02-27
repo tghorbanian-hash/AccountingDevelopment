@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X, Layers, Printer
+  Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X, Layers, Printer,
+  Coins, Calculator
 } from 'lucide-react';
 
 const localTranslations = {
@@ -78,7 +79,15 @@ const localTranslations = {
     noPeriodsFound: 'No fiscal periods defined for this fiscal year.',
     dateNotInPeriods: 'Voucher date does not fall within any period of this fiscal year.',
     periodClosed: 'The fiscal period for this date is closed and you do not have permission to edit/save.',
-    selectedItems: '{count} items selected'
+    selectedItems: '{count} items selected',
+    currencyConversions: 'Currency Conversions',
+    opCurrency: 'Operating Currency',
+    rep1Currency: 'Reporting Currency 1',
+    rep2Currency: 'Reporting Currency 2',
+    exchangeRate: 'Exchange Rate',
+    reverseCalc: 'Reverse Calculation',
+    convertedAmount: 'Final Converted Amount',
+    baseAmount: 'Base Amount'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -152,13 +161,29 @@ const localTranslations = {
     noPeriodsFound: 'دوره‌های مالی برای این سال تعریف نشده است.',
     dateNotInPeriods: 'تاریخ سند در محدوده دوره‌های این سال مالی نیست.',
     periodClosed: 'دوره مالی مربوط به این تاریخ بسته است و شما مجوز ثبت/ویرایش ندارید.',
-    selectedItems: '{count} مورد انتخاب شده'
+    selectedItems: '{count} مورد انتخاب شده',
+    currencyConversions: 'تبدیلات ارزی قلم سند',
+    opCurrency: 'ارز عملیاتی',
+    rep1Currency: 'ارز گزارشگری ۱',
+    rep2Currency: 'ارز گزارشگری ۲',
+    exchangeRate: 'نرخ تبدیل',
+    reverseCalc: 'محاسبه معکوس',
+    convertedAmount: 'مبلغ نهایی (محاسبه شده)',
+    baseAmount: 'مبلغ مبنا'
   }
 };
 
 const normalizeFa = (str) => {
   if (!str) return '';
   return String(str).replace(/[يِي]/g, 'ی').replace(/[كک]/g, 'ک').replace(/[إأآا]/g, 'ا').toLowerCase();
+};
+
+const calcConv = (amount, rate, isReverse) => {
+    if (!amount || !rate) return 0;
+    const numAmt = parseFloat(amount);
+    const numRate = parseFloat(rate);
+    if (isNaN(numAmt) || isNaN(numRate) || numRate === 0) return 0;
+    return isReverse ? (numAmt / numRate) : (numAmt * numRate);
 };
 
 const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placeholder, className }) => {
@@ -318,7 +343,8 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
 
 const formatNum = (num) => {
   if (num === null || num === undefined || num === '') return '';
-  return Number(num).toLocaleString();
+  const parsed = Number(num);
+  return isNaN(parsed) ? '' : parsed.toLocaleString('en-US', { maximumFractionDigits: 6 });
 };
 
 const parseNum = (str) => {
@@ -338,6 +364,7 @@ const Vouchers = ({ language = 'fa' }) => {
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
+  const [currencyModalIndex, setCurrencyModalIndex] = useState(null);
   
   const [voucherToPrint, setVoucherToPrint] = useState(null);
 
@@ -351,6 +378,7 @@ const Vouchers = ({ language = 'fa' }) => {
   const [ledgers, setLedgers] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
+  const [currencyGlobals, setCurrencyGlobals] = useState(null);
   
   const [detailTypes, setDetailTypes] = useState([]);
   const [allDetailInstances, setAllDetailInstances] = useState([]);
@@ -400,7 +428,7 @@ const Vouchers = ({ language = 'fa' }) => {
         }
     };
 
-    const [brData, fyData, ledData, structData, dtData, diData, doctypeData, currData] = await Promise.all([
+    const [brData, fyData, ledData, structData, dtData, diData, doctypeData, currData, currGlobalsData] = await Promise.all([
         safeFetch(supabase.schema('gen').from('branches').select('*')),
         safeFetch(supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false })),
         safeFetch(supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure, metadata').eq('is_active', true).order('title')),
@@ -408,7 +436,8 @@ const Vouchers = ({ language = 'fa' }) => {
         safeFetch(supabase.schema('gl').from('detail_types').select('id, code, title').eq('is_active', true)),
         safeFetch(supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)),
         safeFetch(supabase.schema('gl').from('doc_types').select('id, code, title, type').eq('is_active', true)),
-        safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true))
+        safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true)),
+        safeFetch(supabase.schema('gen').from('currency_globals').select('*').limit(1))
     ]);
 
     if (brData) setBranches(brData.filter(b => b.is_active !== false));
@@ -417,6 +446,7 @@ const Vouchers = ({ language = 'fa' }) => {
     if (structData) setAccountStructures(structData);
     if (dtData) setDetailTypes(dtData);
     if (diData) setAllDetailInstances(diData);
+    if (currGlobalsData && currGlobalsData.length > 0) setCurrencyGlobals(currGlobalsData[0]);
 
     setContextVals(prev => {
         if (!prev.fiscal_year_id && !prev.ledger_id) {
@@ -608,7 +638,19 @@ const Vouchers = ({ language = 'fa' }) => {
           return { 
              ...item, 
              currency_code: detailsObj.currency_code || '',
-             details_dict: detailsObj.selected_details || {} 
+             details_dict: detailsObj.selected_details || {},
+             op_rate: item.op_rate ?? 1,
+             op_is_reverse: item.op_is_reverse ?? false,
+             op_debit: item.op_debit ?? 0,
+             op_credit: item.op_credit ?? 0,
+             rep1_rate: item.rep1_rate ?? 1,
+             rep1_is_reverse: item.rep1_is_reverse ?? false,
+             rep1_debit: item.rep1_debit ?? 0,
+             rep1_credit: item.rep1_credit ?? 0,
+             rep2_rate: item.rep2_rate ?? 1,
+             rep2_is_reverse: item.rep2_is_reverse ?? false,
+             rep2_debit: item.rep2_debit ?? 0,
+             rep2_credit: item.rep2_credit ?? 0,
           };
         });
         setVoucherItems(mappedItems);
@@ -653,7 +695,10 @@ const Vouchers = ({ language = 'fa' }) => {
         description: '',
         tracking_number: '',
         tracking_date: '',
-        quantity: ''
+        quantity: '',
+        op_rate: 1, op_is_reverse: false, op_debit: 0, op_credit: 0,
+        rep1_rate: 1, rep1_is_reverse: false, rep1_debit: 0, rep1_credit: 0,
+        rep2_rate: 1, rep2_is_reverse: false, rep2_debit: 0, rep2_credit: 0
       }]);
       setLoading(false);
     }
@@ -848,7 +893,19 @@ const Vouchers = ({ language = 'fa' }) => {
           tracking_number: cleanData(item.tracking_number),
           tracking_date: cleanData(item.tracking_date),
           quantity: parseNum(item.quantity) === 0 ? null : parseNum(item.quantity),
-          details: { currency_code: item.currency_code, selected_details: item.details_dict || {} }
+          details: { currency_code: item.currency_code, selected_details: item.details_dict || {} },
+          op_rate: parseNum(item.op_rate),
+          op_is_reverse: item.op_is_reverse,
+          op_debit: parseNum(item.op_debit),
+          op_credit: parseNum(item.op_credit),
+          rep1_rate: parseNum(item.rep1_rate),
+          rep1_is_reverse: item.rep1_is_reverse,
+          rep1_debit: parseNum(item.rep1_debit),
+          rep1_credit: parseNum(item.rep1_credit),
+          rep2_rate: parseNum(item.rep2_rate),
+          rep2_is_reverse: item.rep2_is_reverse,
+          rep2_debit: parseNum(item.rep2_debit),
+          rep2_credit: parseNum(item.rep2_credit),
         };
       });
 
@@ -907,6 +964,21 @@ const Vouchers = ({ language = 'fa' }) => {
 
     newItems[index][field] = value;
     
+    // Auto-calculate Currency Conversions if amounts or rates change
+    if (['debit', 'credit', 'op_rate', 'op_is_reverse', 'rep1_rate', 'rep1_is_reverse', 'rep2_rate', 'rep2_is_reverse'].includes(field)) {
+        const baseDebit = parseNum(newItems[index].debit);
+        const baseCredit = parseNum(newItems[index].credit);
+        
+        newItems[index].op_debit = calcConv(baseDebit, newItems[index].op_rate, newItems[index].op_is_reverse);
+        newItems[index].op_credit = calcConv(baseCredit, newItems[index].op_rate, newItems[index].op_is_reverse);
+
+        newItems[index].rep1_debit = calcConv(baseDebit, newItems[index].rep1_rate, newItems[index].rep1_is_reverse);
+        newItems[index].rep1_credit = calcConv(baseCredit, newItems[index].rep1_rate, newItems[index].rep1_is_reverse);
+
+        newItems[index].rep2_debit = calcConv(baseDebit, newItems[index].rep2_rate, newItems[index].rep2_is_reverse);
+        newItems[index].rep2_credit = calcConv(baseCredit, newItems[index].rep2_rate, newItems[index].rep2_is_reverse);
+    }
+
     if (field === 'account_id') {
       const selectedAcc = accounts.find(a => String(a.id) === String(value));
       const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
@@ -940,7 +1012,10 @@ const Vouchers = ({ language = 'fa' }) => {
       description: lastDescription, 
       tracking_number: '', 
       tracking_date: '',
-      quantity: '' 
+      quantity: '',
+      op_rate: 1, op_is_reverse: false, op_debit: 0, op_credit: 0,
+      rep1_rate: 1, rep1_is_reverse: false, rep1_debit: 0, rep1_credit: 0,
+      rep2_rate: 1, rep2_is_reverse: false, rep2_debit: 0, rep2_credit: 0
     }]);
     setFocusedRowId(newId);
   };
@@ -959,9 +1034,21 @@ const Vouchers = ({ language = 'fa' }) => {
        if (diff < 0) {
            newItems[emptyRowIndex].debit = Math.abs(diff);
            newItems[emptyRowIndex].credit = 0;
+           newItems[emptyRowIndex].op_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].op_rate, newItems[emptyRowIndex].op_is_reverse);
+           newItems[emptyRowIndex].op_credit = 0;
+           newItems[emptyRowIndex].rep1_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].rep1_rate, newItems[emptyRowIndex].rep1_is_reverse);
+           newItems[emptyRowIndex].rep1_credit = 0;
+           newItems[emptyRowIndex].rep2_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].rep2_rate, newItems[emptyRowIndex].rep2_is_reverse);
+           newItems[emptyRowIndex].rep2_credit = 0;
        } else {
            newItems[emptyRowIndex].credit = diff;
            newItems[emptyRowIndex].debit = 0;
+           newItems[emptyRowIndex].op_credit = calcConv(diff, newItems[emptyRowIndex].op_rate, newItems[emptyRowIndex].op_is_reverse);
+           newItems[emptyRowIndex].op_debit = 0;
+           newItems[emptyRowIndex].rep1_credit = calcConv(diff, newItems[emptyRowIndex].rep1_rate, newItems[emptyRowIndex].rep1_is_reverse);
+           newItems[emptyRowIndex].rep1_debit = 0;
+           newItems[emptyRowIndex].rep2_credit = calcConv(diff, newItems[emptyRowIndex].rep2_rate, newItems[emptyRowIndex].rep2_is_reverse);
+           newItems[emptyRowIndex].rep2_debit = 0;
        }
        setVoucherItems(newItems);
        setFocusedRowId(newItems[emptyRowIndex].id);
@@ -979,7 +1066,10 @@ const Vouchers = ({ language = 'fa' }) => {
          description: '', 
          tracking_number: '', 
          tracking_date: '',
-         quantity: '' 
+         quantity: '',
+         op_rate: 1, op_is_reverse: false, op_debit: diff < 0 ? Math.abs(diff) : 0, op_credit: diff > 0 ? diff : 0,
+         rep1_rate: 1, rep1_is_reverse: false, rep1_debit: diff < 0 ? Math.abs(diff) : 0, rep1_credit: diff > 0 ? diff : 0,
+         rep2_rate: 1, rep2_is_reverse: false, rep2_debit: diff < 0 ? Math.abs(diff) : 0, rep2_credit: diff > 0 ? diff : 0
        }]);
        setFocusedRowId(newId);
     }
@@ -1068,6 +1158,12 @@ const Vouchers = ({ language = 'fa' }) => {
   const selectedVouchers = vouchers.filter(v => selectedIds.includes(v.id));
   const allDraft = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'draft');
   const allTemp = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'temporary');
+
+  // Helpers for Currency Names
+  const getCurrencyTitle = (code) => {
+      if(!code) return '-';
+      return currencies.find(c => c.code === code)?.title || code;
+  }
 
   if (view === 'form' && currentVoucher) {
     const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
@@ -1235,16 +1331,25 @@ const Vouchers = ({ language = 'fa' }) => {
                                  </div>
                                  <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
                                     <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
-                                    <select 
-                                       className={`w-full border rounded h-8 px-1 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
-                                       value={item.currency_code || ''}
-                                       onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
-                                       disabled={isReadonly}
-                                       onFocus={() => setFocusedRowId(item.id)}
-                                    >
-                                       <option value="">-</option>
-                                       {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
-                                    </select>
+                                    <div className="flex items-center gap-1 h-8">
+                                      <select 
+                                         className={`flex-1 w-full border rounded h-full px-1 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
+                                         value={item.currency_code || ''}
+                                         onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
+                                         disabled={isReadonly}
+                                         onFocus={() => setFocusedRowId(item.id)}
+                                      >
+                                         <option value="">-</option>
+                                         {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
+                                      </select>
+                                      <button 
+                                        className={`w-8 h-full shrink-0 flex items-center justify-center rounded border transition-colors ${isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100'}`}
+                                        onClick={(e) => { e.stopPropagation(); if(!isReadonly) setCurrencyModalIndex(index); }}
+                                        title={t.currencyConversions}
+                                      >
+                                        <Coins size={14}/>
+                                      </button>
+                                    </div>
                                  </div>
                                  <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
                                     <div className="flex justify-between items-center">
@@ -1314,6 +1419,122 @@ const Vouchers = ({ language = 'fa' }) => {
             </div>
           </div>
         </div>
+        
+        {/* Currency Conversion Modal */}
+        {currencyModalIndex !== null && voucherItems[currencyModalIndex] && (
+            <Modal isOpen={true} onClose={() => setCurrencyModalIndex(null)} title={`${t.currencyConversions} - ${t.row} ${currencyModalIndex + 1}`} size="lg" footer={<Button variant="primary" onClick={() => setCurrencyModalIndex(null)}>{isRtl ? 'تایید و بستن' : 'Confirm & Close'}</Button>}>
+                <div className="p-4 bg-slate-50/50 flex flex-col gap-4">
+                    <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm text-sm">
+                        <div className="flex items-center gap-2">
+                           <Calculator size={18} className="text-indigo-500"/>
+                           <span className="font-bold text-slate-700">{t.baseAmount}:</span>
+                           <span className={`font-bold ${parseNum(voucherItems[currencyModalIndex].debit) > 0 ? 'text-emerald-600' : (parseNum(voucherItems[currencyModalIndex].credit) > 0 ? 'text-rose-600' : 'text-slate-500')}`}>
+                               {parseNum(voucherItems[currencyModalIndex].debit) > 0 
+                                  ? `${formatNum(voucherItems[currencyModalIndex].debit)} (${t.debit})` 
+                                  : parseNum(voucherItems[currencyModalIndex].credit) > 0 
+                                      ? `${formatNum(voucherItems[currencyModalIndex].credit)} (${t.credit})`
+                                      : '0'}
+                           </span>
+                        </div>
+                        <Badge variant="indigo">{getCurrencyTitle(voucherItems[currencyModalIndex].currency_code)}</Badge>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm bg-white">
+                        <table className="w-full text-xs text-right dir-rtl">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                                <tr>
+                                    <th className="py-2 px-3 font-bold">{isRtl ? 'نوع ارز' : 'Type'}</th>
+                                    <th className="py-2 px-3 font-bold">{isRtl ? 'ارز مقصد' : 'Target'}</th>
+                                    <th className="py-2 px-3 font-bold w-32">{t.exchangeRate}</th>
+                                    <th className="py-2 px-3 font-bold text-center">{t.reverseCalc}</th>
+                                    <th className="py-2 px-3 font-bold w-40">{t.convertedAmount}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {/* Operating Currency */}
+                                {currencyGlobals?.op_currency && (
+                                    <tr className="border-b border-slate-100 hover:bg-slate-50">
+                                        <td className="py-2 px-3 font-bold text-slate-700">{t.opCurrency}</td>
+                                        <td className="py-2 px-3">{getCurrencyTitle(currencyGlobals.op_currency)}</td>
+                                        <td className="py-2 px-3">
+                                            <input type="text" className="w-full border border-slate-200 rounded h-7 px-2 text-left dir-ltr focus:border-indigo-500 outline-none" 
+                                                value={voucherItems[currencyModalIndex].op_rate} 
+                                                onChange={(e) => handleItemChange(currencyModalIndex, 'op_rate', e.target.value)} 
+                                            />
+                                        </td>
+                                        <td className="py-2 px-3 text-center">
+                                            <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded cursor-pointer" 
+                                                checked={voucherItems[currencyModalIndex].op_is_reverse} 
+                                                onChange={(e) => handleItemChange(currencyModalIndex, 'op_is_reverse', e.target.checked)} 
+                                            />
+                                        </td>
+                                        <td className="py-2 px-3">
+                                            <div className="w-full h-7 bg-indigo-50 border border-indigo-100 rounded flex items-center px-2 font-bold text-indigo-700 text-left dir-ltr overflow-hidden text-ellipsis whitespace-nowrap">
+                                                {formatNum(parseNum(voucherItems[currencyModalIndex].debit) > 0 ? voucherItems[currencyModalIndex].op_debit : voucherItems[currencyModalIndex].op_credit)}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+
+                                {/* Reporting Currency 1 */}
+                                {currencyGlobals?.rep1_currency && (
+                                    <tr className="border-b border-slate-100 hover:bg-slate-50">
+                                        <td className="py-2 px-3 font-bold text-slate-700">{t.rep1Currency}</td>
+                                        <td className="py-2 px-3">{getCurrencyTitle(currencyGlobals.rep1_currency)}</td>
+                                        <td className="py-2 px-3">
+                                            <input type="text" className="w-full border border-slate-200 rounded h-7 px-2 text-left dir-ltr focus:border-indigo-500 outline-none" 
+                                                value={voucherItems[currencyModalIndex].rep1_rate} 
+                                                onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_rate', e.target.value)} 
+                                            />
+                                        </td>
+                                        <td className="py-2 px-3 text-center">
+                                            <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded cursor-pointer" 
+                                                checked={voucherItems[currencyModalIndex].rep1_is_reverse} 
+                                                onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_is_reverse', e.target.checked)} 
+                                            />
+                                        </td>
+                                        <td className="py-2 px-3">
+                                            <div className="w-full h-7 bg-indigo-50 border border-indigo-100 rounded flex items-center px-2 font-bold text-indigo-700 text-left dir-ltr overflow-hidden text-ellipsis whitespace-nowrap">
+                                                {formatNum(parseNum(voucherItems[currencyModalIndex].debit) > 0 ? voucherItems[currencyModalIndex].rep1_debit : voucherItems[currencyModalIndex].rep1_credit)}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+
+                                {/* Reporting Currency 2 */}
+                                {currencyGlobals?.rep2_currency && (
+                                    <tr className="hover:bg-slate-50">
+                                        <td className="py-2 px-3 font-bold text-slate-700">{t.rep2Currency}</td>
+                                        <td className="py-2 px-3">{getCurrencyTitle(currencyGlobals.rep2_currency)}</td>
+                                        <td className="py-2 px-3">
+                                            <input type="text" className="w-full border border-slate-200 rounded h-7 px-2 text-left dir-ltr focus:border-indigo-500 outline-none" 
+                                                value={voucherItems[currencyModalIndex].rep2_rate} 
+                                                onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_rate', e.target.value)} 
+                                            />
+                                        </td>
+                                        <td className="py-2 px-3 text-center">
+                                            <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded cursor-pointer" 
+                                                checked={voucherItems[currencyModalIndex].rep2_is_reverse} 
+                                                onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_is_reverse', e.target.checked)} 
+                                            />
+                                        </td>
+                                        <td className="py-2 px-3">
+                                            <div className="w-full h-7 bg-indigo-50 border border-indigo-100 rounded flex items-center px-2 font-bold text-indigo-700 text-left dir-ltr overflow-hidden text-ellipsis whitespace-nowrap">
+                                                {formatNum(parseNum(voucherItems[currencyModalIndex].debit) > 0 ? voucherItems[currencyModalIndex].rep2_debit : voucherItems[currencyModalIndex].rep2_credit)}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p className="text-[10px] text-slate-500 text-justify bg-amber-50 p-2 rounded border border-amber-200 flex gap-2 items-start mt-2">
+                        <FileWarning size={14} className="shrink-0 text-amber-500" />
+                        <span>{isRtl ? 'مقادیر تبدیل‌شده به صورت خودکار محاسبه شده و با تغییر مبلغ مبنا یا نرخ تبدیل در لحظه به‌روزرسانی می‌شوند. این مقادیر در گزارشات پایه سیستم مورد استفاده قرار می‌گیرند.' : 'Converted values are automatically calculated and updated in real-time. These are used for base system reports.'}</span>
+                    </p>
+                </div>
+            </Modal>
+        )}
       </div>
     );
   }
