@@ -51,7 +51,7 @@ const localTranslations = {
     general: 'General',
     trackingNumber: 'Tracking No.',
     trackingDate: 'Tracking Date',
-    quantity: 'Quantity',
+    quantity: 'Qty',
     unbalancedError: 'Voucher is not balanced. Can only save as draft.',
     zeroAmountError: 'Total amount cannot be zero. Please enter debit or credit values.',
     dualEntryError: 'A single row cannot have both debit and credit values.',
@@ -95,7 +95,11 @@ const localTranslations = {
     summary: 'Voucher Summary',
     copyVoucher: 'Copy Voucher',
     balanced: 'Balanced',
-    unbalanced: 'Unbalanced'
+    unbalanced: 'Unbalanced',
+    summaryBase: 'Base',
+    summaryOp: 'OP Cur',
+    summaryRep1: 'Rep 1 Cur',
+    summaryRep2: 'Rep 2 Cur',
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -107,8 +111,8 @@ const localTranslations = {
     type: 'نوع سند',
     status: 'وضعیت',
     description: 'شرح',
-    totalDebit: 'جمع بدهکار',
-    totalCredit: 'جمع بستانکار',
+    totalDebit: 'بدهکار',
+    totalCredit: 'بستانکار',
     amount: 'مبلغ سند',
     actions: 'عملیات',
     edit: 'ویرایش',
@@ -124,12 +128,12 @@ const localTranslations = {
     items: 'اقلام سند',
     addRow: 'ردیف جدید',
     row: 'ردیف',
-    account: 'معین',
+    account: 'کد و شرح معین',
     detail: 'تفصیل',
     debit: 'بدهکار',
     credit: 'بستانکار',
     currency: 'ارز',
-    balance: 'تراز کردن سند',
+    balance: 'تراز کردن',
     saveDraft: 'ذخیره یادداشت',
     saveTemp: 'ذخیره موقت',
     backToList: 'بازگشت به فهرست',
@@ -185,7 +189,11 @@ const localTranslations = {
     summary: 'خلاصه سند',
     copyVoucher: 'کپی سند',
     balanced: 'تراز',
-    unbalanced: 'اختلاف'
+    unbalanced: 'اختلاف',
+    summaryBase: 'Base',
+    summaryOp: 'OP Cur',
+    summaryRep1: 'Rep 1 Cur',
+    summaryRep2: 'Rep 2 Cur',
   }
 };
 
@@ -293,14 +301,14 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
 };
 
 const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange, disabled, t }) => {
-  const [activeType, useState] = React.useState(null);
-  const [search, setSearch] = React.useState('');
+  const [activeType, setActiveType] = useState(null);
+  const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        useState(null);
+        setActiveType(null);
         setSearch('');
       }
     };
@@ -358,7 +366,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
                                onMouseDown={(e) => { 
                                   e.preventDefault(); 
                                   onChange({ ...value, [type.code]: d.id });
-                                  useState(null);
+                                  setActiveType(null);
                                   setSearch('');
                                }}
                              >
@@ -372,7 +380,7 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
                    </div>
                 ) : (
                    <button 
-                      onClick={(e) => { e.preventDefault(); if(!disabled) { useState(type.code); setSearch(''); } }} 
+                      onClick={(e) => { e.preventDefault(); if(!disabled) { setActiveType(type.code); setSearch(''); } }} 
                       className={`bg-white border border-dashed text-[11px] px-2 py-0.5 rounded transition-colors ${disabled ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 hover:bg-indigo-50'}`}
                    >
                       + {type.title}
@@ -404,30 +412,30 @@ const Vouchers = ({ language = 'fa' }) => {
   const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, Accordion } = UI;
   const supabase = window.supabase;
 
-  const [view, setView] = React.useState('list');
-  const [loading, setLoading] = React.useState(false);
-  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
-  const [voucherToDelete, setVoucherToDelete] = React.useState(null);
-  const [currencyModalIndex, setCurrencyModalIndex] = React.useState(null);
+  const [view, setView] = useState('list');
+  const [loading, setLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [voucherToDelete, setVoucherToDelete] = useState(null);
+  const [currencyModalIndex, setCurrencyModalIndex] = useState(null);
   
-  const [voucherToPrint, setVoucherToPrint] = React.useState(null);
+  const [voucherToPrint, setVoucherToPrint] = useState(null);
 
-  const [contextVals, setContextVals] = React.useState({ fiscal_year_id: '', ledger_id: '' });
+  const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
 
-  const [vouchers, setVouchers] = React.useState([]);
-  const [accounts, setAccounts] = React.useState([]);
-  const [accountStructures, setAccountStructures] = React.useState([]);
-  const [branches, setBranches] = React.useState([]);
-  const [fiscalYears, setFiscalYears] = React.useState([]);
-  const [ledgers, setLedgers] = React.useState([]);
-  const [docTypes, setDocTypes] = React.useState([]);
-  const [currencies, setCurrencies] = React.useState([]);
-  const [currencyGlobals, setCurrencyGlobals] = React.useState(null);
+  const [vouchers, setVouchers] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [accountStructures, setAccountStructures] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [fiscalYears, setFiscalYears] = useState([]);
+  const [ledgers, setLedgers] = useState([]);
+  const [docTypes, setDocTypes] = useState([]);
+  const [currencies, setCurrencies] = useState([]);
+  const [currencyGlobals, setCurrencyGlobals] = useState(null);
   
-  const [detailTypes, setDetailTypes] = React.useState([]);
-  const [allDetailInstances, setAllDetailInstances] = React.useState([]);
+  const [detailTypes, setDetailTypes] = useState([]);
+  const [allDetailInstances, setAllDetailInstances] = useState([]);
   
-  const [searchParams, setSearchParams] = React.useState({ 
+  const [searchParams, setSearchParams] = useState({ 
       voucher_number: '', 
       description: '', 
       from_date: '', 
@@ -436,13 +444,13 @@ const Vouchers = ({ language = 'fa' }) => {
       voucher_type: '', 
       account_id: '' 
   });
-  const [selectedIds, setSelectedIds] = React.useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
 
-  const [currentVoucher, setCurrentVoucher] = React.useState(null);
-  const [voucherItems, setVoucherItems] = React.useState([]);
+  const [currentVoucher, setCurrentVoucher] = useState(null);
+  const [voucherItems, setVoucherItems] = useState([]);
   
-  const [focusedRowId, setFocusedRowId] = React.useState(null);
-  const [isHeaderOpen, setIsHeaderOpen] = React.useState(true);
+  const [focusedRowId, setFocusedRowId] = useState(null);
+  const [isHeaderOpen, setIsHeaderOpen] = useState(true);
 
   useEffect(() => {
     fetchLookups();
@@ -747,6 +755,7 @@ const Vouchers = ({ language = 'fa' }) => {
         rep2_rate: 1, rep2_is_reverse: false, rep2_debit: 0, rep2_credit: 0
       }]);
       setFocusedRowId(newId);
+      setIsHeaderOpen(false);
       setLoading(false);
     }
     setView('form');
@@ -913,8 +922,11 @@ const Vouchers = ({ language = 'fa' }) => {
         }
     }
 
-    const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
-    const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
+    let totalDebit = 0, totalCredit = 0;
+    voucherItems.forEach(item => {
+        totalDebit += parseNum(item.debit);
+        totalCredit += parseNum(item.credit);
+    });
     
     if (totalDebit === 0 && totalCredit === 0) {
       alert(t.zeroAmountError);
@@ -1188,7 +1200,8 @@ const Vouchers = ({ language = 'fa' }) => {
       rep1_rate: 1, rep1_is_reverse: false, rep1_debit: 0, rep1_credit: 0,
       rep2_rate: 1, rep2_is_reverse: false, rep2_debit: 0, rep2_credit: 0
     }]);
-    handleItemFocus(newId);
+    setFocusedRowId(newId);
+    setIsHeaderOpen(false);
   };
 
   const duplicateRow = (index) => {
@@ -1201,7 +1214,8 @@ const Vouchers = ({ language = 'fa' }) => {
       const renumbered = itemsCpy.map((it, idx) => ({...it, row_number: idx + 1}));
       
       setVoucherItems(renumbered);
-      handleItemFocus(newId);
+      setFocusedRowId(newId);
+      setIsHeaderOpen(false);
   };
 
   const globalBalance = () => {
@@ -1235,7 +1249,8 @@ const Vouchers = ({ language = 'fa' }) => {
            newItems[emptyRowIndex].rep2_debit = 0;
        }
        setVoucherItems(newItems);
-       handleItemFocus(newItems[emptyRowIndex].id);
+       setFocusedRowId(newItems[emptyRowIndex].id);
+       setIsHeaderOpen(false);
     } else {
        const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
        const newId = 'temp_' + Date.now();
@@ -1255,7 +1270,8 @@ const Vouchers = ({ language = 'fa' }) => {
          rep1_rate: 1, rep1_is_reverse: false, rep1_debit: diff < 0 ? Math.abs(diff) : 0, rep1_credit: diff > 0 ? diff : 0,
          rep2_rate: 1, rep2_is_reverse: false, rep2_debit: diff < 0 ? Math.abs(diff) : 0, rep2_credit: diff > 0 ? diff : 0
        }]);
-       handleItemFocus(newId);
+       setFocusedRowId(newId);
+       setIsHeaderOpen(false);
     }
   };
 
@@ -1351,15 +1367,18 @@ const Vouchers = ({ language = 'fa' }) => {
   }
 
   if (view === 'form' && currentVoucher) {
-    const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
-    const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
+    let totalDebit = 0, totalCredit = 0, opTotalDebit = 0, opTotalCredit = 0, rep1TotalDebit = 0, rep1TotalCredit = 0, rep2TotalDebit = 0, rep2TotalCredit = 0;
     
-    const opTotalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.op_debit), 0);
-    const opTotalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.op_credit), 0);
-    const rep1TotalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.rep1_debit), 0);
-    const rep1TotalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.rep1_credit), 0);
-    const rep2TotalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.rep2_debit), 0);
-    const rep2TotalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.rep2_credit), 0);
+    voucherItems.forEach(item => {
+        totalDebit += parseNum(item.debit);
+        totalCredit += parseNum(item.credit);
+        opTotalDebit += parseNum(item.op_debit);
+        opTotalCredit += parseNum(item.op_credit);
+        rep1TotalDebit += parseNum(item.rep1_debit);
+        rep1TotalCredit += parseNum(item.rep1_credit);
+        rep2TotalDebit += parseNum(item.rep2_debit);
+        rep2TotalCredit += parseNum(item.rep2_credit);
+    });
 
     const isBalanced = totalDebit === totalCredit;
     const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final';
@@ -1369,8 +1388,8 @@ const Vouchers = ({ language = 'fa' }) => {
     const currentLedgerTitle = currentLedger?.title || '';
 
     return (
-      <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
-        <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
+      <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`} onClick={() => setFocusedRowId(null)}>
+        <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => { setView('list'); setCurrentVoucher(null); setVoucherItems([]); }} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
             <div className="h-6 w-px bg-slate-200 mx-1"></div>
@@ -1399,7 +1418,7 @@ const Vouchers = ({ language = 'fa' }) => {
             icon={FileText}
             className="shrink-0"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4" onClick={(e) => e.stopPropagation()}>
               <InputField label={t.fiscalYear} value={currentFiscalYearTitle} disabled isRtl={isRtl} />
               <InputField label={t.ledger} value={currentLedgerTitle} disabled isRtl={isRtl} />
               <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => {
@@ -1454,7 +1473,7 @@ const Vouchers = ({ language = 'fa' }) => {
           <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4">
             
             {/* --- Main Items List (Left/Main) --- */}
-            <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0" onClick={() => setFocusedRowId(null)}>
+            <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
                   <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
                   {!isReadonly && (
@@ -1465,210 +1484,237 @@ const Vouchers = ({ language = 'fa' }) => {
                   )}
                 </div>
                 
-                <div className="flex-1 overflow-auto custom-scrollbar p-2 bg-slate-50">
-                   {voucherItems.map((item, index) => {
-                      const isFocused = focusedRowId === item.id;
-                      const isEditing = isFocused && !isReadonly;
-                      
-                      const accountObj = accounts.find(a => String(a.id) === String(item.account_id));
-                      let hasTracking = false;
-                      let hasQuantity = false;
-                      if (accountObj && accountObj.metadata) {
-                          const meta = typeof accountObj.metadata === 'string' ? JSON.parse(accountObj.metadata) : accountObj.metadata;
-                          if (meta.trackFeature) hasTracking = true;
-                          if (meta.qtyFeature) hasQuantity = true;
-                      }
+                <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar bg-slate-50 relative" onClick={() => setFocusedRowId(null)}>
+                   <div className="min-w-max flex flex-col h-full">
+                       
+                       {/* List Header */}
+                       <div className="flex items-center gap-3 p-2 bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase sticky top-0 z-20 shrink-0 shadow-sm">
+                           <div className="w-6 text-center">{t.row}</div>
+                           <div className="w-48">{t.account}</div>
+                           <div className="w-24 text-center">{t.debit}</div>
+                           <div className="w-24 text-center">{t.credit}</div>
+                           <div className="w-16 text-center">{t.currency}</div>
+                           <div className="w-48">{t.description}</div>
+                           <div className="w-48">{t.detail}</div>
+                           <div className="w-24 text-center">{t.trackingNumber} / {t.trackingDate}</div>
+                           <div className="w-16 text-center">{t.quantity}</div>
+                       </div>
 
-                      const allowedDetailTypes = getValidDetailTypes(item.account_id);
-                      const hasDetails = allowedDetailTypes.length > 0;
-                      const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
-                      const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
+                       {/* List Items */}
+                       <div className="flex-1 flex flex-col pb-6">
+                           {voucherItems.map((item, index) => {
+                              const isFocused = focusedRowId === item.id;
+                              const isEditing = isFocused && !isReadonly;
+                              
+                              const accountObj = accounts.find(a => String(a.id) === String(item.account_id));
+                              let hasTracking = false;
+                              let hasQuantity = false;
+                              if (accountObj && accountObj.metadata) {
+                                  const meta = typeof accountObj.metadata === 'string' ? JSON.parse(accountObj.metadata) : accountObj.metadata;
+                                  if (meta.trackFeature) hasTracking = true;
+                                  if (meta.qtyFeature) hasQuantity = true;
+                              }
 
-                      const accountDisplay = accountObj ? accountObj.full_code + ' - ' + accountObj.title : '-';
-                      const detailsDisplay = Object.values(item.details_dict || {}).map(id => allDetailInstances.find(d => String(d.id) === String(id))?.title).filter(Boolean).join(' / ');
+                              const allowedDetailTypes = getValidDetailTypes(item.account_id);
+                              const hasDetails = allowedDetailTypes.length > 0;
+                              const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
+                              const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
 
-                      // Compact View Mode
-                      if (!isEditing) {
-                          const hasForeignCurrency = item.currency_code !== currentLedger?.currency || parseNum(item.op_rate) !== 1 || parseNum(item.rep1_rate) !== 1;
-                          const hasTrackingData = item.tracking_number || item.tracking_date;
-                          const hasQuantityData = item.quantity && parseNum(item.quantity) > 0;
-
-                          return (
-                              <div
-                                  key={item.id}
-                                  className={`flex items-center gap-2 p-2 bg-white border-b border-slate-100 cursor-pointer transition-colors text-[11px] group ${isFocused ? 'ring-1 ring-indigo-200 shadow-sm z-10 relative' : 'hover:bg-indigo-50/40'}`}
-                                  onClick={(e) => { e.stopPropagation(); handleItemFocus(item.id); }}
-                              >
-                                  <div className="w-6 text-center font-bold text-slate-400 group-hover:text-indigo-500 shrink-0">{item.row_number}</div>
+                              // Compact View Mode
+                              if (!isEditing) {
+                                  const hasForeignCurrency = item.currency_code !== currentLedger?.currency || parseNum(item.op_rate) !== 1 || parseNum(item.rep1_rate) !== 1 || parseNum(item.rep2_rate) !== 1;
+                                  const hasTrackingData = item.tracking_number || item.tracking_date;
+                                  const hasQuantityData = item.quantity && parseNum(item.quantity) > 0;
                                   
-                                  <div className="flex-1 flex items-center gap-2 overflow-hidden min-w-0">
-                                      <div className="flex items-center gap-1.5 shrink-0 max-w-[40%]">
-                                          <span className="font-bold text-slate-700 truncate" title={accountDisplay}>{accountDisplay}</span>
-                                          {detailsDisplay && <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100 truncate max-w-[120px]" title={detailsDisplay}>{detailsDisplay}</span>}
-                                      </div>
-                                      
-                                      <div className="text-slate-500 truncate flex-1 min-w-[50px]" title={item.description || '-'}>{item.description || '-'}</div>
-                                      
-                                      <div className="flex items-center gap-1.5 shrink-0">
-                                          {hasTrackingData && (
-                                              <div className="flex items-center gap-1 bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-100 text-[9px]" title={`${t.trackingNumber}: ${item.tracking_number} - ${t.trackingDate}: ${item.tracking_date}`}>
-                                                  <FileText size={10} />
-                                                  <span className="max-w-[80px] truncate">{item.tracking_number || '-'} {item.tracking_date ? `(${item.tracking_date})` : ''}</span>
-                                              </div>
-                                          )}
-                                          {hasQuantityData && (
-                                              <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100 text-[9px]" title={`${t.quantity}: ${item.quantity}`}>
-                                                  <Layers size={10} />
-                                                  <span>{formatNum(item.quantity)}</span>
-                                              </div>
-                                          )}
-                                          {hasForeignCurrency && (
-                                              <div className="flex items-center gap-1 bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 text-[9px]" title={t.currencyConversions}>
-                                                  <Coins size={10} />
-                                              </div>
-                                          )}
-                                      </div>
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-3 shrink-0 px-1">
-                                      <div className="w-20 flex flex-col items-end justify-center">
-                                          <span className="text-[8px] text-slate-400 uppercase leading-none">{t.debit}</span>
-                                          <span className={`font-bold dir-ltr text-[11px] ${parseNum(item.debit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>{formatNum(item.debit) || '-'}</span>
-                                      </div>
-                                      <div className="w-20 flex flex-col items-end justify-center">
-                                          <span className="text-[8px] text-slate-400 uppercase leading-none">{t.credit}</span>
-                                          <span className={`font-bold dir-ltr text-[11px] ${parseNum(item.credit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>{formatNum(item.credit) || '-'}</span>
-                                      </div>
-                                      <div className="w-10 text-center text-slate-500 font-bold bg-slate-50 rounded py-0.5 border border-slate-100 text-[9px]">{getCurrencyTitle(item.currency_code)}</div>
-                                  </div>
-                              </div>
-                          );
-                      }
+                                  const detailsArray = Object.values(item.details_dict || {}).map(id => allDetailInstances.find(d => String(d.id) === String(id))?.title).filter(Boolean);
 
-                      // Full Edit View Mode
-                      return (
-                         <div 
-                            key={item.id} 
-                            className={`mb-2 bg-white rounded-lg border transition-all duration-200 border-indigo-400 shadow-md ring-1 ring-indigo-100`}
-                            onClick={(e) => e.stopPropagation()}
-                         >
-                            <div className="flex flex-col md:flex-row gap-0">
-                               <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg">
-                                  <RowNumberInput value={item.row_number} onChangeRow={(newNum) => handleRowReorder(item.id, newNum)} max={voucherItems.length} />
-                                  <div className="mt-2 flex flex-col gap-1.5 items-center">
-                                      <button className="text-slate-400 hover:text-indigo-600 p-1 rounded transition-all" title={t.copyRow} onClick={(e) => { e.stopPropagation(); duplicateRow(index); }}><CopyPlus size={14} /></button>
-                                      <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
-                                  </div>
-                               </div>
-                               
-                               <div className="flex-1 p-2 flex flex-col gap-1.5">
-                                  {/* --- ROW 1 --- */}
-                                  <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
-                                     <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
-                                        <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
-                                        <div className={`border rounded h-8 flex items-center border-indigo-300 bg-indigo-50/20`}>
-                                           <SearchableAccountSelect 
-                                              accounts={validAccountsForLedger} 
-                                              value={item.account_id} 
-                                              onChange={(v) => handleItemChange(index, 'account_id', v)} 
-                                              disabled={isReadonly} 
-                                              placeholder={t.searchAccount} 
-                                              className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors cursor-pointer`}
-                                              onFocus={() => handleItemFocus(item.id)}
-                                           />
-                                        </div>
-                                     </div>
-                                     <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                        <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
-                                        <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
-                                            const raw = e.target.value.replace(/,/g, '');
-                                            if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
-                                        }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
-                                     </div>
-                                     <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                        <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
-                                        <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
-                                            const raw = e.target.value.replace(/,/g, '');
-                                            if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
-                                        }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
-                                     </div>
-                                     <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                        <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
-                                        <div className="flex items-center gap-1 h-8">
-                                          <select 
-                                             className={`flex-1 w-full border rounded h-full px-1 text-[12px] outline-none border-indigo-300 bg-white`}
-                                             value={item.currency_code || ''}
-                                             onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
-                                             disabled={isReadonly}
-                                             onFocus={() => handleItemFocus(item.id)}
-                                          >
-                                             <option value="">-</option>
-                                             {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
-                                          </select>
-                                          <button 
-                                            className={`w-8 h-full shrink-0 flex items-center justify-center rounded border transition-colors bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100`}
-                                            onClick={(e) => { e.stopPropagation(); setCurrencyModalIndex(index); }}
-                                            title={t.currencyConversions}
-                                          >
-                                            <Coins size={14}/>
-                                          </button>
-                                        </div>
-                                     </div>
-                                     <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
-                                        <div className="flex justify-between items-center">
-                                            <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
-                                            {index > 0 && (
-                                                <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
-                                            )}
-                                        </div>
-                                        <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
-                                     </div>
-                                  </div>
+                                  return (
+                                      <div
+                                          key={item.id}
+                                          className={`flex items-start gap-3 p-3 bg-white border-b border-slate-100 cursor-pointer transition-colors text-[11px] hover:bg-indigo-50/60 w-full ${isFocused ? 'ring-1 ring-indigo-200 shadow-sm z-10 relative bg-indigo-50/20' : ''}`}
+                                          onClick={(e) => { e.stopPropagation(); handleItemFocus(item.id); }}
+                                      >
+                                          {/* 1. Row */}
+                                          <div className="w-6 text-center font-bold text-slate-400 pt-1 shrink-0">{item.row_number}</div>
+                                          
+                                          {/* 2 & 3. Acc Code & Title */}
+                                          <div className="w-48 flex flex-col gap-0.5 shrink-0 pt-0.5">
+                                              <span className="font-bold text-slate-700">{accountObj ? accountObj.full_code : '-'}</span>
+                                              <span className="text-slate-500">{accountObj ? accountObj.title : '-'}</span>
+                                          </div>
+                                          
+                                          {/* 4. Debit */}
+                                          <div className="w-24 text-right shrink-0 pt-1">
+                                              <span className={`font-bold dir-ltr ${parseNum(item.debit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>{formatNum(item.debit) || '-'}</span>
+                                          </div>
 
-                                  {/* --- ROW 2 (Conditional) --- */}
-                                  {showRow2 && (
-                                     <div className="grid grid-cols-12 gap-x-3 gap-y-2 p-2 bg-slate-50/80 rounded border border-slate-100 mt-0.5">
-                                        <div className="col-span-12 lg:col-span-5 flex flex-col gap-1">
-                                           <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
-                                           <div className={`border rounded min-h-8 flex items-center border-indigo-300 bg-indigo-50/20 ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
-                                               <MultiDetailSelector 
-                                                  allowedTypes={allowedDetailTypes}
-                                                  allInstances={allDetailInstances}
-                                                  value={item.details_dict || {}} 
-                                                  onChange={(v) => handleItemChange(index, 'details_dict', v)} 
-                                                  disabled={isReadonly || allowedDetailTypes.length === 0} 
-                                                  t={t}
-                                               />
-                                           </div>
-                                        </div>
-                                        <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
-                                           <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
-                                           <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => handleItemFocus(item.id)} />
-                                        </div>
-                                        <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
-                                           <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
-                                           <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => handleItemFocus(item.id)} />
-                                        </div>
-                                        <div className={`col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
-                                           <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
-                                           <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white`} value={formatNum(item.quantity)} onChange={(e) => {
-                                               const raw = e.target.value.replace(/,/g, '');
-                                               if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
-                                           }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => handleItemFocus(item.id)} />
-                                        </div>
-                                     </div>
-                                  )}
-                               </div>
-                            </div>
-                         </div>
-                      );
-                   })}
+                                          {/* 5. Credit */}
+                                          <div className="w-24 text-right shrink-0 pt-1">
+                                              <span className={`font-bold dir-ltr ${parseNum(item.credit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>{formatNum(item.credit) || '-'}</span>
+                                          </div>
+
+                                          {/* 6. Currency */}
+                                          <div className="w-16 flex flex-col justify-center items-center gap-1 shrink-0 bg-slate-50 border border-slate-100 rounded px-1 py-1 h-fit mt-0.5 text-slate-500 font-bold">
+                                              <span>{getCurrencyTitle(item.currency_code)}</span>
+                                              {hasForeignCurrency && <Coins size={12} className="text-purple-500" title={t.currencyConversions} />}
+                                          </div>
+
+                                          {/* 7. Description */}
+                                          <div className="w-48 text-slate-600 break-words whitespace-normal shrink-0 pt-1 leading-relaxed">
+                                              {item.description || '-'}
+                                          </div>
+
+                                          {/* 8. Details */}
+                                          <div className="w-48 flex flex-wrap gap-1 shrink-0 pt-0.5 items-start content-start">
+                                              {detailsArray.length > 0 ? detailsArray.map((d, i) => (
+                                                  <span key={i} className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 text-[10px] whitespace-normal text-right">{d}</span>
+                                              )) : <span className="text-slate-300 pt-0.5">-</span>}
+                                          </div>
+
+                                          {/* 9. Tracking */}
+                                          <div className="w-24 flex flex-col items-center gap-0.5 shrink-0 text-[10px] text-slate-500 pt-0.5">
+                                              {hasTrackingData ? (
+                                                  <>
+                                                      <div className="font-bold text-slate-600">{item.tracking_number || '-'}</div>
+                                                      <div>{item.tracking_date || '-'}</div>
+                                                  </>
+                                              ) : <span className="text-slate-300">-</span>}
+                                          </div>
+
+                                          {/* 10. Quantity */}
+                                          <div className="w-16 text-right shrink-0 font-bold text-slate-600 dir-ltr pt-1">
+                                              {hasQuantityData ? formatNum(item.quantity) : <span className="text-slate-300">-</span>}
+                                          </div>
+                                      </div>
+                                  );
+                              }
+
+                              // Full Edit View Mode
+                              return (
+                                 <div 
+                                    key={item.id} 
+                                    className={`my-2 mx-1 bg-white rounded-lg border transition-all duration-200 border-indigo-400 shadow-md ring-1 ring-indigo-100 shrink-0 w-[calc(100%-8px)] lg:w-[calc(100%-8px)] min-w-[800px]`}
+                                    onClick={(e) => e.stopPropagation()}
+                                 >
+                                    <div className="flex flex-col md:flex-row gap-0">
+                                       <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg shrink-0">
+                                          <RowNumberInput value={item.row_number} onChangeRow={(newNum) => handleRowReorder(item.id, newNum)} max={voucherItems.length} />
+                                          <div className="mt-2 flex flex-col gap-1.5 items-center">
+                                              <button className="text-slate-400 hover:text-indigo-600 p-1 rounded transition-all" title={t.copyRow} onClick={(e) => { e.stopPropagation(); duplicateRow(index); }}><CopyPlus size={14} /></button>
+                                              <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
+                                          </div>
+                                       </div>
+                                       
+                                       <div className="flex-1 p-2 flex flex-col gap-1.5">
+                                          {/* --- ROW 1 --- */}
+                                          <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
+                                             <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
+                                                <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
+                                                <div className={`border rounded h-8 flex items-center border-indigo-300 bg-indigo-50/20`}>
+                                                   <SearchableAccountSelect 
+                                                      accounts={validAccountsForLedger} 
+                                                      value={item.account_id} 
+                                                      onChange={(v) => handleItemChange(index, 'account_id', v)} 
+                                                      disabled={isReadonly} 
+                                                      placeholder={t.searchAccount} 
+                                                      className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors cursor-pointer`}
+                                                      onFocus={() => handleItemFocus(item.id)}
+                                                   />
+                                                </div>
+                                             </div>
+                                             <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                                <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
+                                                <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
+                                                    const raw = e.target.value.replace(/,/g, '');
+                                                    if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
+                                                }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                             </div>
+                                             <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                                <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
+                                                <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
+                                                    const raw = e.target.value.replace(/,/g, '');
+                                                    if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
+                                                }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                             </div>
+                                             <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                                <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
+                                                <div className="flex items-center gap-1 h-8">
+                                                  <select 
+                                                     className={`flex-1 w-full border rounded h-full px-1 text-[12px] outline-none border-indigo-300 bg-white`}
+                                                     value={item.currency_code || ''}
+                                                     onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
+                                                     disabled={isReadonly}
+                                                     onFocus={() => handleItemFocus(item.id)}
+                                                  >
+                                                     <option value="">-</option>
+                                                     {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
+                                                  </select>
+                                                  <button 
+                                                    className={`w-8 h-full shrink-0 flex items-center justify-center rounded border transition-colors bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100`}
+                                                    onClick={(e) => { e.stopPropagation(); setCurrencyModalIndex(index); }}
+                                                    title={t.currencyConversions}
+                                                  >
+                                                    <Coins size={14}/>
+                                                  </button>
+                                                </div>
+                                             </div>
+                                             <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
+                                                    {index > 0 && (
+                                                        <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
+                                                    )}
+                                                </div>
+                                                <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                             </div>
+                                          </div>
+
+                                          {/* --- ROW 2 (Conditional) --- */}
+                                          {showRow2 && (
+                                             <div className="grid grid-cols-12 gap-x-3 gap-y-2 p-2 bg-slate-50/80 rounded border border-slate-100 mt-0.5">
+                                                <div className="col-span-12 lg:col-span-5 flex flex-col gap-1">
+                                                   <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
+                                                   <div className={`border rounded min-h-8 flex items-center border-indigo-300 bg-indigo-50/20 ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
+                                                       <MultiDetailSelector 
+                                                          allowedTypes={allowedDetailTypes}
+                                                          allInstances={allDetailInstances}
+                                                          value={item.details_dict || {}} 
+                                                          onChange={(v) => handleItemChange(index, 'details_dict', v)} 
+                                                          disabled={isReadonly || allowedDetailTypes.length === 0} 
+                                                          t={t}
+                                                       />
+                                                   </div>
+                                                </div>
+                                                <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                                   <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
+                                                   <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => handleItemFocus(item.id)} />
+                                                </div>
+                                                <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                                   <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
+                                                   <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => handleItemFocus(item.id)} />
+                                                </div>
+                                                <div className={`col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
+                                                   <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
+                                                   <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white`} value={formatNum(item.quantity)} onChange={(e) => {
+                                                       const raw = e.target.value.replace(/,/g, '');
+                                                       if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
+                                                   }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => handleItemFocus(item.id)} />
+                                                </div>
+                                             </div>
+                                          )}
+                                       </div>
+                                    </div>
+                                 </div>
+                              );
+                           })}
+                       </div>
+                   </div>
                 </div>
             </div>
 
             {/* --- Totals Sidebar (Right) --- */}
-            <div className="w-full lg:w-[220px] shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto custom-scrollbar">
-                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-10">
+            <div className="w-full lg:w-[280px] shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+                <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center sticky top-0 z-10 shadow-sm">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                         <Layers size={14} className="text-indigo-500"/>
                         {t.summary}
@@ -1681,48 +1727,48 @@ const Vouchers = ({ language = 'fa' }) => {
                 
                 <div className="flex flex-col gap-3 p-3 text-xs">
                    {/* Base Currency Total */}
-                   <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+                   <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors">
                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
-                           <span className="uppercase tracking-wider">{t.base}</span>
+                           <span className="uppercase tracking-wider">{t.summaryBase}</span>
                            <Badge variant="indigo" size="sm">{getCurrencyTitle(currentLedger?.currency)}</Badge>
                        </div>
-                       <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-indigo-700 dir-ltr">{formatNum(totalDebit)}</span></div>
-                       <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-indigo-700 dir-ltr">{formatNum(totalCredit)}</span></div>
+                       <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-indigo-700 dir-ltr text-[13px]">{formatNum(totalDebit)}</span></div>
+                       <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-indigo-700 dir-ltr text-[13px]">{formatNum(totalCredit)}</span></div>
                    </div>
                    
                    {/* Operating Currency Total */}
                    {currencyGlobals?.op_currency && (
-                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
-                               <span className="uppercase tracking-wider">{t.opCurrency}</span>
+                               <span className="uppercase tracking-wider">{t.summaryOp}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.op_currency)}</Badge>
                            </div>
-                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(opTotalDebit)}</span></div>
-                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(opTotalCredit)}</span></div>
+                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(opTotalDebit)}</span></div>
+                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(opTotalCredit)}</span></div>
                        </div>
                    )}
 
                    {/* Reporting Currency 1 Total */}
                    {currencyGlobals?.rep1_currency && (
-                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
-                               <span className="uppercase tracking-wider">{t.rep1Currency}</span>
+                               <span className="uppercase tracking-wider">{t.summaryRep1}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep1_currency)}</Badge>
                            </div>
-                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(rep1TotalDebit)}</span></div>
-                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(rep1TotalCredit)}</span></div>
+                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(rep1TotalDebit)}</span></div>
+                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(rep1TotalCredit)}</span></div>
                        </div>
                    )}
 
                    {/* Reporting Currency 2 Total */}
                    {currencyGlobals?.rep2_currency && (
-                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm">
+                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
-                               <span className="uppercase tracking-wider">{t.rep2Currency}</span>
+                               <span className="uppercase tracking-wider">{t.summaryRep2}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep2_currency)}</Badge>
                            </div>
-                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(rep2TotalDebit)}</span></div>
-                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(rep2TotalCredit)}</span></div>
+                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(rep2TotalDebit)}</span></div>
+                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(rep2TotalCredit)}</span></div>
                        </div>
                    )}
                 </div>
