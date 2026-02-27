@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, ArrowRight, ArrowLeft, 
-  Save, FileText, CheckCircle, FileWarning, Filter, Search, Scale, Copy, Check, X, Printer, CheckSquare, Plus, Eye, RotateCcw, ListOrdered
+  Save, FileText, CheckCircle, FileWarning, Filter, Search, Scale, Copy, Check, X, Printer, CheckSquare, Plus, Eye, RotateCcw, ListOrdered,
+  Coins, Calculator, CopyPlus, PanelRightClose, PanelRightOpen
 } from 'lucide-react';
 
 const localTranslations = {
@@ -38,7 +39,7 @@ const localTranslations = {
     debit: 'Debit',
     credit: 'Credit',
     currency: 'Currency',
-    balance: 'Balance Voucher',
+    balance: 'Balance',
     saveTemp: 'Save as Temporary',
     saveReviewed: 'Save as Reviewed',
     revertToTemp: 'Revert to Temporary',
@@ -49,7 +50,7 @@ const localTranslations = {
     general: 'General',
     trackingNumber: 'Tracking No.',
     trackingDate: 'Tracking Date',
-    quantity: 'Quantity',
+    quantity: 'Qty',
     unbalancedError: 'Voucher is not balanced.',
     zeroAmountError: 'Total amount cannot be zero. Please enter debit or credit values.',
     dualEntryError: 'A single row cannot have both debit and credit values.',
@@ -87,7 +88,27 @@ const localTranslations = {
     sortError: 'Error during sorting operation.',
     sortDesc: 'Manage and reorder the daily numbers of vouchers.',
     bulkSortDesc: 'Select a date range to sequentially reorder all daily numbers day-by-day starting from 1.',
-    singleSortDesc: 'Assign a new daily number to this voucher. Other vouchers on the same day will automatically shift.'
+    singleSortDesc: 'Assign a new daily number to this voucher. Other vouchers on the same day will automatically shift.',
+    currencyConversions: 'Currency Conversions',
+    opCurrency: 'Operating Currency',
+    rep1Currency: 'Reporting Currency 1',
+    rep2Currency: 'Reporting Currency 2',
+    exchangeRate: 'Exchange Rate',
+    reverseCalc: 'Reverse Calculation',
+    convertedAmount: 'Final Converted Amount',
+    baseAmount: 'Base Amount',
+    duplicateRowError: 'Row {row} is an exact duplicate of another row. Please modify at least one field.',
+    currencyMandatoryError: 'Currency conversions are mandatory for the account in row {row}.',
+    base: 'Base',
+    copyRow: 'Copy Row',
+    summary: 'Summary',
+    copyVoucher: 'Copy Voucher',
+    balanced: 'Balanced',
+    unbalanced: 'Unbalanced',
+    summaryBase: 'Base',
+    summaryOp: 'OP Cur',
+    summaryRep1: 'Rep 1 Cur',
+    summaryRep2: 'Rep 2 Cur',
   },
   fa: {
     title: 'بررسی اسناد',
@@ -116,12 +137,12 @@ const localTranslations = {
     items: 'اقلام سند',
     addRow: 'ردیف جدید',
     row: 'ردیف',
-    account: 'معین',
+    account: 'کد و شرح معین',
     detail: 'تفصیل',
     debit: 'بدهکار',
     credit: 'بستانکار',
     currency: 'ارز',
-    balance: 'تراز کردن سند',
+    balance: 'تراز کردن',
     saveTemp: 'ذخیره به عنوان موقت',
     saveReviewed: 'تایید و ذخیره (بررسی شده)',
     revertToTemp: 'برگشت به موقت',
@@ -170,7 +191,27 @@ const localTranslations = {
     sortError: 'خطا در عملیات مرتب‌سازی.',
     sortDesc: 'در این بخش می‌توانید شماره روزانه اسناد را مرتب کنید.',
     bulkSortDesc: 'با انتخاب بازه زمانی، شماره روزانه تمامی اسناد ثبت شده در آن روزها به ترتیب از ۱ مرتب می‌شوند.',
-    singleSortDesc: 'با تعیین شماره روزانه جدید، این سند جابجا شده و شماره سایر اسنادِ آن روز به صورت خودکار شیفت پیدا می‌کند.'
+    singleSortDesc: 'با تعیین شماره روزانه جدید، این سند جابجا شده و شماره سایر اسنادِ آن روز به صورت خودکار شیفت پیدا می‌کند.',
+    currencyConversions: 'تبدیلات ارزی قلم سند',
+    opCurrency: 'ارز عملیاتی',
+    rep1Currency: 'ارز گزارشگری ۱',
+    rep2Currency: 'ارز گزارشگری ۲',
+    exchangeRate: 'نرخ تبدیل',
+    reverseCalc: 'محاسبه معکوس',
+    convertedAmount: 'مبلغ نهایی (محاسبه شده)',
+    baseAmount: 'مبلغ مبنا',
+    duplicateRowError: 'ردیف {row} دقیقاً مشابه یک ردیف دیگر است. لطفاً حداقل یک فیلد را تغییر دهید.',
+    currencyMandatoryError: 'ورود اطلاعات تبدیلات ارزی برای معین ردیف {row} اجباری است.',
+    base: 'مبنا',
+    copyRow: 'کپی ردیف',
+    summary: 'خلاصه سند',
+    copyVoucher: 'کپی سند',
+    balanced: 'تراز',
+    unbalanced: 'اختلاف',
+    summaryBase: 'ارز مبنا',
+    summaryOp: 'عملیاتی',
+    summaryRep1: 'گزارشگری ۱',
+    summaryRep2: 'گزارشگری ۲',
   }
 };
 
@@ -179,7 +220,43 @@ const normalizeFa = (str) => {
   return String(str).replace(/[يِي]/g, 'ی').replace(/[كک]/g, 'ک').replace(/[إأآا]/g, 'ا').toLowerCase();
 };
 
-const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placeholder, className }) => {
+const calcConv = (amount, rate, isReverse) => {
+    if (!amount || !rate) return 0;
+    const numAmt = parseFloat(amount);
+    const numRate = parseFloat(rate);
+    if (isNaN(numAmt) || isNaN(numRate) || numRate === 0) return 0;
+    return isReverse ? (numAmt / numRate) : (numAmt * numRate);
+};
+
+const RowNumberInput = ({ value, onChangeRow, max }) => {
+    const [val, setVal] = useState(value);
+    
+    useEffect(() => { 
+        setVal(value); 
+    }, [value]);
+    
+    const handleBlur = () => {
+        let num = parseInt(val, 10);
+        if (isNaN(num) || num < 1) num = 1;
+        if (num > max) num = max;
+        setVal(num);
+        if (num !== value) onChangeRow(num);
+    };
+
+    return (
+        <input 
+            type="number" 
+            className="w-8 text-center bg-transparent border-b border-dashed border-slate-300 outline-none text-[11px] font-bold text-slate-500 hover:border-indigo-400 focus:border-indigo-500 focus:text-indigo-700 transition-colors" 
+            value={val} 
+            onChange={e => setVal(e.target.value)} 
+            onBlur={handleBlur} 
+            onKeyDown={e => e.key === 'Enter' && handleBlur()} 
+            title="تغییر شماره ردیف"
+        />
+    );
+};
+
+const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placeholder, className, onFocus }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
@@ -213,7 +290,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
           className={className || `w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           value={isOpen ? search : displaySelected}
           onChange={e => { setSearch(e.target.value); setIsOpen(true); }}
-          onFocus={() => { setIsOpen(true); setSearch(''); }}
+          onFocus={() => { setIsOpen(true); setSearch(''); if (onFocus) onFocus(); }}
           disabled={disabled}
           placeholder={placeholder}
           title={displaySelected}
@@ -233,7 +310,7 @@ const SearchableAccountSelect = ({ accounts, value, onChange, disabled, placehol
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">{localTranslations.fa.notFound}</div>
+            <div className="px-3 py-3 text-[11px] text-slate-400 text-center">{t?.notFound || 'موردی یافت نشد'}</div>
           )}
         </div>
       )}
@@ -336,7 +413,8 @@ const MultiDetailSelector = ({ allowedTypes, allInstances, value = {}, onChange,
 
 const formatNum = (num) => {
   if (num === null || num === undefined || num === '') return '';
-  return Number(num).toLocaleString();
+  const parsed = Number(num);
+  return isNaN(parsed) ? '' : parsed.toLocaleString('en-US', { maximumFractionDigits: 6 });
 };
 
 const parseNum = (str) => {
@@ -349,7 +427,7 @@ const VoucherReview = ({ language = 'fa' }) => {
   const isRtl = language === 'fa';
   
   const UI = window.UI || {};
-  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Accordion } = UI;
+  const { Button, InputField, SelectField, DataGrid, FilterSection, Modal, Badge, Accordion } = UI;
   const supabase = window.supabase;
 
   const [view, setView] = useState('list');
@@ -357,6 +435,7 @@ const VoucherReview = ({ language = 'fa' }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
   const [voucherToPrint, setVoucherToPrint] = useState(null);
+  const [currencyModalIndex, setCurrencyModalIndex] = useState(null);
 
   const [showSortModal, setShowSortModal] = useState(false);
   const [sortTab, setSortTab] = useState('bulk');
@@ -379,6 +458,7 @@ const VoucherReview = ({ language = 'fa' }) => {
   const [ledgers, setLedgers] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
+  const [currencyGlobals, setCurrencyGlobals] = useState(null);
   
   const [detailTypes, setDetailTypes] = useState([]);
   const [allDetailInstances, setAllDetailInstances] = useState([]);
@@ -399,6 +479,7 @@ const VoucherReview = ({ language = 'fa' }) => {
   
   const [focusedRowId, setFocusedRowId] = useState(null);
   const [isHeaderOpen, setIsHeaderOpen] = useState(true);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
 
   useEffect(() => {
     fetchLookups();
@@ -427,7 +508,7 @@ const VoucherReview = ({ language = 'fa' }) => {
         }
     };
 
-    const [brData, fyData, ledData, structData, dtData, diData, doctypeData, currData] = await Promise.all([
+    const [brData, fyData, ledData, structData, dtData, diData, doctypeData, currData, currGlobalsData] = await Promise.all([
         safeFetch(supabase.schema('gen').from('branches').select('*')),
         safeFetch(supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false })),
         safeFetch(supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure, metadata').eq('is_active', true).order('title')),
@@ -435,7 +516,8 @@ const VoucherReview = ({ language = 'fa' }) => {
         safeFetch(supabase.schema('gl').from('detail_types').select('id, code, title').eq('is_active', true)),
         safeFetch(supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)),
         safeFetch(supabase.schema('gl').from('doc_types').select('id, code, title, type').eq('is_active', true)),
-        safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true))
+        safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true)),
+        safeFetch(supabase.schema('gen').from('currency_globals').select('*').limit(1))
     ]);
 
     if (brData) setBranches(brData.filter(b => b.is_active !== false));
@@ -444,6 +526,7 @@ const VoucherReview = ({ language = 'fa' }) => {
     if (structData) setAccountStructures(structData);
     if (dtData) setDetailTypes(dtData);
     if (diData) setAllDetailInstances(diData);
+    if (currGlobalsData && currGlobalsData.length > 0) setCurrencyGlobals(currGlobalsData[0]);
 
     setContextVals(prev => {
         if (!prev.fiscal_year_id && !prev.ledger_id) {
@@ -556,6 +639,7 @@ const VoucherReview = ({ language = 'fa' }) => {
   const handleOpenForm = async (voucher) => {
     if (!voucher) return;
     setIsHeaderOpen(true);
+    setIsSummaryOpen(true);
     setCurrentVoucher(voucher);
     setLoading(true);
     try {
@@ -572,10 +656,23 @@ const VoucherReview = ({ language = 'fa' }) => {
         return { 
            ...item, 
            currency_code: detailsObj.currency_code || '',
-           details_dict: detailsObj.selected_details || {} 
+           details_dict: detailsObj.selected_details || {},
+           op_rate: item.op_rate ?? 1,
+           op_is_reverse: item.op_is_reverse ?? false,
+           op_debit: item.op_debit ?? 0,
+           op_credit: item.op_credit ?? 0,
+           rep1_rate: item.rep1_rate ?? 1,
+           rep1_is_reverse: item.rep1_is_reverse ?? false,
+           rep1_debit: item.rep1_debit ?? 0,
+           rep1_credit: item.rep1_credit ?? 0,
+           rep2_rate: item.rep2_rate ?? 1,
+           rep2_is_reverse: item.rep2_is_reverse ?? false,
+           rep2_debit: item.rep2_debit ?? 0,
+           rep2_credit: item.rep2_credit ?? 0,
         };
       });
       setVoucherItems(mappedItems);
+      setFocusedRowId(null);
     } catch (error) {
       console.error('Error fetching items:', error);
     } finally {
@@ -592,6 +689,23 @@ const VoucherReview = ({ language = 'fa' }) => {
      const allowedTafsilCodesOrIds = meta.tafsils || [];
      if (allowedTafsilCodesOrIds.length === 0) return [];
      return detailTypes.filter(dt => allowedTafsilCodesOrIds.some(t => String(dt.id) === String(t) || dt.code === String(t)));
+  };
+
+  const getRowSignature = (item) => {
+     return JSON.stringify({
+         acc: item.account_id,
+         deb: parseNum(item.debit),
+         cred: parseNum(item.credit),
+         cur: item.currency_code,
+         desc: item.description,
+         det: item.details_dict,
+         tn: item.tracking_number,
+         td: item.tracking_date,
+         qty: parseNum(item.quantity),
+         op_r: parseNum(item.op_rate),
+         rep1_r: parseNum(item.rep1_rate),
+         rep2_r: parseNum(item.rep2_rate)
+     });
   };
 
   const handleSaveVoucher = async (status) => {
@@ -620,12 +734,21 @@ const VoucherReview = ({ language = 'fa' }) => {
         }
     }
 
+    const rowSignatures = new Set();
+
     for (let i = 0; i < voucherItems.length; i++) {
         const item = voucherItems[i];
         if (!item.description || !item.account_id) {
            alert(t.reqFields);
            return;
         }
+
+        const sig = getRowSignature(item);
+        if (rowSignatures.has(sig)) {
+             alert(t.duplicateRowError.replace('{row}', i + 1));
+             return;
+        }
+        rowSignatures.add(sig);
 
         const account = accounts.find(a => String(a.id) === String(item.account_id));
         if (account && account.metadata) {
@@ -636,6 +759,10 @@ const VoucherReview = ({ language = 'fa' }) => {
             }
             if (meta.qtyFeature && meta.qtyMandatory && (!item.quantity || parseNum(item.quantity) <= 0)) {
                 alert(t.qtyReqError + ' ' + (i + 1) + ' (' + account.title + ')');
+                return;
+            }
+            if (meta.currencyFeature && meta.currencyMandatory && (!item.op_rate || !item.rep1_rate || !item.rep2_rate || parseNum(item.op_rate) <= 0)) {
+                alert(t.currencyMandatoryError.replace('{row}', i + 1));
                 return;
             }
         }
@@ -652,8 +779,11 @@ const VoucherReview = ({ language = 'fa' }) => {
         }
     }
 
-    const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
-    const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
+    let totalDebit = 0, totalCredit = 0;
+    voucherItems.forEach(item => {
+        totalDebit += parseNum(item.debit);
+        totalCredit += parseNum(item.credit);
+    });
     
     if (totalDebit === 0 && totalCredit === 0) {
       alert(t.zeroAmountError);
@@ -684,7 +814,11 @@ const VoucherReview = ({ language = 'fa' }) => {
         updated_at: new Date().toISOString()
       };
 
-      if (status === 'reviewed') voucherData.reviewed_by = currentUserId;
+      if (status === 'reviewed') {
+          voucherData.reviewed_by = currentUserId;
+      } else {
+          voucherData.reviewed_by = null;
+      }
 
       const { error } = await supabase.schema('gl').from('vouchers').update(voucherData).eq('id', voucherData.id);
       if (error) throw error;
@@ -692,7 +826,7 @@ const VoucherReview = ({ language = 'fa' }) => {
 
       const itemsToSave = voucherItems.map((item, index) => ({
         voucher_id: voucherData.id,
-        row_number: index + 1,
+        row_number: item.row_number,
         account_id: cleanData(item.account_id),
         debit: parseNum(item.debit),
         credit: parseNum(item.credit),
@@ -700,7 +834,19 @@ const VoucherReview = ({ language = 'fa' }) => {
         tracking_number: cleanData(item.tracking_number),
         tracking_date: cleanData(item.tracking_date),
         quantity: parseNum(item.quantity) === 0 ? null : parseNum(item.quantity),
-        details: { currency_code: item.currency_code, selected_details: item.details_dict || {} }
+        details: { currency_code: item.currency_code, selected_details: item.details_dict || {} },
+        op_rate: parseNum(item.op_rate),
+        op_is_reverse: item.op_is_reverse,
+        op_debit: parseNum(item.op_debit),
+        op_credit: parseNum(item.op_credit),
+        rep1_rate: parseNum(item.rep1_rate),
+        rep1_is_reverse: item.rep1_is_reverse,
+        rep1_debit: parseNum(item.rep1_debit),
+        rep1_credit: parseNum(item.rep1_credit),
+        rep2_rate: parseNum(item.rep2_rate),
+        rep2_is_reverse: item.rep2_is_reverse,
+        rep2_debit: parseNum(item.rep2_debit),
+        rep2_credit: parseNum(item.rep2_credit)
       }));
 
       if (itemsToSave.length > 0) {
@@ -727,7 +873,11 @@ const VoucherReview = ({ language = 'fa' }) => {
         const { data: authData } = await supabase.auth.getUser();
         const currentUserId = authData?.user?.id || null;
         let updatePayload = { status: newStatus };
-        if (newStatus === 'reviewed') updatePayload.reviewed_by = currentUserId;
+        if (newStatus === 'reviewed') {
+            updatePayload.reviewed_by = currentUserId;
+        } else {
+            updatePayload.reviewed_by = null;
+        }
         const { error } = await supabase.schema('gl').from('vouchers').update(updatePayload).in('id', selectedIds);
         if (error) throw error;
         setSelectedIds([]);
@@ -743,31 +893,97 @@ const VoucherReview = ({ language = 'fa' }) => {
      setVoucherToPrint(voucher);
   };
 
+  const handleItemFocus = (id) => {
+      setFocusedRowId(id);
+      setIsHeaderOpen(false);
+  };
+
   const handleItemChange = (index, field, value) => {
     const newItems = [...voucherItems];
+    
     if (field === 'debit' || field === 'credit') {
       const otherField = field === 'debit' ? 'credit' : 'debit';
-      if (parseNum(value) > 0) newItems[index][otherField] = 0;
+      if (parseNum(value) > 0) {
+        newItems[index][otherField] = 0;
+      }
     }
+
     newItems[index][field] = value;
+    
+    if (field === 'currency_code' && currencyGlobals) {
+       if (value === currencyGlobals.op_currency) { newItems[index].op_rate = 1; newItems[index].op_is_reverse = false; }
+       if (value === currencyGlobals.rep1_currency) { newItems[index].rep1_rate = 1; newItems[index].rep1_is_reverse = false; }
+       if (value === currencyGlobals.rep2_currency) { newItems[index].rep2_rate = 1; newItems[index].rep2_is_reverse = false; }
+    }
+    
+    if (['debit', 'credit', 'currency_code', 'op_rate', 'op_is_reverse', 'rep1_rate', 'rep1_is_reverse', 'rep2_rate', 'rep2_is_reverse'].includes(field)) {
+        const baseDebit = parseNum(newItems[index].debit);
+        const baseCredit = parseNum(newItems[index].credit);
+        
+        newItems[index].op_debit = calcConv(baseDebit, newItems[index].op_rate, newItems[index].op_is_reverse);
+        newItems[index].op_credit = calcConv(baseCredit, newItems[index].op_rate, newItems[index].op_is_reverse);
+
+        newItems[index].rep1_debit = calcConv(baseDebit, newItems[index].rep1_rate, newItems[index].rep1_is_reverse);
+        newItems[index].rep1_credit = calcConv(baseCredit, newItems[index].rep1_rate, newItems[index].rep1_is_reverse);
+
+        newItems[index].rep2_debit = calcConv(baseDebit, newItems[index].rep2_rate, newItems[index].rep2_is_reverse);
+        newItems[index].rep2_credit = calcConv(baseCredit, newItems[index].rep2_rate, newItems[index].rep2_is_reverse);
+    }
+
     if (field === 'account_id') {
       const selectedAcc = accounts.find(a => String(a.id) === String(value));
       const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
       let newCurrency = currentLedger?.currency || '';
+
       if (selectedAcc && selectedAcc.metadata) {
         const meta = typeof selectedAcc.metadata === 'string' ? JSON.parse(selectedAcc.metadata) : selectedAcc.metadata;
-        if (meta.currency_code) newCurrency = meta.currency_code;
+        if (meta.currencyFeature && meta.currency_code) {
+             newCurrency = meta.currency_code;
+        }
       }
+      
       newItems[index]['currency_code'] = newCurrency;
+      if (currencyGlobals) {
+           if (newCurrency === currencyGlobals.op_currency) { newItems[index].op_rate = 1; newItems[index].op_is_reverse = false; }
+           if (newCurrency === currencyGlobals.rep1_currency) { newItems[index].rep1_rate = 1; newItems[index].rep1_is_reverse = false; }
+           if (newCurrency === currencyGlobals.rep2_currency) { newItems[index].rep2_rate = 1; newItems[index].rep2_is_reverse = false; }
+      }
+      
+      const baseDebit = parseNum(newItems[index].debit);
+      const baseCredit = parseNum(newItems[index].credit);
+      newItems[index].op_debit = calcConv(baseDebit, newItems[index].op_rate, newItems[index].op_is_reverse);
+      newItems[index].op_credit = calcConv(baseCredit, newItems[index].op_rate, newItems[index].op_is_reverse);
+      newItems[index].rep1_debit = calcConv(baseDebit, newItems[index].rep1_rate, newItems[index].rep1_is_reverse);
+      newItems[index].rep1_credit = calcConv(baseCredit, newItems[index].rep1_rate, newItems[index].rep1_is_reverse);
+      newItems[index].rep2_debit = calcConv(baseDebit, newItems[index].rep2_rate, newItems[index].rep2_is_reverse);
+      newItems[index].rep2_credit = calcConv(baseCredit, newItems[index].rep2_rate, newItems[index].rep2_is_reverse);
+
       newItems[index]['details_dict'] = {}; 
     }
+
     setVoucherItems(newItems);
+  };
+
+  const handleRowReorder = (id, newRowStr) => {
+      const newIndex = parseInt(newRowStr, 10) - 1;
+      if (isNaN(newIndex) || newIndex < 0 || newIndex >= voucherItems.length) return;
+      
+      const currentIdx = voucherItems.findIndex(i => i.id === id);
+      if (currentIdx === -1 || currentIdx === newIndex) return;
+      
+      let itemsCpy = [...voucherItems];
+      const [movedItem] = itemsCpy.splice(currentIdx, 1);
+      itemsCpy.splice(newIndex, 0, movedItem);
+      itemsCpy = itemsCpy.map((it, idx) => ({...it, row_number: idx + 1}));
+      
+      setVoucherItems(itemsCpy);
   };
 
   const addItemRow = () => {
     const activeLedgerId = currentVoucher?.ledger_id || contextVals.ledger_id;
     const currentLedger = ledgers.find(l => String(l.id) === String(activeLedgerId));
     const lastDescription = voucherItems.length > 0 ? voucherItems[voucherItems.length - 1].description : '';
+
     const newId = 'temp_' + Date.now();
     setVoucherItems([...voucherItems, { 
       id: newId, 
@@ -780,29 +996,62 @@ const VoucherReview = ({ language = 'fa' }) => {
       description: lastDescription, 
       tracking_number: '', 
       tracking_date: '',
-      quantity: '' 
+      quantity: '',
+      op_rate: 1, op_is_reverse: false, op_debit: 0, op_credit: 0,
+      rep1_rate: 1, rep1_is_reverse: false, rep1_debit: 0, rep1_credit: 0,
+      rep2_rate: 1, rep2_is_reverse: false, rep2_debit: 0, rep2_credit: 0
     }]);
     setFocusedRowId(newId);
+    setIsHeaderOpen(false);
+  };
+
+  const duplicateRow = (index) => {
+      const itemToCopy = voucherItems[index];
+      const newId = 'temp_' + Date.now();
+      const newItem = { ...itemToCopy, id: newId };
+      
+      const itemsCpy = [...voucherItems];
+      itemsCpy.splice(index + 1, 0, newItem);
+      const renumbered = itemsCpy.map((it, idx) => ({...it, row_number: idx + 1}));
+      
+      setVoucherItems(renumbered);
+      setFocusedRowId(newId);
+      setIsHeaderOpen(false);
   };
 
   const globalBalance = () => {
     const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
     const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
     const diff = totalDebit - totalCredit;
+    
     if (diff === 0) return;
 
     const emptyRowIndex = voucherItems.findIndex(item => parseNum(item.debit) === 0 && parseNum(item.credit) === 0);
+
     if (emptyRowIndex !== -1) {
        const newItems = [...voucherItems];
        if (diff < 0) {
            newItems[emptyRowIndex].debit = Math.abs(diff);
            newItems[emptyRowIndex].credit = 0;
+           newItems[emptyRowIndex].op_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].op_rate, newItems[emptyRowIndex].op_is_reverse);
+           newItems[emptyRowIndex].op_credit = 0;
+           newItems[emptyRowIndex].rep1_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].rep1_rate, newItems[emptyRowIndex].rep1_is_reverse);
+           newItems[emptyRowIndex].rep1_credit = 0;
+           newItems[emptyRowIndex].rep2_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].rep2_rate, newItems[emptyRowIndex].rep2_is_reverse);
+           newItems[emptyRowIndex].rep2_credit = 0;
        } else {
            newItems[emptyRowIndex].credit = diff;
            newItems[emptyRowIndex].debit = 0;
+           newItems[emptyRowIndex].op_credit = calcConv(diff, newItems[emptyRowIndex].op_rate, newItems[emptyRowIndex].op_is_reverse);
+           newItems[emptyRowIndex].op_debit = 0;
+           newItems[emptyRowIndex].rep1_credit = calcConv(diff, newItems[emptyRowIndex].rep1_rate, newItems[emptyRowIndex].rep1_is_reverse);
+           newItems[emptyRowIndex].rep1_debit = 0;
+           newItems[emptyRowIndex].rep2_credit = calcConv(diff, newItems[emptyRowIndex].rep2_rate, newItems[emptyRowIndex].rep2_is_reverse);
+           newItems[emptyRowIndex].rep2_debit = 0;
        }
        setVoucherItems(newItems);
        setFocusedRowId(newItems[emptyRowIndex].id);
+       setIsHeaderOpen(false);
     } else {
        const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
        const newId = 'temp_' + Date.now();
@@ -817,9 +1066,13 @@ const VoucherReview = ({ language = 'fa' }) => {
          description: '', 
          tracking_number: '', 
          tracking_date: '',
-         quantity: '' 
+         quantity: '',
+         op_rate: 1, op_is_reverse: false, op_debit: diff < 0 ? Math.abs(diff) : 0, op_credit: diff > 0 ? diff : 0,
+         rep1_rate: 1, rep1_is_reverse: false, rep1_debit: diff < 0 ? Math.abs(diff) : 0, rep1_credit: diff > 0 ? diff : 0,
+         rep2_rate: 1, rep2_is_reverse: false, rep2_debit: diff < 0 ? Math.abs(diff) : 0, rep2_credit: diff > 0 ? diff : 0
        }]);
        setFocusedRowId(newId);
+       setIsHeaderOpen(false);
     }
   };
 
@@ -833,7 +1086,9 @@ const VoucherReview = ({ language = 'fa' }) => {
 
   const removeRow = (index) => {
     if (voucherItems.length > 1) {
-      setVoucherItems(voucherItems.filter((_, i) => i !== index));
+      const itemsCpy = voucherItems.filter((_, i) => i !== index);
+      const renumbered = itemsCpy.map((it, idx) => ({...it, row_number: idx + 1}));
+      setVoucherItems(renumbered);
     }
   };
 
@@ -851,6 +1106,7 @@ const VoucherReview = ({ language = 'fa' }) => {
   };
 
   const promptDelete = (voucher) => {
+    if (voucher.status === 'reviewed') return;
     setVoucherToDelete(voucher);
     setShowDeleteModal(true);
   };
@@ -1024,19 +1280,35 @@ const VoucherReview = ({ language = 'fa' }) => {
   const allTemp = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'temporary');
   const allReviewed = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'reviewed');
 
+  const getCurrencyTitle = (code) => {
+      if(!code) return '-';
+      return currencies.find(c => c.code === code)?.title || code;
+  }
+
   if (view === 'form' && currentVoucher) {
-    const totalDebit = voucherItems.reduce((sum, item) => sum + parseNum(item.debit), 0);
-    const totalCredit = voucherItems.reduce((sum, item) => sum + parseNum(item.credit), 0);
+    let totalDebit = 0, totalCredit = 0, opTotalDebit = 0, opTotalCredit = 0, rep1TotalDebit = 0, rep1TotalCredit = 0, rep2TotalDebit = 0, rep2TotalCredit = 0;
+    
+    voucherItems.forEach(item => {
+        totalDebit += parseNum(item.debit);
+        totalCredit += parseNum(item.credit);
+        opTotalDebit += parseNum(item.op_debit);
+        opTotalCredit += parseNum(item.op_credit);
+        rep1TotalDebit += parseNum(item.rep1_debit);
+        rep1TotalCredit += parseNum(item.rep1_credit);
+        rep2TotalDebit += parseNum(item.rep2_debit);
+        rep2TotalCredit += parseNum(item.rep2_credit);
+    });
+
     const isBalanced = totalDebit === totalCredit;
+    const isReadonly = currentVoucher.status === 'reviewed';
     const isVoucherNoManual = currentLedgerMeta.uniquenessScope === 'none';
     const currentFiscalYearTitle = fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || '';
-    const currentLedgerTitle = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || '';
-    
-    const isReadonly = currentVoucher.status === 'reviewed';
+    const currentLedger = ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
+    const currentLedgerTitle = currentLedger?.title || '';
 
     return (
-      <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
-        <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
+      <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`} onClick={() => setFocusedRowId(null)}>
+        <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => { setView('list'); setCurrentVoucher(null); setVoucherItems([]); }} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
             <div className="h-6 w-px bg-slate-200 mx-1"></div>
@@ -1065,7 +1337,7 @@ const VoucherReview = ({ language = 'fa' }) => {
             icon={FileText}
             className="shrink-0"
           >
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4" onClick={(e) => e.stopPropagation()}>
               <InputField label={t.fiscalYear} value={currentFiscalYearTitle} disabled isRtl={isRtl} />
               <InputField label={t.ledger} value={currentLedgerTitle} disabled isRtl={isRtl} />
               <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})} disabled={isReadonly} isRtl={isRtl}>
@@ -1099,157 +1371,446 @@ const VoucherReview = ({ language = 'fa' }) => {
             </div>
           </Accordion>
 
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-            <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
-              <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
-              {!isReadonly && (
-                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={globalBalance} icon={Scale}>{t.balance}</Button>
-                    <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>
-                 </div>
-              )}
-            </div>
+          <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4">
             
-            <div className="flex-1 overflow-auto custom-scrollbar p-2 bg-slate-100">
-               {voucherItems.map((item, index) => {
-                  const isFocused = focusedRowId === item.id;
-                  const accountObj = accounts.find(a => String(a.id) === String(item.account_id));
-                  let hasTracking = false;
-                  let hasQuantity = false;
-                  if (accountObj && accountObj.metadata) {
-                      const meta = typeof accountObj.metadata === 'string' ? JSON.parse(accountObj.metadata) : accountObj.metadata;
-                      if (meta.trackFeature) hasTracking = true;
-                      if (meta.qtyFeature) hasQuantity = true;
-                  }
+            {/* --- Main Items List (Left/Main) --- */}
+            <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
+                  <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
+                  <div className="flex gap-2">
+                    {!isReadonly && (
+                        <>
+                           <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); globalBalance(); }} icon={Scale}>{t.balance}</Button>
+                           <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); addItemRow(); }} icon={Plus}>{t.addRow}</Button>
+                        </>
+                    )}
+                    <div className="w-px bg-slate-300 mx-1 h-8"></div>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsSummaryOpen(!isSummaryOpen); }} 
+                        className={`w-8 h-8 flex items-center justify-center rounded border transition-colors ${isSummaryOpen ? 'bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                        title={t.summary}
+                    >
+                        {isSummaryOpen ? (isRtl ? <PanelRightClose size={16}/> : <PanelRightClose size={16}/>) : (isRtl ? <PanelRightOpen size={16}/> : <PanelRightOpen size={16}/>)}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar bg-slate-50" onClick={() => setFocusedRowId(null)}>
+                   <div className="flex flex-col pb-6 w-full min-w-min">
+                       {voucherItems.map((item, index) => {
+                          const isFocused = focusedRowId === item.id;
+                          const isEditing = isFocused && !isReadonly;
+                          
+                          const accountObj = accounts.find(a => String(a.id) === String(item.account_id));
+                          let hasTracking = false;
+                          let hasQuantity = false;
+                          if (accountObj && accountObj.metadata) {
+                              const meta = typeof accountObj.metadata === 'string' ? JSON.parse(accountObj.metadata) : accountObj.metadata;
+                              if (meta.trackFeature) hasTracking = true;
+                              if (meta.qtyFeature) hasQuantity = true;
+                          }
 
-                  const allowedDetailTypes = getValidDetailTypes(item.account_id);
-                  const hasDetails = allowedDetailTypes.length > 0;
-                  const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
-                  const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
+                          const allowedDetailTypes = getValidDetailTypes(item.account_id);
+                          const hasDetails = allowedDetailTypes.length > 0;
+                          const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
+                          const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
 
-                  return (
-                     <div 
-                        key={item.id} 
-                        className={`mb-2 bg-white rounded-lg border transition-all duration-200 ${isFocused ? 'border-indigo-400 shadow-md ring-1 ring-indigo-100' : 'border-slate-200 shadow-sm hover:border-indigo-200'}`}
-                        onClick={() => setFocusedRowId(item.id)}
-                     >
-                        <div className="flex flex-col md:flex-row gap-0">
-                           <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg">
-                              <span className="text-xs font-bold text-slate-400 mb-2">{index + 1}</span>
-                              {!isReadonly && (
-                                <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
-                              )}
-                           </div>
-                           
-                           <div className="flex-1 p-2 flex flex-col gap-1.5">
-                              <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
-                                 <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
-                                    <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
-                                    <div className={`border rounded h-8 flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
-                                       <SearchableAccountSelect 
-                                          accounts={validAccountsForLedger} 
-                                          value={item.account_id} 
-                                          onChange={(v) => handleItemChange(index, 'account_id', v)} 
-                                          disabled={isReadonly}
-                                          placeholder={t.searchAccount} 
-                                          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors ${isReadonly ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                       />
-                                    </div>
-                                 </div>
-                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                    <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
-                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
-                                        const raw = e.target.value.replace(/,/g, '');
-                                        if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
-                                    }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                                 </div>
-                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                    <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
-                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
-                                        const raw = e.target.value.replace(/,/g, '');
-                                        if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
-                                    }} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                                 </div>
-                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                    <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
-                                    <select 
-                                       className={`w-full border rounded h-8 px-1 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
-                                       value={item.currency_code || ''}
-                                       onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
-                                       disabled={isReadonly}
-                                       onFocus={() => setFocusedRowId(item.id)}
-                                    >
-                                       <option value="">-</option>
-                                       {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
-                                    </select>
-                                 </div>
-                                 <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
-                                        {!isReadonly && index > 0 && (
-                                            <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
-                                        )}
-                                    </div>
-                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => setFocusedRowId(item.id)} />
-                                 </div>
-                              </div>
+                          // Compact View Mode
+                          if (!isEditing) {
+                              const hasForeignCurrency = item.currency_code !== currentLedger?.currency || parseNum(item.op_rate) !== 1 || parseNum(item.rep1_rate) !== 1 || parseNum(item.rep2_rate) !== 1;
+                              const hasTrackingData = item.tracking_number || item.tracking_date;
+                              const hasQuantityData = item.quantity && parseNum(item.quantity) > 0;
+                              const accountDisplay = accountObj ? `${accountObj.full_code} - ${accountObj.title}` : '-';
+                              const detailsArray = Object.values(item.details_dict || {}).map(id => allDetailInstances.find(d => String(d.id) === String(id))?.title).filter(Boolean);
 
-                              {showRow2 && (
-                                 <div className="grid grid-cols-12 gap-x-3 gap-y-2 p-2 bg-slate-50/80 rounded border border-slate-100 mt-0.5">
-                                    <div className="col-span-12 lg:col-span-6 flex flex-col gap-1">
-                                       <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
-                                       <div className={`border rounded min-h-8 flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
-                                           <MultiDetailSelector 
-                                              allowedTypes={allowedDetailTypes}
-                                              allInstances={allDetailInstances}
-                                              value={item.details_dict || {}} 
-                                              onChange={(v) => handleItemChange(index, 'details_dict', v)} 
-                                              disabled={isReadonly || allowedDetailTypes.length === 0} 
-                                              t={t}
-                                           />
-                                       </div>
-                                    </div>
-                                    <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
-                                       <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
-                                       <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => setFocusedRowId(item.id)} />
-                                    </div>
-                                    <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
-                                       <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
-                                       <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => setFocusedRowId(item.id)} />
-                                    </div>
-                                    <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
-                                       <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
-                                       <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={formatNum(item.quantity)} onChange={(e) => {
-                                           const raw = e.target.value.replace(/,/g, '');
-                                           if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
-                                       }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => setFocusedRowId(item.id)} />
-                                    </div>
-                                 </div>
-                              )}
-                           </div>
+                              return (
+                                  <div
+                                      key={item.id}
+                                      className={`flex items-center gap-2 p-3 bg-white border-b border-slate-100 cursor-pointer transition-colors text-[11px] hover:bg-indigo-50/40 w-full shrink-0 ${isFocused ? 'ring-1 ring-indigo-200 shadow-sm z-10 relative bg-indigo-50/20' : ''}`}
+                                      onClick={(e) => { e.stopPropagation(); handleItemFocus(item.id); }}
+                                  >
+                                      {/* 1. Row */}
+                                      <div className="w-8 text-center font-bold text-slate-400 shrink-0">{item.row_number}</div>
+                                      
+                                      {/* 2. Account */}
+                                      <div className="w-[260px] shrink-0 font-bold text-slate-700 truncate" title={accountDisplay}>
+                                          {accountDisplay}
+                                      </div>
+
+                                      {/* 3. Debit */}
+                                      <div className="w-[90px] shrink-0 flex flex-col text-left dir-ltr">
+                                          <span className="text-[9px] text-slate-400 mb-0.5 uppercase tracking-wide">{t.debit}</span>
+                                          <span className={`font-bold ${parseNum(item.debit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>
+                                              {formatNum(item.debit) || '-'}
+                                          </span>
+                                      </div>
+
+                                      {/* 4. Credit */}
+                                      <div className="w-[90px] shrink-0 flex flex-col text-left dir-ltr">
+                                          <span className="text-[9px] text-slate-400 mb-0.5 uppercase tracking-wide">{t.credit}</span>
+                                          <span className={`font-bold ${parseNum(item.credit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>
+                                              {formatNum(item.credit) || '-'}
+                                          </span>
+                                      </div>
+
+                                      {/* 5. Currency */}
+                                      <div className="w-[70px] shrink-0 flex items-center justify-center gap-1.5 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-slate-500 font-bold whitespace-nowrap">
+                                          <span>{getCurrencyTitle(item.currency_code)}</span>
+                                          {hasForeignCurrency && <Coins size={14} className="text-purple-500 shrink-0" title={t.currencyConversions} />}
+                                      </div>
+
+                                      {/* 6. Description */}
+                                      <div className="w-[280px] shrink-0 text-slate-600 truncate" title={item.description || '-'}>
+                                          {item.description || '-'}
+                                      </div>
+
+                                      {/* 7. Extra Meta */}
+                                      <div className="flex-1 flex flex-wrap items-center gap-2 min-w-[200px]">
+                                          {detailsArray.length > 0 && (
+                                              <div className="flex items-center gap-1">
+                                                  {detailsArray.map((d, i) => (
+                                                      <span key={i} className="text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 text-[10px] truncate max-w-[150px]">{d}</span>
+                                                  ))}
+                                              </div>
+                                          )}
+                                          {hasTrackingData && (
+                                              <div className="flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-[10px]" title={`${t.trackingNumber} / ${t.trackingDate}`}>
+                                                  <FileText size={10}/> {item.tracking_number || '-'} {item.tracking_date ? `(${item.tracking_date})` : ''}
+                                              </div>
+                                          )}
+                                          {hasQuantityData && (
+                                              <div className="flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-[10px]" title={t.quantity}>
+                                                  <Layers size={10}/> <span className="dir-ltr font-bold text-slate-600">{formatNum(item.quantity)}</span>
+                                              </div>
+                                          )}
+                                      </div>
+                                  </div>
+                              );
+                          }
+
+                          // Full Edit View Mode
+                          return (
+                             <div 
+                                key={item.id} 
+                                className={`my-2 mx-1 bg-white rounded-lg border transition-all duration-200 border-indigo-400 shadow-md ring-1 ring-indigo-100 w-full lg:w-[calc(100%-8px)] shrink-0 min-w-[800px]`}
+                                onClick={(e) => e.stopPropagation()}
+                             >
+                                <div className="flex flex-col md:flex-row gap-0">
+                                   <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg shrink-0">
+                                      <RowNumberInput value={item.row_number} onChangeRow={(newNum) => handleRowReorder(item.id, newNum)} max={voucherItems.length} />
+                                      <div className="mt-2 flex flex-col gap-1.5 items-center">
+                                          {!isReadonly && (
+                                            <>
+                                              <button className="text-slate-400 hover:text-indigo-600 p-1 rounded transition-all" title={t.copyRow} onClick={(e) => { e.stopPropagation(); duplicateRow(index); }}><CopyPlus size={14} /></button>
+                                              <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
+                                            </>
+                                          )}
+                                      </div>
+                                   </div>
+                                   
+                                   <div className="flex-1 p-2 flex flex-col gap-1.5">
+                                      {/* --- ROW 1 --- */}
+                                      <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
+                                         <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
+                                            <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
+                                            <div className={`border rounded h-8 flex items-center border-indigo-300 bg-indigo-50/20`}>
+                                               <SearchableAccountSelect 
+                                                  accounts={validAccountsForLedger} 
+                                                  value={item.account_id} 
+                                                  onChange={(v) => handleItemChange(index, 'account_id', v)} 
+                                                  disabled={isReadonly} 
+                                                  placeholder={t.searchAccount} 
+                                                  className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors ${isReadonly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                                                  onFocus={() => handleItemFocus(item.id)}
+                                               />
+                                            </div>
+                                         </div>
+                                         <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                            <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
+                                            <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
+                                                const raw = e.target.value.replace(/,/g, '');
+                                                if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
+                                            }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                         </div>
+                                         <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                            <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
+                                            <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
+                                                const raw = e.target.value.replace(/,/g, '');
+                                                if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
+                                            }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                         </div>
+                                         <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                            <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
+                                            <div className="flex items-center gap-1 h-8">
+                                              <select 
+                                                 className={`flex-1 w-full border rounded h-full px-1 text-[12px] outline-none border-indigo-300 bg-white`}
+                                                 value={item.currency_code || ''}
+                                                 onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
+                                                 disabled={isReadonly}
+                                                 onFocus={() => handleItemFocus(item.id)}
+                                              >
+                                                 <option value="">-</option>
+                                                 {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
+                                              </select>
+                                              <button 
+                                                className={`w-8 h-full shrink-0 flex items-center justify-center rounded border transition-colors bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100`}
+                                                onClick={(e) => { e.stopPropagation(); setCurrencyModalIndex(index); }}
+                                                title={t.currencyConversions}
+                                              >
+                                                <Coins size={14}/>
+                                              </button>
+                                            </div>
+                                         </div>
+                                         <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
+                                            <div className="flex justify-between items-center">
+                                                <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
+                                                {!isReadonly && index > 0 && (
+                                                    <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
+                                                )}
+                                            </div>
+                                            <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                         </div>
+                                      </div>
+
+                                      {/* --- ROW 2 (Conditional) --- */}
+                                      {showRow2 && (
+                                         <div className="grid grid-cols-12 gap-x-3 gap-y-2 p-2 bg-slate-50/80 rounded border border-slate-100 mt-0.5">
+                                            <div className="col-span-12 lg:col-span-5 flex flex-col gap-1">
+                                               <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
+                                               <div className={`border rounded min-h-8 flex items-center border-indigo-300 bg-indigo-50/20 ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
+                                                   <MultiDetailSelector 
+                                                      allowedTypes={allowedDetailTypes}
+                                                      allInstances={allDetailInstances}
+                                                      value={item.details_dict || {}} 
+                                                      onChange={(v) => handleItemChange(index, 'details_dict', v)} 
+                                                      disabled={isReadonly || allowedDetailTypes.length === 0} 
+                                                      t={t}
+                                                   />
+                                               </div>
+                                            </div>
+                                            <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                               <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
+                                               <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => handleItemFocus(item.id)} />
+                                            </div>
+                                            <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                               <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
+                                               <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => handleItemFocus(item.id)} />
+                                            </div>
+                                            <div className={`col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
+                                               <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
+                                               <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white`} value={formatNum(item.quantity)} onChange={(e) => {
+                                                   const raw = e.target.value.replace(/,/g, '');
+                                                   if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
+                                               }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => handleItemFocus(item.id)} />
+                                            </div>
+                                         </div>
+                                      )}
+                                   </div>
+                                </div>
+                             </div>
+                          );
+                       })}
+                   </div>
+                </div>
+            </div>
+
+            {/* --- Totals Sidebar (Right) --- */}
+            {isSummaryOpen && (
+                <div className="w-full lg:w-[280px] shrink-0 bg-slate-50 border-t lg:border-t-0 lg:border-r rtl:border-r-0 rtl:border-l border-slate-200 flex flex-col overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+                    <div className="p-3 border-b border-slate-200 bg-white flex justify-between items-center z-10 shrink-0">
+                        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                            <Layers size={14} className="text-indigo-500"/>
+                            {t.summary}
+                        </h3>
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border bg-white shadow-sm ${isBalanced ? 'text-emerald-700 border-emerald-200' : 'text-red-700 border-red-200'}`}>
+                            {isBalanced ? <CheckCircle size={12}/> : <FileWarning size={12}/>}
+                            <span className="font-bold text-[10px] dir-ltr">{isBalanced ? t.balanced : formatNum(Math.abs(totalDebit - totalCredit))}</span>
                         </div>
-                     </div>
-                  );
-               })}
-            </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-3 p-3 text-xs">
+                       {/* Base Currency Total */}
+                       <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors">
+                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                               <span className="uppercase tracking-wider">{t.summaryBase}</span>
+                               <Badge variant="indigo" size="sm">{getCurrencyTitle(currentLedger?.currency)}</Badge>
+                           </div>
+                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-indigo-700 dir-ltr text-[13px]">{formatNum(totalDebit)}</span></div>
+                           <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-indigo-700 dir-ltr text-[13px]">{formatNum(totalCredit)}</span></div>
+                       </div>
+                       
+                       {/* Operating Currency Total */}
+                       {currencyGlobals?.op_currency && (
+                           <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+                               <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                                   <span className="uppercase tracking-wider">{t.summaryOp}</span>
+                                   <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.op_currency)}</Badge>
+                               </div>
+                               <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(opTotalDebit)}</span></div>
+                               <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(opTotalCredit)}</span></div>
+                           </div>
+                       )}
 
-            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap gap-8 text-[14px] font-bold shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-              <div className="flex items-center gap-2.5">
-                <span className="text-slate-500 font-sans text-xs uppercase tracking-wider">{t.totalDebit}</span>
-                <span className="text-indigo-700 bg-indigo-50 px-3 py-1 rounded-md border border-indigo-100">{formatNum(totalDebit)}</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span className="text-slate-500 font-sans text-xs uppercase tracking-wider">{t.totalCredit}</span>
-                <span className="text-indigo-700 bg-indigo-50 px-3 py-1 rounded-md border border-indigo-100">{formatNum(totalCredit)}</span>
-              </div>
-              <div className="flex-1"></div>
-              <div className={`flex items-center gap-2 px-4 py-1 rounded-full border ${isBalanced ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-red-700 bg-red-50 border-red-100'}`}>
-                 {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
-                 <span className="font-sans text-xs">{isBalanced ? t.alreadyBalanced || 'Balanced' : formatNum(Math.abs(totalDebit - totalCredit))}</span>
-              </div>
-            </div>
+                       {/* Reporting Currency 1 Total */}
+                       {currencyGlobals?.rep1_currency && (
+                           <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+                               <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                                   <span className="uppercase tracking-wider">{t.summaryRep1}</span>
+                                   <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep1_currency)}</Badge>
+                               </div>
+                               <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(rep1TotalDebit)}</span></div>
+                               <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(rep1TotalCredit)}</span></div>
+                           </div>
+                       )}
+
+                       {/* Reporting Currency 2 Total */}
+                       {currencyGlobals?.rep2_currency && (
+                           <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+                               <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                                   <span className="uppercase tracking-wider">{t.summaryRep2}</span>
+                                   <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep2_currency)}</Badge>
+                               </div>
+                               <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(rep2TotalDebit)}</span></div>
+                               <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNum(rep2TotalCredit)}</span></div>
+                           </div>
+                       )}
+                    </div>
+                </div>
+            )}
+
           </div>
         </div>
+        
+        {/* Currency Conversion Modal */}
+        {currencyModalIndex !== null && voucherItems[currencyModalIndex] && (
+            <Modal isOpen={true} onClose={() => setCurrencyModalIndex(null)} title={`${t.currencyConversions} - ${t.row} ${voucherItems[currencyModalIndex].row_number}`} size="lg" footer={<Button variant="primary" onClick={() => setCurrencyModalIndex(null)}>{isRtl ? 'تایید و بستن' : 'Confirm & Close'}</Button>}>
+                <div className="p-4 bg-slate-50/50 flex flex-col gap-4">
+                    <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm text-sm">
+                        <div className="flex items-center gap-2">
+                           <Calculator size={18} className="text-indigo-500"/>
+                           <span className="font-bold text-slate-700">{t.baseAmount}:</span>
+                           <span className={`font-bold ${parseNum(voucherItems[currencyModalIndex].debit) > 0 ? 'text-emerald-600' : (parseNum(voucherItems[currencyModalIndex].credit) > 0 ? 'text-rose-600' : 'text-slate-500')}`}>
+                               {parseNum(voucherItems[currencyModalIndex].debit) > 0 
+                                  ? `${formatNum(voucherItems[currencyModalIndex].debit)} (${t.debit})` 
+                                  : parseNum(voucherItems[currencyModalIndex].credit) > 0 
+                                      ? `${formatNum(voucherItems[currencyModalIndex].credit)} (${t.credit})`
+                                      : '0'}
+                           </span>
+                        </div>
+                        <Badge variant="indigo">{getCurrencyTitle(voucherItems[currencyModalIndex].currency_code)}</Badge>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm bg-white">
+                        <table className="w-full text-xs text-right dir-rtl">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                                <tr>
+                                    <th className="py-2 px-3 font-bold">{isRtl ? 'نوع ارز' : 'Type'}</th>
+                                    <th className="py-2 px-3 font-bold">{isRtl ? 'ارز مقصد' : 'Target'}</th>
+                                    <th className="py-2 px-3 font-bold w-32">{t.exchangeRate}</th>
+                                    <th className="py-2 px-3 font-bold text-center">{t.reverseCalc}</th>
+                                    <th className="py-2 px-3 font-bold w-40">{t.convertedAmount}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {/* Operating Currency */}
+                                {currencyGlobals?.op_currency && (() => {
+                                    const isMatch = voucherItems[currencyModalIndex].currency_code === currencyGlobals.op_currency;
+                                    return (
+                                        <tr className="border-b border-slate-100 hover:bg-slate-50">
+                                            <td className="py-2 px-3 font-bold text-slate-700">{t.opCurrency}</td>
+                                            <td className="py-2 px-3">{getCurrencyTitle(currencyGlobals.op_currency)}</td>
+                                            <td className="py-2 px-3">
+                                                <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch || isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`}
+                                                    value={voucherItems[currencyModalIndex].op_rate} 
+                                                    onChange={(e) => handleItemChange(currencyModalIndex, 'op_rate', e.target.value)} 
+                                                    disabled={isMatch || isReadonly}
+                                                />
+                                            </td>
+                                            <td className="py-2 px-3 text-center">
+                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
+                                                    checked={voucherItems[currencyModalIndex].op_is_reverse} 
+                                                    onChange={(e) => handleItemChange(currencyModalIndex, 'op_is_reverse', e.target.checked)} 
+                                                    disabled={isMatch || isReadonly}
+                                                />
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <div className="w-full h-7 bg-indigo-50 border border-indigo-100 rounded flex items-center px-2 font-bold text-indigo-700 text-left dir-ltr overflow-hidden text-ellipsis whitespace-nowrap">
+                                                    {formatNum(parseNum(voucherItems[currencyModalIndex].debit) > 0 ? voucherItems[currencyModalIndex].op_debit : voucherItems[currencyModalIndex].op_credit)}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })()}
+
+                                {/* Reporting Currency 1 */}
+                                {currencyGlobals?.rep1_currency && (() => {
+                                    const isMatch = voucherItems[currencyModalIndex].currency_code === currencyGlobals.rep1_currency;
+                                    return (
+                                        <tr className="border-b border-slate-100 hover:bg-slate-50">
+                                            <td className="py-2 px-3 font-bold text-slate-700">{t.rep1Currency}</td>
+                                            <td className="py-2 px-3">{getCurrencyTitle(currencyGlobals.rep1_currency)}</td>
+                                            <td className="py-2 px-3">
+                                                <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch || isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`}
+                                                    value={voucherItems[currencyModalIndex].rep1_rate} 
+                                                    onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_rate', e.target.value)} 
+                                                    disabled={isMatch || isReadonly}
+                                                />
+                                            </td>
+                                            <td className="py-2 px-3 text-center">
+                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
+                                                    checked={voucherItems[currencyModalIndex].rep1_is_reverse} 
+                                                    onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_is_reverse', e.target.checked)} 
+                                                    disabled={isMatch || isReadonly}
+                                                />
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <div className="w-full h-7 bg-indigo-50 border border-indigo-100 rounded flex items-center px-2 font-bold text-indigo-700 text-left dir-ltr overflow-hidden text-ellipsis whitespace-nowrap">
+                                                    {formatNum(parseNum(voucherItems[currencyModalIndex].debit) > 0 ? voucherItems[currencyModalIndex].rep1_debit : voucherItems[currencyModalIndex].rep1_credit)}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })()}
+
+                                {/* Reporting Currency 2 */}
+                                {currencyGlobals?.rep2_currency && (() => {
+                                    const isMatch = voucherItems[currencyModalIndex].currency_code === currencyGlobals.rep2_currency;
+                                    return (
+                                        <tr className="hover:bg-slate-50">
+                                            <td className="py-2 px-3 font-bold text-slate-700">{t.rep2Currency}</td>
+                                            <td className="py-2 px-3">{getCurrencyTitle(currencyGlobals.rep2_currency)}</td>
+                                            <td className="py-2 px-3">
+                                                <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch || isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`}
+                                                    value={voucherItems[currencyModalIndex].rep2_rate} 
+                                                    onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_rate', e.target.value)} 
+                                                    disabled={isMatch || isReadonly}
+                                                />
+                                            </td>
+                                            <td className="py-2 px-3 text-center">
+                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
+                                                    checked={voucherItems[currencyModalIndex].rep2_is_reverse} 
+                                                    onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_is_reverse', e.target.checked)} 
+                                                    disabled={isMatch || isReadonly}
+                                                />
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <div className="w-full h-7 bg-indigo-50 border border-indigo-100 rounded flex items-center px-2 font-bold text-indigo-700 text-left dir-ltr overflow-hidden text-ellipsis whitespace-nowrap">
+                                                    {formatNum(parseNum(voucherItems[currencyModalIndex].debit) > 0 ? voucherItems[currencyModalIndex].rep2_debit : voucherItems[currencyModalIndex].rep2_credit)}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p className="text-[10px] text-slate-500 text-justify bg-amber-50 p-2 rounded border border-amber-200 flex gap-2 items-start mt-2">
+                        <FileWarning size={14} className="shrink-0 text-amber-500" />
+                        <span>{isRtl ? 'مقادیر تبدیل‌شده به صورت خودکار محاسبه شده و با تغییر مبلغ مبنا یا نرخ تبدیل در لحظه به‌روزرسانی می‌شوند. این مقادیر در گزارشات پایه سیستم مورد استفاده قرار می‌گیرند.' : 'Converted values are automatically calculated and updated in real-time. These are used for base system reports.'}</span>
+                    </p>
+                </div>
+            </Modal>
+        )}
       </div>
     );
   }
@@ -1325,7 +1886,15 @@ const VoucherReview = ({ language = 'fa' }) => {
           selectedIds={selectedIds} 
           onSelectRow={(id, c) => setSelectedIds(c ? [...selectedIds, id] : selectedIds.filter(i => i !== id))} 
           onSelectAll={(c) => setSelectedIds(c ? vouchers.map(v => v.id) : [])} 
-          onDelete={(ids) => { setVoucherToDelete(vouchers.find(v => v.id === ids[0])); setShowDeleteModal(true); }} 
+          onDelete={(ids) => { 
+              const selectedVouchers = vouchers.filter(v => ids.includes(v.id));
+              if (selectedVouchers.some(v => v.status === 'reviewed')) {
+                  alert(isRtl ? 'اسناد بررسی شده قابل حذف نیستند.' : 'Reviewed vouchers cannot be deleted.');
+                  return;
+              }
+              setVoucherToDelete(selectedVouchers[0]); 
+              setShowDeleteModal(true); 
+          }} 
           onDoubleClick={(r) => handleOpenForm(r)} 
           isRtl={isRtl} 
           isLoading={loading} 
@@ -1346,7 +1915,9 @@ const VoucherReview = ({ language = 'fa' }) => {
                 onClick={() => handleOpenForm(r)} 
                 title={r.status === 'reviewed' ? t.view : t.edit} 
               />
-              <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} title={t.delete} />
+              {r.status !== 'reviewed' && (
+                <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} title={t.delete} />
+              )}
             </div>
           )}
         />
