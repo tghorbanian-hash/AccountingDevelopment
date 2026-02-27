@@ -1481,13 +1481,13 @@ const Vouchers = ({ language = 'fa' }) => {
                   <div className="flex gap-2">
                     {!isReadonly && (
                         <>
-                           <Button variant="outline" size="sm" onClick={globalBalance} icon={Scale}>{t.balance}</Button>
-                           <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>
+                           <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); globalBalance(); }} icon={Scale}>{t.balance}</Button>
+                           <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); addItemRow(); }} icon={Plus}>{t.addRow}</Button>
                         </>
                     )}
                     <div className="w-px bg-slate-300 mx-1 h-8"></div>
                     <button 
-                        onClick={() => setIsSummaryOpen(!isSummaryOpen)} 
+                        onClick={(e) => { e.stopPropagation(); setIsSummaryOpen(!isSummaryOpen); }} 
                         className={`w-8 h-8 flex items-center justify-center rounded border transition-colors ${isSummaryOpen ? 'bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                         title={t.summary}
                     >
@@ -1496,8 +1496,8 @@ const Vouchers = ({ language = 'fa' }) => {
                   </div>
                 </div>
                 
-                <div className="flex-1 overflow-auto custom-scrollbar bg-slate-50 relative" onClick={() => setFocusedRowId(null)}>
-                   <div className="flex flex-col pb-6 w-full">
+                <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar bg-slate-50" onClick={() => setFocusedRowId(null)}>
+                   <div className="flex flex-col pb-6 w-full min-w-min">
                        {voucherItems.map((item, index) => {
                           const isFocused = focusedRowId === item.id;
                           const isEditing = isFocused && !isReadonly;
@@ -1521,60 +1521,70 @@ const Vouchers = ({ language = 'fa' }) => {
                               const hasForeignCurrency = item.currency_code !== currentLedger?.currency || parseNum(item.op_rate) !== 1 || parseNum(item.rep1_rate) !== 1 || parseNum(item.rep2_rate) !== 1;
                               const hasTrackingData = item.tracking_number || item.tracking_date;
                               const hasQuantityData = item.quantity && parseNum(item.quantity) > 0;
-                              
+                              const accountDisplay = accountObj ? `${accountObj.full_code} - ${accountObj.title}` : '-';
                               const detailsArray = Object.values(item.details_dict || {}).map(id => allDetailInstances.find(d => String(d.id) === String(id))?.title).filter(Boolean);
 
                               return (
                                   <div
                                       key={item.id}
-                                      className={`flex flex-wrap lg:flex-nowrap items-center gap-x-3 gap-y-1.5 p-2 bg-white border-b border-slate-100 cursor-pointer transition-colors text-[11px] hover:bg-indigo-50/40 w-full ${isFocused ? 'ring-1 ring-indigo-200 shadow-sm z-10 relative bg-indigo-50/20' : ''}`}
+                                      className={`flex items-center gap-2 p-3 bg-white border-b border-slate-100 cursor-pointer transition-colors text-[11px] hover:bg-indigo-50/40 w-full shrink-0 ${isFocused ? 'ring-1 ring-indigo-200 shadow-sm z-10 relative bg-indigo-50/20' : ''}`}
                                       onClick={(e) => { e.stopPropagation(); handleItemFocus(item.id); }}
                                   >
                                       {/* 1. Row */}
-                                      <div className="w-5 text-center font-bold text-slate-400 shrink-0">{item.row_number}</div>
+                                      <div className="w-8 text-center font-bold text-slate-400 shrink-0">{item.row_number}</div>
                                       
-                                      {/* 2. Code & Title */}
-                                      <div className="shrink-0 font-bold text-slate-700 whitespace-nowrap min-w-[120px] max-w-[250px] truncate" title={accountObj ? `${accountObj.full_code} - ${accountObj.title}` : '-'}>
-                                          {accountObj ? `${accountObj.full_code} - ${accountObj.title}` : '-'}
+                                      {/* 2. Account */}
+                                      <div className="w-[260px] shrink-0 font-bold text-slate-700 truncate" title={accountDisplay}>
+                                          {accountDisplay}
                                       </div>
 
-                                      {/* 3, 4, 5. Debit, Credit, Currency */}
-                                      <div className="flex items-center gap-2 shrink-0">
-                                          <div className={`w-20 text-right dir-ltr font-bold ${parseNum(item.debit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>{formatNum(item.debit) || '-'}</div>
-                                          <div className={`w-20 text-right dir-ltr font-bold ${parseNum(item.credit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>{formatNum(item.credit) || '-'}</div>
-                                          <div className="w-14 flex items-center justify-center gap-0.5 bg-slate-50 border border-slate-100 rounded px-1 h-5 text-slate-500 font-bold">
-                                              <span>{getCurrencyTitle(item.currency_code)}</span>
-                                              {hasForeignCurrency && <Coins size={10} className="text-purple-500" title={t.currencyConversions} />}
-                                          </div>
+                                      {/* 3. Debit */}
+                                      <div className="w-[90px] shrink-0 flex flex-col text-left dir-ltr">
+                                          <span className="text-[9px] text-slate-400 mb-0.5 uppercase tracking-wide">{t.debit}</span>
+                                          <span className={`font-bold ${parseNum(item.debit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>
+                                              {formatNum(item.debit) || '-'}
+                                          </span>
+                                      </div>
+
+                                      {/* 4. Credit */}
+                                      <div className="w-[90px] shrink-0 flex flex-col text-left dir-ltr">
+                                          <span className="text-[9px] text-slate-400 mb-0.5 uppercase tracking-wide">{t.credit}</span>
+                                          <span className={`font-bold ${parseNum(item.credit) > 0 ? 'text-indigo-700' : 'text-slate-300'}`}>
+                                              {formatNum(item.credit) || '-'}
+                                          </span>
+                                      </div>
+
+                                      {/* 5. Currency */}
+                                      <div className="w-[70px] shrink-0 flex items-center justify-center gap-1.5 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-slate-500 font-bold whitespace-nowrap">
+                                          <span>{getCurrencyTitle(item.currency_code)}</span>
+                                          {hasForeignCurrency && <Coins size={14} className="text-purple-500 shrink-0" title={t.currencyConversions} />}
                                       </div>
 
                                       {/* 6. Description */}
-                                      <div className="flex-1 text-slate-600 min-w-[100px] truncate" title={item.description || '-'}>
+                                      <div className="w-[280px] shrink-0 text-slate-600 truncate" title={item.description || '-'}>
                                           {item.description || '-'}
                                       </div>
 
-                                      {/* 7. Details */}
-                                      {detailsArray.length > 0 && (
-                                          <div className="shrink-0 flex items-center">
-                                              <span className="text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 text-[10px]">
-                                                  {detailsArray.join(' / ')}
-                                              </span>
-                                          </div>
-                                      )}
-
-                                      {/* 8. Tracking */}
-                                      {hasTrackingData && (
-                                          <div className="shrink-0 flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-[10px]" title={`${t.trackingNumber} / ${t.trackingDate}`}>
-                                              <FileText size={10}/> {item.tracking_number || '-'} {item.tracking_date ? `(${item.tracking_date})` : ''}
-                                          </div>
-                                      )}
-
-                                      {/* 9. Quantity */}
-                                      {hasQuantityData && (
-                                          <div className="shrink-0 flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-[10px]" title={t.quantity}>
-                                              <Layers size={10}/> <span className="dir-ltr font-bold text-slate-600">{formatNum(item.quantity)}</span>
-                                          </div>
-                                      )}
+                                      {/* 7. Extra Meta */}
+                                      <div className="flex-1 flex flex-wrap items-center gap-2 min-w-[200px]">
+                                          {detailsArray.length > 0 && (
+                                              <div className="flex items-center gap-1">
+                                                  {detailsArray.map((d, i) => (
+                                                      <span key={i} className="text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 text-[10px] truncate max-w-[150px]">{d}</span>
+                                                  ))}
+                                              </div>
+                                          )}
+                                          {hasTrackingData && (
+                                              <div className="flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-[10px]" title={`${t.trackingNumber} / ${t.trackingDate}`}>
+                                                  <FileText size={10}/> {item.tracking_number || '-'} {item.tracking_date ? `(${item.tracking_date})` : ''}
+                                              </div>
+                                          )}
+                                          {hasQuantityData && (
+                                              <div className="flex items-center gap-1 text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 text-[10px]" title={t.quantity}>
+                                                  <Layers size={10}/> <span className="dir-ltr font-bold text-slate-600">{formatNum(item.quantity)}</span>
+                                              </div>
+                                          )}
+                                      </div>
                                   </div>
                               );
                           }
@@ -1583,7 +1593,7 @@ const Vouchers = ({ language = 'fa' }) => {
                           return (
                              <div 
                                 key={item.id} 
-                                className={`my-2 mx-1 bg-white rounded-lg border transition-all duration-200 border-indigo-400 shadow-md ring-1 ring-indigo-100 shrink-0 w-[calc(100%-8px)]`}
+                                className={`my-2 mx-1 bg-white rounded-lg border transition-all duration-200 border-indigo-400 shadow-md ring-1 ring-indigo-100 w-full lg:w-[calc(100%-8px)] shrink-0 min-w-[800px]`}
                                 onClick={(e) => e.stopPropagation()}
                              >
                                 <div className="flex flex-col md:flex-row gap-0">
@@ -1704,12 +1714,12 @@ const Vouchers = ({ language = 'fa' }) => {
             {/* --- Totals Sidebar (Right) --- */}
             {isSummaryOpen && (
                 <div className="w-full lg:w-[280px] shrink-0 bg-slate-50 border-t lg:border-t-0 lg:border-r rtl:border-r-0 rtl:border-l border-slate-200 flex flex-col overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
-                    <div className="p-3 border-b border-slate-200 bg-slate-100 flex justify-between items-center sticky top-0 z-20">
+                    <div className="p-3 border-b border-slate-200 bg-white flex justify-between items-center z-10 shrink-0">
                         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
                             <Layers size={14} className="text-indigo-500"/>
                             {t.summary}
                         </h3>
-                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border bg-white ${isBalanced ? 'text-emerald-700 border-emerald-200' : 'text-red-700 border-red-200'}`}>
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border bg-white shadow-sm ${isBalanced ? 'text-emerald-700 border-emerald-200' : 'text-red-700 border-red-200'}`}>
                             {isBalanced ? <CheckCircle size={12}/> : <FileWarning size={12}/>}
                             <span className="font-bold text-[10px] dir-ltr">{isBalanced ? t.balanced : formatNum(Math.abs(totalDebit - totalCredit))}</span>
                         </div>
@@ -1717,7 +1727,7 @@ const Vouchers = ({ language = 'fa' }) => {
                     
                     <div className="flex flex-col gap-3 p-3 text-xs">
                        {/* Base Currency Total */}
-                       <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors">
+                       <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                                <span className="uppercase tracking-wider">{t.summaryBase}</span>
                                <Badge variant="indigo" size="sm">{getCurrencyTitle(currentLedger?.currency)}</Badge>
@@ -1728,7 +1738,7 @@ const Vouchers = ({ language = 'fa' }) => {
                        
                        {/* Operating Currency Total */}
                        {currencyGlobals?.op_currency && (
-                           <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+                           <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                                    <span className="uppercase tracking-wider">{t.summaryOp}</span>
                                    <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.op_currency)}</Badge>
@@ -1740,7 +1750,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
                        {/* Reporting Currency 1 Total */}
                        {currencyGlobals?.rep1_currency && (
-                           <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+                           <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                                    <span className="uppercase tracking-wider">{t.summaryRep1}</span>
                                    <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep1_currency)}</Badge>
@@ -1752,7 +1762,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
                        {/* Reporting Currency 2 Total */}
                        {currencyGlobals?.rep2_currency && (
-                           <div className="flex flex-col gap-1.5 bg-white p-2.5 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+                           <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                                    <span className="uppercase tracking-wider">{t.summaryRep2}</span>
                                    <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep2_currency)}</Badge>
