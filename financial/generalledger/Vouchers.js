@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, ArrowRight, ArrowLeft, 
   Save, FileText, CheckCircle, FileWarning, Filter, ChevronDown, Search, Scale, Copy, Check, X, Layers, Printer,
-  Coins, Calculator
+  Coins, Calculator, CopyPlus
 } from 'lucide-react';
 
 const localTranslations = {
@@ -91,7 +91,9 @@ const localTranslations = {
     duplicateRowError: 'Row {row} is an exact duplicate of another row. Please modify at least one field.',
     currencyMandatoryError: 'Currency conversions are mandatory for the account in row {row}.',
     base: 'Base',
-    copyRow: 'Copy Row'
+    copyRow: 'Copy Row',
+    summary: 'Voucher Summary',
+    copyVoucher: 'Copy Voucher'
   },
   fa: {
     title: 'اسناد حسابداری',
@@ -177,7 +179,9 @@ const localTranslations = {
     duplicateRowError: 'ردیف {row} دقیقاً مشابه یک ردیف دیگر است. لطفاً حداقل یک فیلد را تغییر دهید.',
     currencyMandatoryError: 'ورود اطلاعات تبدیلات ارزی برای معین ردیف {row} اجباری است.',
     base: 'مبنا',
-    copyRow: 'کپی ردیف'
+    copyRow: 'کپی ردیف',
+    summary: 'خلاصه سند',
+    copyVoucher: 'کپی سند'
   }
 };
 
@@ -690,6 +694,7 @@ const Vouchers = ({ language = 'fa' }) => {
           };
         });
         setVoucherItems(mappedItems);
+        if (mappedItems.length > 0) setFocusedRowId(mappedItems[0].id);
       } catch (error) {
         console.error('Error fetching items:', error);
       } finally {
@@ -720,8 +725,9 @@ const Vouchers = ({ language = 'fa' }) => {
         ledger_id: initialLedgerId,
         branch_id: defaultBranch?.id || ''
       });
+      const newId = 'temp_' + Date.now();
       setVoucherItems([{
-        id: 'temp_' + Date.now(),
+        id: newId,
         row_number: 1,
         account_id: '',
         details_dict: {},
@@ -736,9 +742,57 @@ const Vouchers = ({ language = 'fa' }) => {
         rep1_rate: 1, rep1_is_reverse: false, rep1_debit: 0, rep1_credit: 0,
         rep2_rate: 1, rep2_is_reverse: false, rep2_debit: 0, rep2_credit: 0
       }]);
+      setFocusedRowId(newId);
       setLoading(false);
     }
     setView('form');
+  };
+
+  const handleCopyVoucher = async (voucher) => {
+      setLoading(true);
+      try {
+          const { data, error } = await supabase.schema('gl').from('voucher_items').select('*').eq('voucher_id', voucher.id).order('row_number', { ascending: true });
+          if (error) throw error;
+
+          const today = new Date().toISOString().split('T')[0];
+          const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, voucher.ledger_id, voucher.fiscal_period_id, voucher.branch_id);
+
+          setCurrentVoucher({
+              ...voucher,
+              id: null,
+              voucher_date: today,
+              status: 'draft',
+              voucher_number: nextVoucher,
+              daily_number: nextDaily,
+              cross_reference: nextCross,
+              reference_number: '',
+              reviewed_by: null,
+              approved_by: null,
+          });
+
+          const mappedItems = (data || []).map((item, index) => {
+              const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
+              return {
+                  ...item,
+                  id: 'temp_' + Date.now() + '_' + index,
+                  voucher_id: null,
+                  currency_code: detailsObj.currency_code || '',
+                  details_dict: detailsObj.selected_details || {},
+                  op_rate: item.op_rate ?? 1, op_is_reverse: item.op_is_reverse ?? false, op_debit: item.op_debit ?? 0, op_credit: item.op_credit ?? 0,
+                  rep1_rate: item.rep1_rate ?? 1, rep1_is_reverse: item.rep1_is_reverse ?? false, rep1_debit: item.rep1_debit ?? 0, rep1_credit: item.rep1_credit ?? 0,
+                  rep2_rate: item.rep2_rate ?? 1, rep2_is_reverse: item.rep2_is_reverse ?? false, rep2_debit: item.rep2_debit ?? 0, rep2_credit: item.rep2_credit ?? 0,
+              };
+          });
+          
+          setVoucherItems(mappedItems);
+          setView('form');
+          setIsHeaderOpen(true);
+          if (mappedItems.length > 0) setFocusedRowId(mappedItems[0].id);
+      } catch (err) {
+          console.error('Error copying voucher:', err);
+      } finally {
+          setLoading(false);
+      }
   };
 
   const getValidDetailTypes = (accountId) => {
@@ -1045,7 +1099,6 @@ const Vouchers = ({ language = 'fa' }) => {
        if (value === currencyGlobals.rep2_currency) { newItems[index].rep2_rate = 1; newItems[index].rep2_is_reverse = false; }
     }
     
-    // Auto-calculate Currency Conversions if amounts or rates change
     if (['debit', 'credit', 'currency_code', 'op_rate', 'op_is_reverse', 'rep1_rate', 'rep1_is_reverse', 'rep2_rate', 'rep2_is_reverse'].includes(field)) {
         const baseDebit = parseNum(newItems[index].debit);
         const baseCredit = parseNum(newItems[index].credit);
@@ -1317,7 +1370,7 @@ const Vouchers = ({ language = 'fa' }) => {
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => { setView('list'); setCurrentVoucher(null); setVoucherItems([]); }} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
             <div className="h-6 w-px bg-slate-200 mx-1"></div>
-            <h2 className="text-lg font-bold text-slate-800">{currentVoucher.id ? t.edit : t.newVoucher}</h2>
+            <h2 className="text-lg font-bold text-slate-800">{currentVoucher.id && currentVoucher.status !== 'draft' ? t.edit : t.newVoucher}</h2>
             {currentVoucher.id && getStatusBadge(currentVoucher.status)}
           </div>
           <div className="flex items-center gap-2">
@@ -1348,7 +1401,7 @@ const Vouchers = ({ language = 'fa' }) => {
               <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => {
                   const newBranch = e.target.value;
                   setCurrentVoucher({...currentVoucher, branch_id: newBranch});
-                  if (!currentVoucher.id) {
+                  if (!currentVoucher.id || currentVoucher.status === 'draft') {
                      fetchAutoNumbers(currentVoucher.voucher_date, currentVoucher.ledger_id, currentVoucher.fiscal_period_id, newBranch).then(({nextVoucher}) => {
                          if (currentLedgerMeta.uniquenessScope === 'branch') {
                              setCurrentVoucher(prev => ({...prev, voucher_number: nextVoucher}));
@@ -1377,7 +1430,7 @@ const Vouchers = ({ language = 'fa' }) => {
               <InputField type="date" label={t.date} value={currentVoucher.voucher_date || ''} onChange={(e) => {
                  const newDate = e.target.value;
                  setCurrentVoucher({...currentVoucher, voucher_date: newDate});
-                 if (!currentVoucher.id) {
+                 if (!currentVoucher.id || currentVoucher.status === 'draft') {
                      fetchAutoNumbers(newDate, currentVoucher.ledger_id, currentVoucher.fiscal_period_id, currentVoucher.branch_id).then(({nextDaily}) => {
                          setCurrentVoucher(prev => ({...prev, daily_number: nextDaily}));
                      });
@@ -1394,163 +1447,205 @@ const Vouchers = ({ language = 'fa' }) => {
             </div>
           </Accordion>
 
-          <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-            <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
-              <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
-              {!isReadonly && (
-                <div className="flex gap-2">
-                   <Button variant="outline" size="sm" onClick={globalBalance} icon={Scale}>{t.balance}</Button>
-                   <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>
-                </div>
-              )}
-            </div>
+          <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4">
             
-            <div className="flex-1 overflow-auto custom-scrollbar p-2 bg-slate-100">
-               {voucherItems.map((item, index) => {
-                  const isFocused = focusedRowId === item.id;
-                  const accountObj = accounts.find(a => String(a.id) === String(item.account_id));
-                  let hasTracking = false;
-                  let hasQuantity = false;
-                  if (accountObj && accountObj.metadata) {
-                      const meta = typeof accountObj.metadata === 'string' ? JSON.parse(accountObj.metadata) : accountObj.metadata;
-                      if (meta.trackFeature) hasTracking = true;
-                      if (meta.qtyFeature) hasQuantity = true;
-                  }
+            {/* --- Main Items List (Left/Main) --- */}
+            <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0">
+                <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
+                  <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
+                  {!isReadonly && (
+                    <div className="flex gap-2">
+                       <Button variant="outline" size="sm" onClick={globalBalance} icon={Scale}>{t.balance}</Button>
+                       <Button variant="primary" size="sm" onClick={addItemRow} icon={Plus}>{t.addRow}</Button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex-1 overflow-auto custom-scrollbar p-2 bg-slate-50">
+                   {voucherItems.map((item, index) => {
+                      const isFocused = focusedRowId === item.id;
+                      const isEditing = isFocused && !isReadonly;
+                      
+                      const accountObj = accounts.find(a => String(a.id) === String(item.account_id));
+                      let hasTracking = false;
+                      let hasQuantity = false;
+                      if (accountObj && accountObj.metadata) {
+                          const meta = typeof accountObj.metadata === 'string' ? JSON.parse(accountObj.metadata) : accountObj.metadata;
+                          if (meta.trackFeature) hasTracking = true;
+                          if (meta.qtyFeature) hasQuantity = true;
+                      }
 
-                  const allowedDetailTypes = getValidDetailTypes(item.account_id);
-                  const hasDetails = allowedDetailTypes.length > 0;
-                  const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
-                  const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
+                      const allowedDetailTypes = getValidDetailTypes(item.account_id);
+                      const hasDetails = allowedDetailTypes.length > 0;
+                      const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
+                      const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
 
-                  return (
-                     <div 
-                        key={item.id} 
-                        className={`mb-2 bg-white rounded-lg border transition-all duration-200 ${isFocused ? 'border-indigo-400 shadow-md ring-1 ring-indigo-100' : 'border-slate-200 shadow-sm hover:border-indigo-200'}`}
-                        onClickCapture={() => handleItemFocus(item.id)}
-                        onFocusCapture={() => handleItemFocus(item.id)}
-                     >
-                        <div className="flex flex-col md:flex-row gap-0">
-                           <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg">
-                              <RowNumberInput value={item.row_number} onChangeRow={(newNum) => handleRowReorder(item.id, newNum)} max={voucherItems.length} />
-                              {!isReadonly && (
-                                <div className="mt-2 flex flex-col gap-1.5 items-center">
-                                    <button className="text-slate-400 hover:text-indigo-600 p-1 rounded transition-all" title={t.copyRow} onClick={(e) => { e.stopPropagation(); duplicateRow(index); }}><Copy size={14} /></button>
-                                    <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
-                                </div>
-                              )}
-                           </div>
-                           
-                           <div className="flex-1 p-2 flex flex-col gap-1.5">
-                              {/* --- ROW 1 --- */}
-                              <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
-                                 <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
-                                    <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
-                                    <div className={`border rounded h-8 flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'}`}>
-                                       <SearchableAccountSelect 
-                                          accounts={validAccountsForLedger} 
-                                          value={item.account_id} 
-                                          onChange={(v) => handleItemChange(index, 'account_id', v)} 
-                                          disabled={isReadonly} 
-                                          placeholder={t.searchAccount} 
-                                          className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors ${isReadonly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                          onFocus={() => handleItemFocus(item.id)}
-                                       />
-                                    </div>
-                                 </div>
-                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                    <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
-                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
-                                        const raw = e.target.value.replace(/,/g, '');
-                                        if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
-                                    }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
-                                 </div>
-                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                    <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
-                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
-                                        const raw = e.target.value.replace(/,/g, '');
-                                        if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
-                                    }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
-                                 </div>
-                                 <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
-                                    <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
-                                    <div className="flex items-center gap-1 h-8">
-                                      <select 
-                                         className={`flex-1 w-full border rounded h-full px-1 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
-                                         value={item.currency_code || ''}
-                                         onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
-                                         disabled={isReadonly}
-                                         onFocus={() => handleItemFocus(item.id)}
-                                      >
-                                         <option value="">-</option>
-                                         {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
-                                      </select>
-                                      <button 
-                                        className={`w-8 h-full shrink-0 flex items-center justify-center rounded border transition-colors ${isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100'}`}
-                                        onClick={(e) => { e.stopPropagation(); if(!isReadonly) setCurrencyModalIndex(index); }}
-                                        title={t.currencyConversions}
-                                      >
-                                        <Coins size={14}/>
-                                      </button>
-                                    </div>
-                                 </div>
-                                 <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
-                                    <div className="flex justify-between items-center">
-                                        <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
-                                        {!isReadonly && index > 0 && (
-                                            <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
-                                        )}
-                                    </div>
-                                    <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
-                                 </div>
+                      const accountDisplay = accountObj ? accountObj.full_code + ' - ' + accountObj.title : '-';
+                      const detailsDisplay = Object.values(item.details_dict || {}).map(id => allDetailInstances.find(d => String(d.id) === String(id))?.title).filter(Boolean).join(' / ');
+
+                      // Compact View Mode
+                      if (!isEditing) {
+                          return (
+                              <div
+                                  key={item.id}
+                                  className={`flex items-center gap-3 p-2 bg-white border-b border-slate-100 cursor-pointer transition-colors text-[11px] group ${isFocused ? 'ring-1 ring-indigo-200 shadow-sm z-10 relative' : 'hover:bg-indigo-50/40'}`}
+                                  onClick={() => handleItemFocus(item.id)}
+                              >
+                                  <div className="w-8 text-center font-bold text-slate-400 group-hover:text-indigo-500">{item.row_number}</div>
+                                  <div className="flex-1 flex flex-col gap-1 overflow-hidden">
+                                      <div className="flex items-center gap-2 truncate">
+                                          <span className="font-bold text-slate-700">{accountDisplay}</span>
+                                          {detailsDisplay && <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 truncate max-w-[150px]">{detailsDisplay}</span>}
+                                      </div>
+                                      <div className="text-slate-500 truncate text-[10px]">{item.description || '-'}</div>
+                                  </div>
+                                  <div className="w-24 flex flex-col items-end justify-center">
+                                      <span className="text-[9px] text-slate-400">{t.debit}</span>
+                                      <span className={`font-bold dir-ltr ${parseNum(item.debit) > 0 ? 'text-indigo-700' : 'text-slate-400'}`}>{formatNum(item.debit) || '-'}</span>
+                                  </div>
+                                  <div className="w-24 flex flex-col items-end justify-center">
+                                      <span className="text-[9px] text-slate-400">{t.credit}</span>
+                                      <span className={`font-bold dir-ltr ${parseNum(item.credit) > 0 ? 'text-indigo-700' : 'text-slate-400'}`}>{formatNum(item.credit) || '-'}</span>
+                                  </div>
+                                  <div className="w-12 text-center text-slate-500 font-bold bg-slate-50 rounded py-1 border border-slate-100">{getCurrencyTitle(item.currency_code)}</div>
                               </div>
+                          );
+                      }
 
-                              {/* --- ROW 2 (Conditional) --- */}
-                              {showRow2 && (
-                                 <div className="grid grid-cols-12 gap-x-3 gap-y-2 p-2 bg-slate-50/80 rounded border border-slate-100 mt-0.5">
-                                    <div className="col-span-12 lg:col-span-5 flex flex-col gap-1">
-                                       <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
-                                       <div className={`border rounded min-h-8 flex items-center ${isFocused ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 bg-slate-50'} ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
-                                           <MultiDetailSelector 
-                                              allowedTypes={allowedDetailTypes}
-                                              allInstances={allDetailInstances}
-                                              value={item.details_dict || {}} 
-                                              onChange={(v) => handleItemChange(index, 'details_dict', v)} 
-                                              disabled={isReadonly || allowedDetailTypes.length === 0} 
-                                              t={t}
+                      // Full Edit View Mode
+                      return (
+                         <div 
+                            key={item.id} 
+                            className={`mb-2 bg-white rounded-lg border transition-all duration-200 border-indigo-400 shadow-md ring-1 ring-indigo-100`}
+                         >
+                            <div className="flex flex-col md:flex-row gap-0">
+                               <div className="w-12 bg-slate-50 flex flex-col items-center justify-center border-r border-slate-100 py-2 rounded-r-lg">
+                                  <RowNumberInput value={item.row_number} onChangeRow={(newNum) => handleRowReorder(item.id, newNum)} max={voucherItems.length} />
+                                  <div className="mt-2 flex flex-col gap-1.5 items-center">
+                                      <button className="text-slate-400 hover:text-indigo-600 p-1 rounded transition-all" title={t.copyRow} onClick={(e) => { e.stopPropagation(); duplicateRow(index); }}><CopyPlus size={14} /></button>
+                                      <button className="text-red-400 hover:text-red-600 p-1 rounded transition-all" onClick={(e) => { e.stopPropagation(); removeRow(index); }}><Trash2 size={14} /></button>
+                                  </div>
+                               </div>
+                               
+                               <div className="flex-1 p-2 flex flex-col gap-1.5">
+                                  {/* --- ROW 1 --- */}
+                                  <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
+                                     <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
+                                        <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
+                                        <div className={`border rounded h-8 flex items-center border-indigo-300 bg-indigo-50/20`}>
+                                           <SearchableAccountSelect 
+                                              accounts={validAccountsForLedger} 
+                                              value={item.account_id} 
+                                              onChange={(v) => handleItemChange(index, 'account_id', v)} 
+                                              disabled={isReadonly} 
+                                              placeholder={t.searchAccount} 
+                                              className={`w-full bg-transparent border-0 border-b border-transparent hover:border-slate-300 focus:border-indigo-500 rounded-none h-8 px-2 outline-none text-[12px] text-slate-800 transition-colors cursor-pointer`}
+                                              onFocus={() => handleItemFocus(item.id)}
                                            />
-                                       </div>
-                                    </div>
-                                    <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
-                                       <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
-                                       <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => handleItemFocus(item.id)} />
-                                    </div>
-                                    <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
-                                       <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
-                                       <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'} uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => handleItemFocus(item.id)} />
-                                    </div>
-                                    <div className={`col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
-                                       <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
-                                       <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none ${isFocused ? 'border-indigo-300 bg-white' : 'border-slate-200 bg-slate-50'}`} value={formatNum(item.quantity)} onChange={(e) => {
-                                           const raw = e.target.value.replace(/,/g, '');
-                                           if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
-                                       }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => handleItemFocus(item.id)} />
-                                    </div>
-                                 </div>
-                              )}
-                           </div>
-                        </div>
-                     </div>
-                  );
-               })}
+                                        </div>
+                                     </div>
+                                     <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                        <div className="text-[10px] font-bold text-slate-500">{t.debit}</div>
+                                        <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white ${item.debit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.debit)} onChange={(e) => {
+                                            const raw = e.target.value.replace(/,/g, '');
+                                            if (!isNaN(raw)) handleItemChange(index, 'debit', raw === '' ? 0 : raw);
+                                        }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                     </div>
+                                     <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                        <div className="text-[10px] font-bold text-slate-500">{t.credit}</div>
+                                        <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white ${item.credit > 0 ? 'text-indigo-700 font-bold bg-indigo-50/30' : ''}`} value={formatNum(item.credit)} onChange={(e) => {
+                                            const raw = e.target.value.replace(/,/g, '');
+                                            if (!isNaN(raw)) handleItemChange(index, 'credit', raw === '' ? 0 : raw);
+                                        }} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                     </div>
+                                     <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
+                                        <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
+                                        <div className="flex items-center gap-1 h-8">
+                                          <select 
+                                             className={`flex-1 w-full border rounded h-full px-1 text-[12px] outline-none border-indigo-300 bg-white`}
+                                             value={item.currency_code || ''}
+                                             onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)}
+                                             disabled={isReadonly}
+                                             onFocus={() => handleItemFocus(item.id)}
+                                          >
+                                             <option value="">-</option>
+                                             {currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
+                                          </select>
+                                          <button 
+                                            className={`w-8 h-full shrink-0 flex items-center justify-center rounded border transition-colors bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100`}
+                                            onClick={(e) => { e.stopPropagation(); setCurrencyModalIndex(index); }}
+                                            title={t.currencyConversions}
+                                          >
+                                            <Coins size={14}/>
+                                          </button>
+                                        </div>
+                                     </div>
+                                     <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
+                                        <div className="flex justify-between items-center">
+                                            <div className="text-[10px] font-bold text-slate-500">{t.description}</div>
+                                            {index > 0 && (
+                                                <button onClick={() => copyDescription(index)} className="text-[10px] text-indigo-500 flex items-center gap-1 hover:text-indigo-700"><Copy size={10}/> {t.copyFromAbove}</button>
+                                            )}
+                                        </div>
+                                        <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white`} value={item.description || ''} onChange={(e) => handleItemChange(index, 'description', e.target.value)} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)} />
+                                     </div>
+                                  </div>
+
+                                  {/* --- ROW 2 (Conditional) --- */}
+                                  {showRow2 && (
+                                     <div className="grid grid-cols-12 gap-x-3 gap-y-2 p-2 bg-slate-50/80 rounded border border-slate-100 mt-0.5">
+                                        <div className="col-span-12 lg:col-span-5 flex flex-col gap-1">
+                                           <div className="text-[10px] font-bold text-slate-500">{t.detail}</div>
+                                           <div className={`border rounded min-h-8 flex items-center border-indigo-300 bg-indigo-50/20 ${allowedDetailTypes.length === 0 ? 'opacity-60 bg-slate-100' : ''}`}>
+                                               <MultiDetailSelector 
+                                                  allowedTypes={allowedDetailTypes}
+                                                  allInstances={allDetailInstances}
+                                                  value={item.details_dict || {}} 
+                                                  onChange={(v) => handleItemChange(index, 'details_dict', v)} 
+                                                  disabled={isReadonly || allowedDetailTypes.length === 0} 
+                                                  t={t}
+                                               />
+                                           </div>
+                                        </div>
+                                        <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                           <div className="text-[10px] font-bold text-slate-500">{t.trackingNumber}</div>
+                                           <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white`} value={item.tracking_number || ''} onChange={(e) => handleItemChange(index, 'tracking_number', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_number)} onFocus={() => handleItemFocus(item.id)} />
+                                        </div>
+                                        <div className={`col-span-4 lg:col-span-2 flex flex-col gap-1 ${hasTracking ? '' : 'opacity-40 grayscale'}`}>
+                                           <div className="text-[10px] font-bold text-slate-500">{t.trackingDate}</div>
+                                           <input type="date" className={`w-full border rounded h-8 px-2 text-[12px] outline-none border-indigo-300 bg-white uppercase`} value={item.tracking_date || ''} onChange={(e) => handleItemChange(index, 'tracking_date', e.target.value)} disabled={isReadonly || (!hasTracking && !item.tracking_date)} onFocus={() => handleItemFocus(item.id)} />
+                                        </div>
+                                        <div className={`col-span-4 lg:col-span-3 flex flex-col gap-1 ${hasQuantity ? '' : 'opacity-40 grayscale'}`}>
+                                           <div className="text-[10px] font-bold text-slate-500">{t.quantity}</div>
+                                           <input type="text" className={`w-full border rounded h-8 px-2 text-[12px] dir-ltr text-right outline-none border-indigo-300 bg-white`} value={formatNum(item.quantity)} onChange={(e) => {
+                                               const raw = e.target.value.replace(/,/g, '');
+                                               if (!isNaN(raw)) handleItemChange(index, 'quantity', raw === '' ? '' : raw);
+                                           }} disabled={isReadonly || (!hasQuantity && !item.quantity)} onFocus={() => handleItemFocus(item.id)} />
+                                        </div>
+                                     </div>
+                                  )}
+                               </div>
+                            </div>
+                         </div>
+                      );
+                   })}
+                </div>
             </div>
 
-            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-col gap-3 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-               {/* Summary Totals Grid */}
-               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+            {/* --- Totals Sidebar (Right) --- */}
+            <div className="w-full lg:w-[280px] shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-y-auto custom-scrollbar">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <Layers size={16} className="text-indigo-500"/>
+                        {t.summary}
+                    </h3>
+                </div>
+                
+                <div className="flex flex-col gap-4 p-4 text-xs">
                    {/* Base Currency Total */}
-                   <div className="flex flex-col gap-1 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                       <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1">
-                           <span className="uppercase">{t.base}</span>
+                   <div className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                       <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                           <span className="uppercase tracking-wider">{t.base}</span>
                            <Badge variant="indigo" size="sm">{getCurrencyTitle(currentLedger?.currency)}</Badge>
                        </div>
                        <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-indigo-700 dir-ltr">{formatNum(totalDebit)}</span></div>
@@ -1559,9 +1654,9 @@ const Vouchers = ({ language = 'fa' }) => {
                    
                    {/* Operating Currency Total */}
                    {currencyGlobals?.op_currency && (
-                       <div className="flex flex-col gap-1 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1">
-                               <span className="uppercase">{t.opCurrency}</span>
+                       <div className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                               <span className="uppercase tracking-wider">{t.opCurrency}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.op_currency)}</Badge>
                            </div>
                            <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(opTotalDebit)}</span></div>
@@ -1571,9 +1666,9 @@ const Vouchers = ({ language = 'fa' }) => {
 
                    {/* Reporting Currency 1 Total */}
                    {currencyGlobals?.rep1_currency && (
-                       <div className="flex flex-col gap-1 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1">
-                               <span className="uppercase">{t.rep1Currency}</span>
+                       <div className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                               <span className="uppercase tracking-wider">{t.rep1Currency}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep1_currency)}</Badge>
                            </div>
                            <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(rep1TotalDebit)}</span></div>
@@ -1583,24 +1678,32 @@ const Vouchers = ({ language = 'fa' }) => {
 
                    {/* Reporting Currency 2 Total */}
                    {currencyGlobals?.rep2_currency && (
-                       <div className="flex flex-col gap-1 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1">
-                               <span className="uppercase">{t.rep2Currency}</span>
+                       <div className="flex flex-col gap-2 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                               <span className="uppercase tracking-wider">{t.rep2Currency}</span>
                                <Badge variant="slate" size="sm">{getCurrencyTitle(currencyGlobals.rep2_currency)}</Badge>
                            </div>
                            <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(rep2TotalDebit)}</span></div>
                            <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr">{formatNum(rep2TotalCredit)}</span></div>
                        </div>
                    )}
-               </div>
+                </div>
 
-               <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-[14px] font-bold">
-                  <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full border ${isBalanced ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-red-700 bg-red-50 border-red-100'}`}>
-                     {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
-                     <span className="font-sans text-xs">{isBalanced ? t.alreadyBalanced || 'Balanced' : formatNum(Math.abs(totalDebit - totalCredit))}</span>
+                <div className="mt-auto p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col">
+                  <div className={`flex flex-col gap-2 p-3 rounded-lg border ${isBalanced ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-red-700 bg-red-50 border-red-100'}`}>
+                     <div className="flex items-center gap-2">
+                        {isBalanced ? <CheckCircle size={16}/> : <FileWarning size={16}/>}
+                        <span className="font-bold text-[13px]">{isBalanced ? (t.alreadyBalanced || 'Balanced') : 'Unbalanced'}</span>
+                     </div>
+                     {!isBalanced && (
+                        <div className="text-[14px] font-black dir-ltr text-right mt-1">
+                            {formatNum(Math.abs(totalDebit - totalCredit))}
+                        </div>
+                     )}
                   </div>
-               </div>
+                </div>
             </div>
+
           </div>
         </div>
         
@@ -1646,14 +1749,14 @@ const Vouchers = ({ language = 'fa' }) => {
                                                 <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`}
                                                     value={voucherItems[currencyModalIndex].op_rate} 
                                                     onChange={(e) => handleItemChange(currencyModalIndex, 'op_rate', e.target.value)} 
-                                                    disabled={isMatch}
+                                                    disabled={isMatch || isReadonly}
                                                 />
                                             </td>
                                             <td className="py-2 px-3 text-center">
-                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
+                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
                                                     checked={voucherItems[currencyModalIndex].op_is_reverse} 
                                                     onChange={(e) => handleItemChange(currencyModalIndex, 'op_is_reverse', e.target.checked)} 
-                                                    disabled={isMatch}
+                                                    disabled={isMatch || isReadonly}
                                                 />
                                             </td>
                                             <td className="py-2 px-3">
@@ -1676,14 +1779,14 @@ const Vouchers = ({ language = 'fa' }) => {
                                                 <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`}
                                                     value={voucherItems[currencyModalIndex].rep1_rate} 
                                                     onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_rate', e.target.value)} 
-                                                    disabled={isMatch}
+                                                    disabled={isMatch || isReadonly}
                                                 />
                                             </td>
                                             <td className="py-2 px-3 text-center">
-                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
+                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
                                                     checked={voucherItems[currencyModalIndex].rep1_is_reverse} 
                                                     onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_is_reverse', e.target.checked)} 
-                                                    disabled={isMatch}
+                                                    disabled={isMatch || isReadonly}
                                                 />
                                             </td>
                                             <td className="py-2 px-3">
@@ -1706,14 +1809,14 @@ const Vouchers = ({ language = 'fa' }) => {
                                                 <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`}
                                                     value={voucherItems[currencyModalIndex].rep2_rate} 
                                                     onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_rate', e.target.value)} 
-                                                    disabled={isMatch}
+                                                    disabled={isMatch || isReadonly}
                                                 />
                                             </td>
                                             <td className="py-2 px-3 text-center">
-                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
+                                                <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`}
                                                     checked={voucherItems[currencyModalIndex].rep2_is_reverse} 
                                                     onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_is_reverse', e.target.checked)} 
-                                                    disabled={isMatch}
+                                                    disabled={isMatch || isReadonly}
                                                 />
                                             </td>
                                             <td className="py-2 px-3">
@@ -1823,6 +1926,7 @@ const Vouchers = ({ language = 'fa' }) => {
           }
           actions={(r) => (
             <div className="flex gap-1 justify-center">
+              <Button variant="ghost" size="iconSm" icon={Copy} onClick={() => handleCopyVoucher(r)} title={t.copyVoucher} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50" />
               <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => handlePrint(r)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
               <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r)} />
               <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} />
