@@ -1,7 +1,7 @@
 /* Filename: financial/generalledger/VoucherUtils.js */
 import React from 'react';
 
-export const localTranslations = {
+const localTranslations = {
   en: {
     title: 'Journal Vouchers',
     subtitle: 'Manage accounting vouchers and documents',
@@ -204,7 +204,7 @@ export const localTranslations = {
   }
 };
 
-export const getStatusBadge = (status, t) => {
+const getStatusBadge = (status, t) => {
     const config = {
         'draft': { label: t.statusDraft, bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
         'temporary': { label: t.statusTemporary, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
@@ -215,7 +215,7 @@ export const getStatusBadge = (status, t) => {
     return <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${c.bg} ${c.text} ${c.border}`}>{c.label}</span>;
 };
 
-export const calcConv = (amount, rate, isReverse) => {
+const calcConv = (amount, rate, isReverse) => {
     if (!amount || !rate) return 0;
     const numAmt = parseFloat(amount);
     const numRate = parseFloat(rate);
@@ -223,7 +223,7 @@ export const calcConv = (amount, rate, isReverse) => {
     return isReverse ? (numAmt / numRate) : (numAmt * numRate);
 };
 
-export const csvToArray = (text) => {
+const csvToArray = (text) => {
     let p = '', row = [''], ret = [row], i = 0, r = 0, s = !0, l;
     for (l of text) {
         if ('"' === l) {
@@ -239,7 +239,7 @@ export const csvToArray = (text) => {
     return ret.filter(r => r.length > 1 || r[0] !== '');
 };
 
-export const fetchAutoNumbers = async (date, ledgerId, fyId, branchId, supabase) => {
+const fetchAutoNumbers = async (date, ledgerId, fyId, branchId, supabase) => {
     let nextDaily = 1;
     let nextCross = 1;
     let nextVoucher = '';
@@ -292,7 +292,7 @@ export const fetchAutoNumbers = async (date, ledgerId, fyId, branchId, supabase)
     return { nextDaily, nextCross, nextVoucher, config };
 };
 
-export const validateFiscalPeriod = async (date, fyId, supabase, t) => {
+const validateFiscalPeriod = async (date, fyId, supabase, t) => {
     try {
         const { data: periods, error: pError } = await supabase.schema('gl').from('fiscal_periods').select('*').eq('year_id', fyId);
         if (pError) throw pError;
@@ -327,7 +327,7 @@ export const validateFiscalPeriod = async (date, fyId, supabase, t) => {
     }
 };
 
-export const generateCSVTemplate = (isRtl) => {
+const generateCSVTemplate = (isRtl) => {
     const header = isRtl 
         ? "شناسه گروه (برای اقلام یک سند),تاریخ,شماره سند,شماره روزانه,شرح سربرگ,کد معین,بدهکار,بستانکار,شرح قلم,ارز\n"
         : "Group_ID,Date,Voucher_Number,Daily_Number,Header_Description,Account_Code,Debit,Credit,Item_Description,Currency_Code\n";
@@ -344,7 +344,7 @@ export const generateCSVTemplate = (isRtl) => {
     URL.revokeObjectURL(url);
 };
 
-export const processCSVImport = async (file, contextVals, lookups, supabase, t) => {
+const processCSVImport = async (file, contextVals, lookups, supabase, t) => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -499,3 +499,15 @@ export const processCSVImport = async (file, contextVals, lookups, supabase, t) 
         reader.readAsText(file, 'UTF-8');
     });
 };
+
+window.VoucherUtils = {
+    localTranslations,
+    getStatusBadge,
+    calcConv,
+    csvToArray,
+    fetchAutoNumbers,
+    validateFiscalPeriod,
+    generateCSVTemplate,
+    processCSVImport
+};
+export default window.VoucherUtils;

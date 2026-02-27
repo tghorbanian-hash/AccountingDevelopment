@@ -5,11 +5,11 @@ import {
   Copy, Printer, Paperclip, DownloadCloud, FileSpreadsheet
 } from 'lucide-react';
 
-import VoucherForm from './VoucherForm';
-import { localTranslations, getStatusBadge, processCSVImport, generateCSVTemplate } from './VoucherUtils';
-
 const Vouchers = ({ language = 'fa' }) => {
-  const t = localTranslations[language] || localTranslations['en'];
+  const { localTranslations, getStatusBadge, processCSVImport, generateCSVTemplate } = window.VoucherUtils || {};
+  const VoucherForm = window.VoucherForm;
+  
+  const t = localTranslations ? (localTranslations[language] || localTranslations['en']) : {};
   const isRtl = language === 'fa';
   
   const UI = window.UI || {};

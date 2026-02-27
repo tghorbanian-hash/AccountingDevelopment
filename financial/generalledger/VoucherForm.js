@@ -4,15 +4,15 @@ import {
   ArrowRight, ArrowLeft, Save, CheckCircle, FileText, Scale, Plus, 
   PanelRightClose, PanelRightOpen, Coins, CopyPlus, Trash2, Copy, Layers, FileWarning, Calculator, X
 } from 'lucide-react';
-import { fetchAutoNumbers, validateFiscalPeriod, calcConv, localTranslations } from './VoucherUtils';
 
 const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, language = 'fa' }) => {
-  const t = localTranslations[language] || localTranslations['en'];
+  const { fetchAutoNumbers, validateFiscalPeriod, calcConv, localTranslations } = window.VoucherUtils || {};
+  const t = localTranslations ? (localTranslations[language] || localTranslations['en']) : {};
   const isRtl = language === 'fa';
   
   const UI = window.UI || {};
   const { Button, InputField, SelectField, Accordion, Modal, Badge, SearchableSelect, MultiTagSelect } = UI;
-  const { formatNumber, parseNumber, normalizePersian } = UI.utils || { formatNumber: (v)=>v, parseNumber: (v)=>v, normalizePersian: (v)=>v };
+  const { formatNumber, parseNumber } = UI.utils || { formatNumber: (v)=>v, parseNumber: (v)=>v };
   const supabase = window.supabase;
 
   // --- States ---
@@ -945,4 +945,5 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   );
 };
 
+window.VoucherForm = VoucherForm;
 export default VoucherForm;
