@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, ArrowRight, ArrowLeft, 
   Save, FileText, CheckCircle, FileWarning, Filter, Search, Scale, Copy, Check, X, Printer, CheckSquare, Plus, Eye, RotateCcw, ListOrdered,
-  Coins, Calculator, CopyPlus, PanelRightClose, PanelRightOpen
+  Coins, Calculator, CopyPlus, PanelRightClose, PanelRightOpen, Layers
 } from 'lucide-react';
 
 const localTranslations = {
@@ -610,6 +610,59 @@ const VoucherReview = ({ language = 'fa' }) => {
      fetchVouchers(cleared);
   };
 
+  const fetchAutoNumbers = async (date, ledgerId, fyId, branchId) => {
+    let nextDaily = 1;
+    let nextCross = 1;
+    let nextVoucher = '';
+    let config = null;
+
+    if (date) {
+        const { data } = await supabase.schema('gl').from('vouchers').select('daily_number').eq('voucher_date', date).order('daily_number', { ascending: false }).limit(1);
+        if (data && data.length > 0 && data[0].daily_number) nextDaily = Number(data[0].daily_number) + 1;
+    }
+
+    if (fyId && ledgerId) {
+        const { data } = await supabase.schema('gl').from('vouchers').select('cross_reference').eq('fiscal_period_id', fyId).eq('ledger_id', ledgerId).order('cross_reference', { ascending: false }).limit(1);
+        if (data && data.length > 0 && data[0].cross_reference) nextCross = Number(data[0].cross_reference) + 1;
+    }
+
+    if (ledgerId) {
+        const { data } = await supabase.schema('gl').from('ledgers').select('metadata').eq('id', ledgerId).single();
+        if (data) {
+            const meta = (typeof data.metadata === 'string' ? JSON.parse(data.metadata) : data.metadata) || {};
+            config = { metadata: meta };
+            
+            const scope = meta.uniquenessScope || 'ledger';
+            const resetYear = meta.resetYear !== false; 
+            const lastNums = meta.lastNumbers || {};
+
+            let lastVoucherNum = 0;
+
+            if (scope === 'none') {
+                nextVoucher = ''; 
+            } else if (scope === 'ledger') {
+                if (resetYear) {
+                    lastVoucherNum = lastNums[fyId] || 0;
+                } else {
+                    lastVoucherNum = typeof lastNums === 'object' ? (lastNums.global || lastNums.ledger || 0) : (isNaN(lastNums) ? 0 : Number(lastNums));
+                }
+                nextVoucher = String(Number(lastVoucherNum) + 1);
+            } else if (scope === 'branch' && branchId) {
+                if (resetYear) {
+                    lastVoucherNum = (lastNums[fyId] && lastNums[fyId][branchId]) ? lastNums[fyId][branchId] : 0;
+                } else {
+                    lastVoucherNum = lastNums[branchId] || 0;
+                }
+                nextVoucher = String(Number(lastVoucherNum) + 1);
+            } else {
+                nextVoucher = String(nextCross);
+            }
+        }
+    }
+
+    return { nextDaily, nextCross, nextVoucher, config };
+  };
+
   const validateFiscalPeriod = async (date, fyId) => {
     try {
         const { data: periods, error: pError } = await supabase.schema('gl').from('fiscal_periods').select('*').eq('year_id', fyId);
@@ -636,49 +689,142 @@ const VoucherReview = ({ language = 'fa' }) => {
     }
   };
 
-  const handleOpenForm = async (voucher) => {
-    if (!voucher) return;
+  const handleOpenForm = async (voucher = null) => {
     setIsHeaderOpen(true);
     setIsSummaryOpen(true);
-    setCurrentVoucher(voucher);
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.schema('gl')
-        .from('voucher_items')
-        .select('*')
-        .eq('voucher_id', voucher.id)
-        .order('row_number', { ascending: true });
-      
-      if (error) throw error;
-      
-      const mappedItems = (data || []).map(item => {
-        const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
-        return { 
-           ...item, 
-           currency_code: detailsObj.currency_code || '',
-           details_dict: detailsObj.selected_details || {},
-           op_rate: item.op_rate ?? 1,
-           op_is_reverse: item.op_is_reverse ?? false,
-           op_debit: item.op_debit ?? 0,
-           op_credit: item.op_credit ?? 0,
-           rep1_rate: item.rep1_rate ?? 1,
-           rep1_is_reverse: item.rep1_is_reverse ?? false,
-           rep1_debit: item.rep1_debit ?? 0,
-           rep1_credit: item.rep1_credit ?? 0,
-           rep2_rate: item.rep2_rate ?? 1,
-           rep2_is_reverse: item.rep2_is_reverse ?? false,
-           rep2_debit: item.rep2_debit ?? 0,
-           rep2_credit: item.rep2_credit ?? 0,
-        };
+    if (voucher) {
+      setCurrentVoucher(voucher);
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.schema('gl')
+          .from('voucher_items')
+          .select('*')
+          .eq('voucher_id', voucher.id)
+          .order('row_number', { ascending: true });
+        
+        if (error) throw error;
+        
+        const mappedItems = (data || []).map(item => {
+          const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
+          return { 
+             ...item, 
+             currency_code: detailsObj.currency_code || '',
+             details_dict: detailsObj.selected_details || {},
+             op_rate: item.op_rate ?? 1,
+             op_is_reverse: item.op_is_reverse ?? false,
+             op_debit: item.op_debit ?? 0,
+             op_credit: item.op_credit ?? 0,
+             rep1_rate: item.rep1_rate ?? 1,
+             rep1_is_reverse: item.rep1_is_reverse ?? false,
+             rep1_debit: item.rep1_debit ?? 0,
+             rep1_credit: item.rep1_credit ?? 0,
+             rep2_rate: item.rep2_rate ?? 1,
+             rep2_is_reverse: item.rep2_is_reverse ?? false,
+             rep2_debit: item.rep2_debit ?? 0,
+             rep2_credit: item.rep2_credit ?? 0,
+          };
+        });
+        setVoucherItems(mappedItems);
+        setFocusedRowId(null);
+      } catch (error) {
+        console.error('Error fetching items:', error);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setLoading(true);
+      const initialLedgerId = contextVals.ledger_id;
+      const initialFyId = contextVals.fiscal_year_id;
+      const currentLedger = ledgers.find(l => String(l.id) === String(initialLedgerId));
+      const defaultCurrency = currentLedger?.currency || '';
+      const defaultBranch = branches.find(b => b.is_default) || branches[0];
+      const today = new Date().toISOString().split('T')[0];
+
+      const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, initialLedgerId, initialFyId, defaultBranch?.id);
+
+      setCurrentVoucher({
+        voucher_date: today,
+        voucher_type: docTypes.length > 0 ? docTypes[0].code : 'sys_general',
+        status: 'draft',
+        description: '',
+        subsidiary_number: '',
+        voucher_number: nextVoucher,
+        daily_number: nextDaily,
+        cross_reference: nextCross,
+        reference_number: '',
+        fiscal_period_id: initialFyId,
+        ledger_id: initialLedgerId,
+        branch_id: defaultBranch?.id || ''
       });
-      setVoucherItems(mappedItems);
-      setFocusedRowId(null);
-    } catch (error) {
-      console.error('Error fetching items:', error);
-    } finally {
+      const newId = 'temp_' + Date.now();
+      setVoucherItems([{
+        id: newId,
+        row_number: 1,
+        account_id: '',
+        details_dict: {},
+        debit: 0,
+        credit: 0,
+        currency_code: defaultCurrency,
+        description: '',
+        tracking_number: '',
+        tracking_date: '',
+        quantity: '',
+        op_rate: 1, op_is_reverse: false, op_debit: 0, op_credit: 0,
+        rep1_rate: 1, rep1_is_reverse: false, rep1_debit: 0, rep1_credit: 0,
+        rep2_rate: 1, rep2_is_reverse: false, rep2_debit: 0, rep2_credit: 0
+      }]);
+      setFocusedRowId(newId);
+      setIsHeaderOpen(false);
       setLoading(false);
-      setView('form');
     }
+    setView('form');
+  };
+
+  const handleCopyVoucher = async (voucher) => {
+      setLoading(true);
+      try {
+          const { data, error } = await supabase.schema('gl').from('voucher_items').select('*').eq('voucher_id', voucher.id).order('row_number', { ascending: true });
+          if (error) throw error;
+
+          const today = new Date().toISOString().split('T')[0];
+          const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, voucher.ledger_id, voucher.fiscal_period_id, voucher.branch_id);
+
+          setCurrentVoucher({
+              ...voucher,
+              id: null,
+              voucher_date: today,
+              status: 'draft',
+              voucher_number: nextVoucher,
+              daily_number: nextDaily,
+              cross_reference: nextCross,
+              reference_number: '',
+              reviewed_by: null,
+              approved_by: null,
+          });
+
+          const mappedItems = (data || []).map((item, index) => {
+              const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
+              return {
+                  ...item,
+                  id: 'temp_' + Date.now() + '_' + index,
+                  voucher_id: null,
+                  currency_code: detailsObj.currency_code || '',
+                  details_dict: detailsObj.selected_details || {},
+                  op_rate: item.op_rate ?? 1, op_is_reverse: item.op_is_reverse ?? false, op_debit: item.op_debit ?? 0, op_credit: item.op_credit ?? 0,
+                  rep1_rate: item.rep1_rate ?? 1, rep1_is_reverse: item.rep1_is_reverse ?? false, rep1_debit: item.rep1_debit ?? 0, rep1_credit: item.rep1_credit ?? 0,
+                  rep2_rate: item.rep2_rate ?? 1, rep2_is_reverse: item.rep2_is_reverse ?? false, rep2_debit: item.rep2_debit ?? 0, rep2_credit: item.rep2_credit ?? 0,
+              };
+          });
+          
+          setVoucherItems(mappedItems);
+          setView('form');
+          setIsHeaderOpen(true);
+          setFocusedRowId(null);
+      } catch (err) {
+          console.error('Error copying voucher:', err);
+      } finally {
+          setLoading(false);
+      }
   };
 
   const getValidDetailTypes = (accountId) => {
@@ -687,7 +833,9 @@ const VoucherReview = ({ language = 'fa' }) => {
      if (!account || !account.metadata) return [];
      const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
      const allowedTafsilCodesOrIds = meta.tafsils || [];
+     
      if (allowedTafsilCodesOrIds.length === 0) return [];
+
      return detailTypes.filter(dt => allowedTafsilCodesOrIds.some(t => String(dt.id) === String(t) || dt.code === String(t)));
   };
 
@@ -738,6 +886,7 @@ const VoucherReview = ({ language = 'fa' }) => {
 
     for (let i = 0; i < voucherItems.length; i++) {
         const item = voucherItems[i];
+        
         if (!item.description || !item.account_id) {
            alert(t.reqFields);
            return;
@@ -753,6 +902,7 @@ const VoucherReview = ({ language = 'fa' }) => {
         const account = accounts.find(a => String(a.id) === String(item.account_id));
         if (account && account.metadata) {
             const meta = typeof account.metadata === 'string' ? JSON.parse(account.metadata) : account.metadata;
+            
             if (meta.trackFeature && meta.trackMandatory && (!item.tracking_number || !item.tracking_date)) {
                 alert(t.trackingReqError + ' ' + (i + 1) + ' (' + account.title + ')');
                 return;
