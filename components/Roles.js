@@ -98,12 +98,9 @@ const Roles = ({ t, isRtl }) => {
     { id: 'status_change', label: t.actStatusChange || (isRtl ? 'تغییر وضعیت' : 'Change Status') },
   ];
 
-  // UUID دقیق فرم "فهرست اسناد" استخراج شده از منابع
-  const DOC_LIST_UUID = "6ba74488-f6f0-4e23-8fc3-9cf6d7477e19";
-
   const DATA_SCOPES = useMemo(() => {
     const scopes = {
-      [DOC_LIST_UUID]: [
+      'vouchers': [
         { id: 'allowed_ledgers', label: t.dsLedgers || (isRtl ? 'دفاتر مجاز' : 'Allowed Ledgers'), options: dbLedgers.map(l => ({ value: String(l.id), label: l.title })) },
         { id: 'allowed_branches', label: t.dsBranches || (isRtl ? 'شعب مجاز' : 'Allowed Branches'), options: dbBranches.map(b => ({ value: String(b.id), label: b.title })) },
         { id: 'allowed_doctypes', label: t.dsDocTypes || (isRtl ? 'انواع سند سیستمی مجاز' : 'Allowed System Doc Types'), options: [
@@ -112,6 +109,7 @@ const Roles = ({ t, isRtl }) => {
         ]}
       ]
     };
+    scopes['doc_list'] = scopes['vouchers']; 
     return scopes;
   }, [dbBranches, dbLedgers, t, isRtl]);
 
@@ -135,8 +133,7 @@ const Roles = ({ t, isRtl }) => {
       const cActionsMap = {};
 
       resData.forEach(r => map.set(r.id, { 
-        id: r.id, // بسیار مهم: برگشت به UUID برای همخوانی با کل سیستم
-        code: r.code, 
+        id: r.code, // بسیار مهم: برگشت به نام کُد فرمت استاندارد 
         uuid: r.id, 
         label: { fa: r.title_fa, en: r.title_en }, 
         type: r.type, 
