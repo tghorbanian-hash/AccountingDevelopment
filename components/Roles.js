@@ -8,7 +8,7 @@ import {
 const Roles = ({ t, isRtl }) => {
   const UI = window.UI || {};
   const { 
-    Button, InputField, Toggle, Badge, DataGrid, 
+    Button, InputField, Badge, DataGrid, 
     FilterSection, Modal, DatePicker, SelectField,
     TreeView, SelectionGrid, ToggleChip 
   } = UI;
@@ -64,7 +64,9 @@ const Roles = ({ t, isRtl }) => {
   const [permissions, setPermissions] = useState({});
   const [dynamicMenu, setDynamicMenu] = useState([]);
   const [allForms, setAllForms] = useState([]);
-  const [customActionsMap, setCustomActionsMap] = useState({}); // Dynamic custom actions per form
+  const [customActionsMap, setCustomActionsMap] = useState({});
+  const [dbBranches, setDbBranches] = useState([]);
+  const [dbLedgers, setDbLedgers] = useState([]);
 
   // --- UI STATES ---
   const [selectedRows, setSelectedRows] = useState([]);
@@ -90,17 +92,28 @@ const Roles = ({ t, isRtl }) => {
     { id: 'edit', label: t.actEdit || (isRtl ? 'ویرایش' : 'Edit') }, 
     { id: 'delete', label: t.actDelete || (isRtl ? 'حذف' : 'Delete') },
     { id: 'print', label: t.actPrint || (isRtl ? 'چاپ' : 'Print') }, 
-    { id: 'approve', label: t.actApprove || (isRtl ? 'تایید' : 'Approve') }, 
+    { id: 'import', label: t.actImport || (isRtl ? 'ایمپورت' : 'Import') },
     { id: 'export', label: t.actExport || (isRtl ? 'خروجی' : 'Export') }, 
-    { id: 'share', label: t.actShare || (isRtl ? 'اشتراک' : 'Share') },
+    { id: 'attach', label: t.actAttach || (isRtl ? 'ضمائم' : 'Attach') },
+    { id: 'status_change', label: t.actStatusChange || (isRtl ? 'تغییر وضعیت' : 'Change Status') },
   ];
 
-  const DATA_SCOPES = {
-    'doc_list': [
-      { id: 'docType', label: t.dsDocType || (isRtl ? 'نوع سند' : 'Doc Type'), options: [{ value: 'opening', label: t.dsDocOpening || (isRtl ? 'سند افتتاحیه' : 'Opening') }, { value: 'general', label: t.dsDocGeneral || (isRtl ? 'سند عمومی' : 'General') }] },
-      { id: 'docStatus', label: t.dsStatus || (isRtl ? 'وضعیت سند' : 'Status'), options: [{ value: 'draft', label: t.dsStatusTemp || (isRtl ? 'پیش‌نویس' : 'Draft') }, { value: 'final', label: t.dsStatusFinal || (isRtl ? 'نهایی' : 'Final') }] }
-    ]
-  };
+  const DATA_SCOPES = useMemo(() => {
+    const scopes = {
+      'vouchers': [
+        { id: 'allowed_ledgers', label: t.dsLedgers || (isRtl ? 'دفاتر مجاز' : 'Allowed Ledgers'), options: dbLedgers.map(l => ({ value: String(l.id), label: l.title })) },
+        { id: 'allowed_branches', label: t.dsBranches || (isRtl ? 'شعب مجاز' : 'Allowed Branches'), options: dbBranches.map(b => ({ value: String(b.id), label: b.title })) },
+        { id: 'allowed_doctypes', label: t.dsDocTypes || (isRtl ? 'انواع سند سیستمی مجاز' : 'Allowed System Doc Types'), options: [
+            { value: 'sys_general', label: t.sysGeneral || (isRtl ? 'سند عمومی' : 'General') },
+            { value: 'sys_opening', label: t.sysOpening || (isRtl ? 'افتتاحیه' : 'Opening') },
+            { value: 'sys_closing', label: t.sysClosing || (isRtl ? 'اختتامیه' : 'Closing') },
+            { value: 'sys_close_acc', label: t.sysCloseAcc || (isRtl ? 'بستن حساب‌ها' : 'Close Accounts') }
+        ]}
+      ]
+    };
+    scopes['doc_list'] = scopes['vouchers']; 
+    return scopes;
+  }, [dbBranches, dbLedgers, t, isRtl]);
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -108,6 +121,12 @@ const Roles = ({ t, isRtl }) => {
   }, [isRtl]);
 
   const fetchData = async () => {
+    const { data: bData } = await supabase.schema('gen').from('branches').select('id, title').eq('is_active', true);
+    if (bData) setDbBranches(bData);
+    
+    const { data: lData } = await supabase.schema('gl').from('ledgers').select('id, title').eq('is_active', true);
+    if (lData) setDbLedgers(lData);
+
     const { data: resData } = await supabase.schema('gen').from('resources').select('*');
     if (resData) {
       const map = new Map();
@@ -126,23 +145,17 @@ const Roles = ({ t, isRtl }) => {
 
       resData.forEach(r => {
         const node = map.get(r.id);
-        
-        // 1. If it is an action, assign it to its parent's custom actions map
         if (r.type === 'action') {
            if (r.parent_id && map.has(r.parent_id)) {
               const parentNode = map.get(r.parent_id);
               if (!cActionsMap[parentNode.id]) cActionsMap[parentNode.id] = [];
-              
-              // Extract purely the action part (e.g. 'cost_centers.assign_detail' -> 'assign_detail')
               const actionId = r.code.includes('.') ? r.code.split('.').pop() : r.code;
-              
               cActionsMap[parentNode.id].push({
                  id: actionId,
                  label: isRtl ? (r.title_fa || r.title_en || actionId) : (r.title_en || r.title_fa || actionId)
               });
            }
         } 
-        // 2. If it is a form or module, build the visual tree
         else {
            if (r.parent_id && map.has(r.parent_id)) {
               map.get(r.parent_id).children.push(node);
@@ -180,7 +193,6 @@ const Roles = ({ t, isRtl }) => {
       const permsMap = {};
       pData.forEach(p => {
         if (!permsMap[p.role_id]) permsMap[p.role_id] = {};
-        
         let actionsArr = [];
         if (typeof p.actions === 'string') {
            try { actionsArr = JSON.parse(p.actions); } 
@@ -188,7 +200,6 @@ const Roles = ({ t, isRtl }) => {
         } else if (Array.isArray(p.actions)) {
            actionsArr = p.actions;
         }
-
         permsMap[p.role_id][p.resource_code] = { actions: actionsArr, dataScopes: p.data_scopes || {} };
       });
       setPermissions(permsMap);
@@ -305,10 +316,7 @@ const Roles = ({ t, isRtl }) => {
         } else {
           let allScopes = {};
           if (DATA_SCOPES[id]) DATA_SCOPES[id].forEach(scope => { allScopes[scope.id] = scope.options.map(o => o.value); });
-          
-          // Combine standard actions + dynamic custom actions attached to this module in DB
           const nodeActions = [...AVAILABLE_ACTIONS, ...(customActionsMap[id] || [])].map(a => a.id);
-          
           next[id] = { actions: nodeActions, dataScopes: allScopes };
         }
       });
@@ -366,7 +374,7 @@ const Roles = ({ t, isRtl }) => {
     { header: t.id || (isRtl ? 'شناسه' : 'ID'), field: 'id', width: 'w-16', render: (r) => <span className="text-[10px] font-mono">{r.id.split('-')[0]}</span> },
     { header: t.username || (isRtl ? 'نام کاربری' : 'Username'), field: 'username', width: 'w-32' },
     { header: t.fullName || (isRtl ? 'نام و نام خانوادگی' : 'Full Name'), field: 'fullName', width: 'w-48', render: (r) => <span className="font-bold text-slate-700">{r.fullName}</span> },
-    { header: t.status || (isRtl ? 'وضعیت کاربر' : 'Status'), field: 'isActive', width: 'w-24', render: (r) => <div className="flex justify-center"><Toggle checked={r.isActive} disabled /></div> },
+    { header: t.status || (isRtl ? 'وضعیت کاربر' : 'Status'), field: 'isActive', width: 'w-24', render: (r) => <div className="flex justify-center"><input type="checkbox" checked={r.isActive} readOnly className="w-4 h-4 text-indigo-600 rounded border-slate-300 cursor-default" /></div> },
   ];
 
   return (
@@ -407,7 +415,10 @@ const Roles = ({ t, isRtl }) => {
             </div>
             <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-2">
                <span className="text-[13px] font-bold text-slate-700">{t.roleStatus || (isRtl ? "وضعیت نقش" : "Role Status")}</span>
-               <Toggle checked={formData.isActive} onChange={(val) => setFormData({...formData, isActive: val})} label={formData.isActive ? (t.active || (isRtl ? "فعال" : "Active")) : (t.inactive || (isRtl ? "غیرفعال" : "Inactive"))} />
+               <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.isActive} onChange={(e) => setFormData({...formData, isActive: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                  <span className="text-sm font-medium text-slate-700">{formData.isActive ? (t.active || (isRtl ? "فعال" : "Active")) : (t.inactive || (isRtl ? "غیرفعال" : "Inactive"))}</span>
+               </label>
             </div>
           </div>
       </Modal>

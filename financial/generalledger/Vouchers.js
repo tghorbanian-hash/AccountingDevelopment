@@ -57,7 +57,7 @@ const Vouchers = ({ language = 'fa' }) => {
   const lookups = useMemo(() => ({
       accounts, accountStructures, branches, fiscalYears, ledgers, 
       docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances,
-      permissions // تزریق پرمیشن‌ها به لوکاپ‌ها برای استفاده در فرم
+      permissions
   }), [accounts, accountStructures, branches, fiscalYears, ledgers, docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances, permissions]);
 
   // --- Initialization & Security ---
@@ -119,21 +119,31 @@ const Vouchers = ({ language = 'fa' }) => {
         safeFetch(supabase.schema('gen').from('currency_globals').select('*').limit(1))
     ]);
 
-    // سطح ۳: فیلتر کردن اطلاعات پایه بر اساس دسترسی کاربر
+    // سطح ۳: اعمال محدودیت شعب
     if (brData) {
-        const filteredBranches = (perms && perms.allowed_branches && perms.allowed_branches.length > 0)
-            ? brData.filter(b => perms.allowed_branches.includes(b.id))
-            : brData;
-        setBranches(filteredBranches.filter(b => b.is_active !== false));
+        if (window.IS_ADMIN) {
+            setBranches(brData.filter(b => b.is_active !== false));
+        } else {
+            const allowed = perms?.allowed_branches || [];
+            const filteredBranches = brData.filter(b => allowed.includes(String(b.id)));
+            setBranches(filteredBranches.filter(b => b.is_active !== false));
+        }
     }
 
     if (fyData) setFiscalYears(fyData);
 
+    // سطح ۳: اعمال محدودیت دفاتر
+    let initialLedgerId = '';
     if (ledData) {
-        const filteredLedgers = (perms && perms.allowed_ledgers && perms.allowed_ledgers.length > 0)
-            ? ledData.filter(l => perms.allowed_ledgers.includes(String(l.id)))
-            : ledData;
-        setLedgers(filteredLedgers);
+        if (window.IS_ADMIN) {
+            setLedgers(ledData);
+            initialLedgerId = ledData[0]?.id || '';
+        } else {
+            const allowed = perms?.allowed_ledgers || [];
+            const filteredLedgers = ledData.filter(l => allowed.includes(String(l.id)));
+            setLedgers(filteredLedgers);
+            initialLedgerId = filteredLedgers[0]?.id || '';
+        }
     }
 
     if (structData) setAccountStructures(structData);
@@ -142,28 +152,25 @@ const Vouchers = ({ language = 'fa' }) => {
     if (currGlobalsData && currGlobalsData.length > 0) setCurrencyGlobals(currGlobalsData[0]);
 
     setContextVals(prev => {
-        const initialLedger = (perms && perms.allowed_ledgers && perms.allowed_ledgers.length > 0)
-            ? ledData?.find(l => perms.allowed_ledgers.includes(String(l.id)))
-            : ledData?.[0];
-            
         if (!prev.fiscal_year_id && !prev.ledger_id) {
-            return { 
-                fiscal_year_id: fyData?.[0]?.id || '', 
-                ledger_id: initialLedger?.id || '' 
-            };
+            return { fiscal_year_id: fyData?.[0]?.id || '', ledger_id: initialLedgerId };
         }
         return prev;
     });
 
+    // سطح ۳: اعمال محدودیت نوع سند
     if (doctypeData) {
-        const allowedSysCodes = ['sys_opening', 'sys_general', 'sys_closing', 'sys_close_acc'];
-        let baseDocTypes = doctypeData.filter(d => d.type === 'user' || allowedSysCodes.includes(d.code));
-        
-        // سطح ۳: فیلتر انواع سند
-        if (perms && perms.allowed_doctypes && perms.allowed_doctypes.length > 0) {
-            baseDocTypes = baseDocTypes.filter(d => perms.allowed_doctypes.includes(d.code));
+        const sysCodes = ['sys_opening', 'sys_general', 'sys_closing', 'sys_close_acc'];
+        if (window.IS_ADMIN) {
+            setDocTypes(doctypeData.filter(d => d.type !== 'sys' || sysCodes.includes(d.code)));
+        } else {
+            const allowedSys = perms?.allowed_doctypes || [];
+            setDocTypes(doctypeData.filter(d => {
+                if (d.type !== 'sys') return true; // انواع کاربری همیشه باز است
+                if (!sysCodes.includes(d.code)) return false; // سایر اسناد سیستمی نامرتبط فیلتر می‌شوند
+                return allowedSys.includes(d.code); // بررسی دسترسی فقط برای 4 نوع سیستمی
+            }));
         }
-        setDocTypes(baseDocTypes);
     }
 
     if (currData) setCurrencies(currData);
@@ -195,12 +202,23 @@ const Vouchers = ({ language = 'fa' }) => {
         .order('voucher_date', { ascending: false })
         .order('voucher_number', { ascending: false });
       
-      // سطح ۳: محدود سازی دیتا در کوئری اصلی
-      if (permissions.allowed_branches && permissions.allowed_branches.length > 0) {
+      // سطح ۳: سخت‌گیری روی کوئری (اگر ادمین نیست)
+      if (!window.IS_ADMIN) {
+          // اگر هیچ شعبه ای مجاز نیست، کلا خالی برگردان
+          if (!permissions.allowed_branches || permissions.allowed_branches.length === 0) {
+              setVouchers([]); setLoading(false); return;
+          }
           query = query.in('branch_id', permissions.allowed_branches);
-      }
-      if (permissions.allowed_doctypes && permissions.allowed_doctypes.length > 0) {
-          query = query.in('voucher_type', permissions.allowed_doctypes);
+
+          // فیلتر أنواع سند در دیتابیس
+          const sysAllowed = permissions.allowed_doctypes || [];
+          if (sysAllowed.length > 0) {
+              // نمایش اسناد کاربری + اسناد سیستمی مجاز
+              query = query.or(`voucher_type.not.ilike.sys_%,voucher_type.in.(${sysAllowed.join(',')})`);
+          } else {
+              // اگر هیچ سند سیستمی مجاز نیست، فقط کاربری ها را بیاور
+              query = query.not('voucher_type', 'ilike', 'sys_%');
+          }
       }
 
       if (paramsObj.voucher_number) query = query.eq('voucher_number', paramsObj.voucher_number);
@@ -385,9 +403,13 @@ const Vouchers = ({ language = 'fa' }) => {
           <select value={contextVals.fiscal_year_id} onChange={e => setContextVals({...contextVals, fiscal_year_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
             {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
           </select>
-          <select value={contextVals.ledger_id} onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
-            {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-          </select>
+          {ledgers.length > 0 ? (
+            <select value={contextVals.ledger_id} onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
+              {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+            </select>
+          ) : (
+            <span className="text-xs text-red-500 font-bold px-2 flex items-center">{isRtl ? 'دفتری مجاز نیست' : 'No ledgers allowed'}</span>
+          )}
         </div>
       </div>
 
@@ -411,7 +433,7 @@ const Vouchers = ({ language = 'fa' }) => {
                 </>
             )}
             {permissions.actions.includes('create') && (
-                <Button variant="primary" size="default" onClick={() => handleOpenForm(null, false)} icon={Plus}>{t.newVoucher}</Button>
+                <Button variant="primary" size="default" onClick={() => handleOpenForm(null, false)} icon={Plus} disabled={ledgers.length === 0}>{t.newVoucher}</Button>
             )}
         </div>
       </div>
