@@ -74,7 +74,8 @@ const Vouchers = ({ language = 'fa' }) => {
                 allowed_doctypes: []
             };
         } else {
-            perms = await getUserPermissions(supabase, 'vouchers');
+            // ارسال آرایه‌ای از کدهای احتمالی تا هر نامی در دیتابیس ثبت شده بود شناسایی شود
+            perms = await getUserPermissions(supabase, ['vouchers', 'doc_list', 'gl.vouchers', 'financial.vouchers', 'gl_vouchers']);
         }
         
         setPermissions(perms);
@@ -158,18 +159,17 @@ const Vouchers = ({ language = 'fa' }) => {
         return prev;
     });
 
-    // سطح ۳: اعمال محدودیت نوع سند (رفع باگ نمایش اسناد نامربوط به ادمین)
+    // سطح ۳: اعمال محدودیت نوع سند
     if (doctypeData) {
         const allowedSysCodes = ['sys_general', 'sys_opening'];
         if (window.IS_ADMIN) {
-            // ادمین هم در این فرم فقط اسناد user و عمومی/افتتاحیه را می‌بیند
             setDocTypes(doctypeData.filter(d => d.type === 'user' || allowedSysCodes.includes(d.code)));
         } else {
             const allowedSys = perms?.allowed_doctypes || [];
             setDocTypes(doctypeData.filter(d => {
-                if (d.type === 'user') return true; // انواع کاربری همیشه باز است
-                if (!allowedSysCodes.includes(d.code)) return false; // سایر اسناد سیستمی نامرتبط در این فرم کلاً فیلتر می‌شوند
-                return allowedSys.includes(d.code); // بررسی دسترسی کاربر فقط برای 2 نوع سیستمی
+                if (d.type === 'user') return true; 
+                if (!allowedSysCodes.includes(d.code)) return false; 
+                return allowedSys.includes(d.code); 
             }));
         }
     }
@@ -205,13 +205,11 @@ const Vouchers = ({ language = 'fa' }) => {
       
       // سطح ۳: سخت‌گیری روی کوئری 
       if (!window.IS_ADMIN) {
-          // اگر هیچ شعبه ای مجاز نیست، کلا خالی برگردان
           if (!permissions.allowed_branches || permissions.allowed_branches.length === 0) {
               setVouchers([]); setLoading(false); return;
           }
           query = query.in('branch_id', permissions.allowed_branches);
 
-          // فیلتر أنواع سند در دیتابیس (اسناد کاربری + اسناد سیستمی مجاز)
           const sysAllowed = permissions.allowed_doctypes || [];
           if (sysAllowed.length > 0) {
               query = query.or(`voucher_type.not.ilike.sys_%,voucher_type.in.(${sysAllowed.join(',')})`);
@@ -219,7 +217,6 @@ const Vouchers = ({ language = 'fa' }) => {
               query = query.not('voucher_type', 'ilike', 'sys_%');
           }
       } else {
-          // ادمین هم در این فرم نباید اسناد سیستمی دیگر مثل رسید انبار و تسعیر را ببیند
           const allowedSysCodes = ['sys_general', 'sys_opening'];
           query = query.or(`voucher_type.not.ilike.sys_%,voucher_type.in.(${allowedSysCodes.join(',')})`);
       }
@@ -372,7 +369,7 @@ const Vouchers = ({ language = 'fa' }) => {
       return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-indigo-600 gap-4"><Lock className="animate-pulse" size={48}/><p className="font-bold">{isRtl ? 'در حال بررسی دسترسی‌ها...' : 'Checking permissions...'}</p></div>;
   }
 
-  if (!permissions?.actions.includes('view')) {
+  if (!permissions || !permissions.actions || !permissions.actions.includes('view')) {
       return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4"><Lock size={64}/><h2 className="text-xl font-black">{isRtl ? 'عدم دسترسی' : 'Access Denied'}</h2><p>{isRtl ? 'شما مجوز مشاهده این صفحه را ندارید.' : 'You do not have permission to view this page.'}</p></div>;
   }
 

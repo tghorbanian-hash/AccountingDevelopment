@@ -503,12 +503,15 @@ const processCSVImport = async (file, contextVals, lookups, supabase, t) => {
 };
 
 /**
- * سطح ۳: دریافت دسترسی‌های ۳ سطحی کاربر از دیتابیس
+ * سطح ۳: دریافت دسترسی‌های ۳ سطحی کاربر از دیتابیس (کاملاً امن و ضد-باگ PostgREST)
  * @param {object} supabase - کلاینت سوپابیس
- * @param {string} resourceCode - کد منبع (مثلاً 'vouchers')
+ * @param {string|array} resourceCodes - کدهای منبع (مثلاً ['vouchers', 'doc_list'])
  */
-const getUserPermissions = async (supabase, resourceCode = 'vouchers') => {
+const getUserPermissions = async (supabase, resourceCodes = ['vouchers']) => {
     try {
+        // تبدیل همیشه به آرایه برای پشتیبانی از کدهای مختلف
+        const codes = Array.isArray(resourceCodes) ? resourceCodes : [resourceCodes];
+        
         const { data: authData } = await supabase.auth.getUser();
         const userId = authData?.user?.id;
         if (!userId) return null;
@@ -517,19 +520,31 @@ const getUserPermissions = async (supabase, resourceCode = 'vouchers') => {
         const { data: userRoles } = await supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', userId);
         const roleIds = userRoles?.map(r => r.role_id) || [];
 
-        // دریافت پرمیشن‌ها برای کاربر یا نقش‌های او
-        let query = supabase.schema('gen').from('permissions').select('*').eq('resource_code', resourceCode);
-        
-        if (roleIds.length > 0) {
-            query = query.or(`user_id.eq.${userId},role_id.in.(${roleIds.join(',')})`);
-        } else {
-            query = query.eq('user_id', userId);
+        let allPerms = [];
+
+        // 1. دریافت پرمیشن‌های مستقیمِ خود کاربر (بدون استفاده از دستور مشکل‌دار .or)
+        const { data: userPerms } = await supabase.schema('gen').from('permissions')
+            .select('*')
+            .eq('user_id', userId)
+            .in('resource_code', codes);
+            
+        if (userPerms && userPerms.length > 0) {
+            allPerms = [...allPerms, ...userPerms];
         }
 
-        const { data: perms, error } = await query;
-        if (error) throw error;
+        // 2. دریافت پرمیشن‌های اختصاص یافته به نقش‌های این کاربر
+        if (roleIds.length > 0) {
+            const { data: rolePerms } = await supabase.schema('gen').from('permissions')
+                .select('*')
+                .in('role_id', roleIds)
+                .in('resource_code', codes);
+                
+            if (rolePerms && rolePerms.length > 0) {
+                allPerms = [...allPerms, ...rolePerms];
+            }
+        }
 
-        // ادغام پرمیشن‌ها (اگر کاربر چندین نقش داشته باشد)
+        // ادغام پرمیشن‌ها (جلوگیری از تکرار)
         const combined = {
             actions: new Set(),
             allowed_branches: [],
@@ -537,7 +552,7 @@ const getUserPermissions = async (supabase, resourceCode = 'vouchers') => {
             allowed_doctypes: []
         };
 
-        perms.forEach(p => {
+        allPerms.forEach(p => {
             // سطح ۲: عملیات
             const actions = Array.isArray(p.actions) ? p.actions : (typeof p.actions === 'string' ? JSON.parse(p.actions) : []);
             actions.forEach(a => combined.actions.add(a));
