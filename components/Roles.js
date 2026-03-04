@@ -200,7 +200,8 @@ const Roles = ({ t, isRtl }) => {
         } else if (Array.isArray(p.actions)) {
            actionsArr = p.actions;
         }
-        permsMap[p.role_id][p.resource_code] = { actions: actionsArr, dataScopes: p.data_scopes || {} };
+        // ذخیره کردن ID دیتابیس برای جلوگیری از خطای Conflict هنگام ویرایش
+        permsMap[p.role_id][p.resource_code] = { id: p.id, actions: actionsArr, dataScopes: p.data_scopes || {} };
       });
       setPermissions(permsMap);
     }
@@ -255,28 +256,53 @@ const Roles = ({ t, isRtl }) => {
   };
 
   const saveAccess = async () => {
-    const { error: delErr } = await supabase.schema('gen').from('permissions').delete().eq('role_id', editingRole.id);
-    if (delErr) console.error(delErr);
+    const toInsert = [];
+    const toUpdate = [];
+    const toDelete = [];
 
-    const permInserts = [];
+    // تفکیک عملیات‌ها به آپدیت، درج و حذف برای جلوگیری از خطای 409 Conflict
     Object.keys(tempPermissions).forEach(formId => {
       const perm = tempPermissions[formId];
-      if (perm.actions.length > 0 || Object.keys(perm.dataScopes).length > 0) {
-        permInserts.push({ role_id: editingRole.id, resource_code: formId, actions: perm.actions, data_scopes: perm.dataScopes });
+      const hasData = perm.actions.length > 0 || Object.keys(perm.dataScopes).length > 0;
+
+      if (hasData) {
+        if (perm.id) {
+          toUpdate.push({ id: perm.id, role_id: editingRole.id, resource_code: formId, actions: perm.actions, data_scopes: perm.dataScopes });
+        } else {
+          toInsert.push({ role_id: editingRole.id, resource_code: formId, actions: perm.actions, data_scopes: perm.dataScopes });
+        }
+      } else if (perm.id) {
+        toDelete.push(perm.id);
       }
     });
 
-    if (permInserts.length > 0) {
-      const { error: insErr } = await supabase.schema('gen').from('permissions').insert(permInserts);
-      if (insErr) {
-         console.error(insErr);
-         alert(t.errSavePerms || (isRtl ? 'خطا در ذخیره دسترسی‌ها' : 'Error saving permissions.'));
-         return;
+    try {
+      if (toDelete.length > 0) {
+        const { error } = await supabase.schema('gen').from('permissions').delete().in('id', toDelete);
+        if (error) throw error;
       }
-    }
 
-    setIsAccessModalOpen(false);
-    fetchData();
+      if (toInsert.length > 0) {
+        const { error } = await supabase.schema('gen').from('permissions').insert(toInsert);
+        if (error) throw error;
+      }
+
+      if (toUpdate.length > 0) {
+        await Promise.all(toUpdate.map(async (p) => {
+          const { error } = await supabase.schema('gen').from('permissions').update({
+            actions: p.actions,
+            data_scopes: p.data_scopes
+          }).eq('id', p.id);
+          if (error) throw error;
+        }));
+      }
+
+      setIsAccessModalOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error("Save Access Error:", err);
+      alert(t.errSavePerms || (isRtl ? 'خطا در ذخیره دسترسی‌ها: ' : 'Error saving permissions: ') + (err.message || ''));
+    }
   };
 
   const updateAction = (moduleId, actionId) => {
@@ -312,12 +338,16 @@ const Roles = ({ t, isRtl }) => {
       const next = { ...prev };
       targetIds.forEach(id => {
         if (mode === 'revoke') {
-          delete next[id];
+          if (next[id]?.id) {
+             next[id] = { id: next[id].id, actions: [], dataScopes: {} };
+          } else {
+             delete next[id];
+          }
         } else {
           let allScopes = {};
           if (DATA_SCOPES[id]) DATA_SCOPES[id].forEach(scope => { allScopes[scope.id] = scope.options.map(o => o.value); });
           const nodeActions = [...AVAILABLE_ACTIONS, ...(customActionsMap[id] || [])].map(a => a.id);
-          next[id] = { actions: nodeActions, dataScopes: allScopes };
+          next[id] = { ...(next[id] || {}), actions: nodeActions, dataScopes: allScopes };
         }
       });
       return next;
