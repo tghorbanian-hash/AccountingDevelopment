@@ -105,9 +105,7 @@ const Roles = ({ t, isRtl }) => {
         { id: 'allowed_branches', label: t.dsBranches || (isRtl ? 'شعب مجاز' : 'Allowed Branches'), options: dbBranches.map(b => ({ value: String(b.id), label: b.title })) },
         { id: 'allowed_doctypes', label: t.dsDocTypes || (isRtl ? 'انواع سند سیستمی مجاز' : 'Allowed System Doc Types'), options: [
             { value: 'sys_general', label: t.sysGeneral || (isRtl ? 'سند عمومی' : 'General') },
-            { value: 'sys_opening', label: t.sysOpening || (isRtl ? 'افتتاحیه' : 'Opening') },
-            { value: 'sys_closing', label: t.sysClosing || (isRtl ? 'اختتامیه' : 'Closing') },
-            { value: 'sys_close_acc', label: t.sysCloseAcc || (isRtl ? 'بستن حساب‌ها' : 'Close Accounts') }
+            { value: 'sys_opening', label: t.sysOpening || (isRtl ? 'افتتاحیه' : 'Opening') }
         ]}
       ]
     };
