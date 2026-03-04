@@ -502,63 +502,75 @@ const processCSVImport = async (file, contextVals, lookups, supabase, t) => {
     });
 };
 
-/**
- * سطح ۳: دریافت دسترسی‌های ۳ سطحی کاربر از دیتابیس (کاملاً امن و ضد-باگ PostgREST)
- * @param {object} supabase - کلاینت سوپابیس
- * @param {string|array} resourceCodes - کدهای منبع (مثلاً ['vouchers', 'doc_list'])
- */
 const getUserPermissions = async (supabase, resourceCodes = ['vouchers']) => {
     try {
-        // تبدیل همیشه به آرایه برای پشتیبانی از کدهای مختلف
         const codes = Array.isArray(resourceCodes) ? resourceCodes : [resourceCodes];
-        
         const { data: authData } = await supabase.auth.getUser();
         const userId = authData?.user?.id;
-        if (!userId) return null;
+        
+        if (!userId) {
+            console.warn("[Permission] No user ID found from auth.");
+            return { actions: [], allowed_branches: [], allowed_ledgers: [], allowed_doctypes: [] };
+        }
 
-        // دریافت نقش‌های کاربر
-        const { data: userRoles } = await supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', userId);
+        const { data: userRoles, error: roleErr } = await supabase.schema('gen').from('user_roles').select('role_id').eq('user_id', userId);
+        if (roleErr) console.error("[Permission] Error fetching roles:", roleErr);
+        
         const roleIds = userRoles?.map(r => r.role_id) || [];
-
         let allPerms = [];
 
-        // 1. دریافت پرمیشن‌های مستقیمِ خود کاربر (بدون استفاده از دستور مشکل‌دار .or)
-        const { data: userPerms } = await supabase.schema('gen').from('permissions')
+        const { data: userPerms, error: uErr } = await supabase.schema('gen').from('permissions')
             .select('*')
             .eq('user_id', userId)
             .in('resource_code', codes);
             
-        if (userPerms && userPerms.length > 0) {
-            allPerms = [...allPerms, ...userPerms];
-        }
+        if (uErr) console.error("[Permission] User perms fetch error:", uErr);
+        if (userPerms && userPerms.length > 0) allPerms.push(...userPerms);
 
-        // 2. دریافت پرمیشن‌های اختصاص یافته به نقش‌های این کاربر
         if (roleIds.length > 0) {
-            const { data: rolePerms } = await supabase.schema('gen').from('permissions')
+            const { data: rolePerms, error: rErr } = await supabase.schema('gen').from('permissions')
                 .select('*')
                 .in('role_id', roleIds)
                 .in('resource_code', codes);
                 
-            if (rolePerms && rolePerms.length > 0) {
-                allPerms = [...allPerms, ...rolePerms];
-            }
+            if (rErr) console.error("[Permission] Role perms fetch error:", rErr);
+            if (rolePerms && rolePerms.length > 0) allPerms.push(...rolePerms);
         }
 
-        // ادغام پرمیشن‌ها (جلوگیری از تکرار)
-        const combined = {
-            actions: new Set(),
-            allowed_branches: [],
-            allowed_ledgers: [],
-            allowed_doctypes: []
-        };
+        if (allPerms.length === 0 && window.USER_PERMISSIONS) {
+            const cached = window.USER_PERMISSIONS.filter(p => codes.includes(p.resource_code));
+            allPerms.push(...cached);
+        }
+
+        if (allPerms.length === 0) {
+             console.warn(`[Permission] No permissions found for user ${userId} on codes: ${codes.join(', ')}. Check database permissions and RLS policies.`);
+             return { actions: [], allowed_branches: [], allowed_ledgers: [], allowed_doctypes: [] };
+        }
+
+        const combined = { actions: new Set(), allowed_branches: [], allowed_ledgers: [], allowed_doctypes: [] };
 
         allPerms.forEach(p => {
-            // سطح ۲: عملیات
-            const actions = Array.isArray(p.actions) ? p.actions : (typeof p.actions === 'string' ? JSON.parse(p.actions) : []);
-            actions.forEach(a => combined.actions.add(a));
+            let actionsArr = [];
+            try {
+                if (Array.isArray(p.actions)) {
+                    actionsArr = p.actions;
+                } else if (typeof p.actions === 'string') {
+                    if (p.actions.trim().startsWith('[')) actionsArr = JSON.parse(p.actions);
+                    else actionsArr = p.actions.split(',').map(s => s.trim());
+                }
+            } catch(e) { console.error("[Permission] Actions JSON parse error:", e, p.actions); }
+            
+            actionsArr.forEach(a => combined.actions.add(a));
 
-            // سطح ۳: دیتای مجاز
-            const scopes = p.data_scopes || {};
+            let scopes = {};
+            try {
+                if (typeof p.data_scopes === 'object' && p.data_scopes !== null) {
+                    scopes = p.data_scopes;
+                } else if (typeof p.data_scopes === 'string') {
+                    scopes = JSON.parse(p.data_scopes);
+                }
+            } catch(e) { console.error("[Permission] Scopes JSON parse error:", e, p.data_scopes); }
+            
             if (scopes.allowed_branches) combined.allowed_branches.push(...scopes.allowed_branches);
             if (scopes.allowed_ledgers) combined.allowed_ledgers.push(...scopes.allowed_ledgers);
             if (scopes.allowed_doctypes) combined.allowed_doctypes.push(...scopes.allowed_doctypes);
@@ -571,8 +583,8 @@ const getUserPermissions = async (supabase, resourceCodes = ['vouchers']) => {
             allowed_doctypes: [...new Set(combined.allowed_doctypes)]
         };
     } catch (err) {
-        console.error('Error fetching permissions:', err);
-        return null;
+        console.error('[Permission] Fatal error in getUserPermissions:', err);
+        return { actions: [], allowed_branches: [], allowed_ledgers: [], allowed_doctypes: [] };
     }
 };
 

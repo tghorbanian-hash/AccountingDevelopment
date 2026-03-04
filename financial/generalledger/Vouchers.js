@@ -74,7 +74,6 @@ const Vouchers = ({ language = 'fa' }) => {
                 allowed_doctypes: []
             };
         } else {
-            // ارسال آرایه‌ای از کدهای احتمالی تا هر نامی در دیتابیس ثبت شده بود شناسایی شود
             perms = await getUserPermissions(supabase, ['vouchers', 'doc_list', 'gl.vouchers', 'financial.vouchers', 'gl_vouchers']);
         }
         
@@ -369,8 +368,30 @@ const Vouchers = ({ language = 'fa' }) => {
       return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-indigo-600 gap-4"><Lock className="animate-pulse" size={48}/><p className="font-bold">{isRtl ? 'در حال بررسی دسترسی‌ها...' : 'Checking permissions...'}</p></div>;
   }
 
+  // Debug Panel Block for Missing Permissions
   if (!permissions || !permissions.actions || !permissions.actions.includes('view')) {
-      return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4"><Lock size={64}/><h2 className="text-xl font-black">{isRtl ? 'عدم دسترسی' : 'Access Denied'}</h2><p>{isRtl ? 'شما مجوز مشاهده این صفحه را ندارید.' : 'You do not have permission to view this page.'}</p></div>;
+      return (
+          <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4 p-6">
+              <Lock size={64}/>
+              <h2 className="text-xl font-black">{isRtl ? 'عدم دسترسی' : 'Access Denied'}</h2>
+              <p>{isRtl ? 'شما مجوز مشاهده این فرم را ندارید.' : 'You do not have permission to view this page.'}</p>
+              
+              <div className="mt-6 w-full max-w-lg bg-white border border-red-100 p-4 rounded-lg shadow-sm">
+                  <h3 className="text-red-500 font-bold text-sm mb-2 text-center">{isRtl ? 'بخش عیب‌یابی (مخصوص ادمین)' : 'Debug Section'}</h3>
+                  <div className="dir-ltr text-left text-xs text-slate-600 font-mono space-y-2">
+                      <p><strong>Required Action:</strong> "view"</p>
+                      <p><strong>Received Actions:</strong> {JSON.stringify(permissions?.actions || [])}</p>
+                      {(!permissions?.actions || permissions.actions.length === 0) && (
+                          <div className="text-amber-700 font-bold bg-amber-50 p-3 rounded mt-2 border border-amber-200">
+                              Warning: No permissions fetched from DB. 
+                              <br/><br/>
+                              If you assigned permissions in the Roles form, check if your database RLS (Row Level Security) on `gen.permissions` or `gen.user_roles` is blocking standard users from reading their own permissions.
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      );
   }
 
   if (view === 'form') {
