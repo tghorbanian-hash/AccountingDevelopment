@@ -98,9 +98,12 @@ const Roles = ({ t, isRtl }) => {
     { id: 'status_change', label: t.actStatusChange || (isRtl ? 'تغییر وضعیت' : 'Change Status') },
   ];
 
+  // UUID دقیق فرم "فهرست اسناد" استخراج شده از منابع
+  const DOC_LIST_UUID = "6ba74488-f6f0-4e23-8fc3-9cf6d7477e19";
+
   const DATA_SCOPES = useMemo(() => {
     const scopes = {
-      'vouchers': [
+      [DOC_LIST_UUID]: [
         { id: 'allowed_ledgers', label: t.dsLedgers || (isRtl ? 'دفاتر مجاز' : 'Allowed Ledgers'), options: dbLedgers.map(l => ({ value: String(l.id), label: l.title })) },
         { id: 'allowed_branches', label: t.dsBranches || (isRtl ? 'شعب مجاز' : 'Allowed Branches'), options: dbBranches.map(b => ({ value: String(b.id), label: b.title })) },
         { id: 'allowed_doctypes', label: t.dsDocTypes || (isRtl ? 'انواع سند سیستمی مجاز' : 'Allowed System Doc Types'), options: [
@@ -109,7 +112,6 @@ const Roles = ({ t, isRtl }) => {
         ]}
       ]
     };
-    scopes['doc_list'] = scopes['vouchers']; 
     return scopes;
   }, [dbBranches, dbLedgers, t, isRtl]);
 
@@ -133,7 +135,8 @@ const Roles = ({ t, isRtl }) => {
       const cActionsMap = {};
 
       resData.forEach(r => map.set(r.id, { 
-        id: r.code, 
+        id: r.id, // بسیار مهم: برگشت به UUID برای همخوانی با کل سیستم
+        code: r.code, 
         uuid: r.id, 
         label: { fa: r.title_fa, en: r.title_en }, 
         type: r.type, 
@@ -198,7 +201,6 @@ const Roles = ({ t, isRtl }) => {
         } else if (Array.isArray(p.actions)) {
            actionsArr = p.actions;
         }
-        // ذخیره کردن ID دیتابیس برای جلوگیری از خطای Conflict هنگام ویرایش
         permsMap[p.role_id][p.resource_code] = { id: p.id, actions: actionsArr, dataScopes: p.data_scopes || {} };
       });
       setPermissions(permsMap);
@@ -258,7 +260,6 @@ const Roles = ({ t, isRtl }) => {
     const toUpdate = [];
     const toDelete = [];
 
-    // تفکیک عملیات‌ها به آپدیت، درج و حذف برای جلوگیری از خطای 409 Conflict
     Object.keys(tempPermissions).forEach(formId => {
       const perm = tempPermissions[formId];
       const hasData = perm.actions.length > 0 || Object.keys(perm.dataScopes).length > 0;

@@ -60,6 +60,9 @@ const Vouchers = ({ language = 'fa' }) => {
       permissions
   }), [accounts, accountStructures, branches, fiscalYears, ledgers, docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances, permissions]);
 
+  // شناسه یکتای فرم در دیتابیس
+  const DOC_LIST_UUID = '6ba74488-f6f0-4e23-8fc3-9cf6d7477e19';
+
   // --- Initialization & Security ---
   useEffect(() => {
     const init = async () => {
@@ -74,7 +77,8 @@ const Vouchers = ({ language = 'fa' }) => {
                 allowed_doctypes: []
             };
         } else {
-            perms = await getUserPermissions(supabase, ['vouchers', 'doc_list', 'gl.vouchers', 'financial.vouchers', 'gl_vouchers']);
+            // حالا هم UUID فرم و هم کد رشته‌ای را می‌فرستیم تا در هر حالتی در دیتابیس پیدا شود
+            perms = await getUserPermissions(supabase, [DOC_LIST_UUID, 'doc_list', 'vouchers']);
         }
         
         setPermissions(perms);
@@ -368,7 +372,7 @@ const Vouchers = ({ language = 'fa' }) => {
       return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-indigo-600 gap-4"><Lock className="animate-pulse" size={48}/><p className="font-bold">{isRtl ? 'در حال بررسی دسترسی‌ها...' : 'Checking permissions...'}</p></div>;
   }
 
-  // Debug Panel Block for Missing Permissions
+  // Debug Panel Block 
   if (!permissions || !permissions.actions || !permissions.actions.includes('view')) {
       return (
           <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4 p-6">
@@ -384,8 +388,8 @@ const Vouchers = ({ language = 'fa' }) => {
                       {(!permissions?.actions || permissions.actions.length === 0) && (
                           <div className="text-amber-700 font-bold bg-amber-50 p-3 rounded mt-2 border border-amber-200">
                               Warning: No permissions fetched from DB. 
-                              <br/><br/>
-                              If you assigned permissions in the Roles form, check if your database RLS (Row Level Security) on `gen.permissions` or `gen.user_roles` is blocking standard users from reading their own permissions.
+                              <br/> 1. Ensure you have assigned permissions to this role in the Roles form.
+                              <br/> 2. Ensure RLS on `permissions` table is not blocking standard users.
                           </div>
                       )}
                   </div>

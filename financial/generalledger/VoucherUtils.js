@@ -519,6 +519,7 @@ const getUserPermissions = async (supabase, resourceCodes = ['vouchers']) => {
         const roleIds = userRoles?.map(r => r.role_id) || [];
         let allPerms = [];
 
+        // Fetch direct user permissions
         const { data: userPerms, error: uErr } = await supabase.schema('gen').from('permissions')
             .select('*')
             .eq('user_id', userId)
@@ -527,6 +528,7 @@ const getUserPermissions = async (supabase, resourceCodes = ['vouchers']) => {
         if (uErr) console.error("[Permission] User perms fetch error:", uErr);
         if (userPerms && userPerms.length > 0) allPerms.push(...userPerms);
 
+        // Fetch role permissions
         if (roleIds.length > 0) {
             const { data: rolePerms, error: rErr } = await supabase.schema('gen').from('permissions')
                 .select('*')
@@ -537,13 +539,23 @@ const getUserPermissions = async (supabase, resourceCodes = ['vouchers']) => {
             if (rolePerms && rolePerms.length > 0) allPerms.push(...rolePerms);
         }
 
+        // 🌟 Fallback بسیار هوشمندانه برای خواندن مستقیم از کش برنامه اصلی 
         if (allPerms.length === 0 && window.USER_PERMISSIONS) {
-            const cached = window.USER_PERMISSIONS.filter(p => codes.includes(p.resource_code));
-            allPerms.push(...cached);
+            if (Array.isArray(window.USER_PERMISSIONS)) {
+                const cached = window.USER_PERMISSIONS.filter(p => codes.includes(p.resource_code) || codes.includes(p.resource_id));
+                allPerms.push(...cached);
+            } else if (typeof window.USER_PERMISSIONS === 'object') {
+                // اگر پرمیشن‌های کش شده به شکل دیکشنری (Key-Value) باشند
+                codes.forEach(c => {
+                    if (window.USER_PERMISSIONS[c]) {
+                        allPerms.push({ resource_code: c, ...window.USER_PERMISSIONS[c] });
+                    }
+                });
+            }
         }
 
         if (allPerms.length === 0) {
-             console.warn(`[Permission] No permissions found for user ${userId} on codes: ${codes.join(', ')}. Check database permissions and RLS policies.`);
+             console.warn(`[Permission] No permissions found for user ${userId} on codes: ${codes.join(', ')}.`);
              return { actions: [], allowed_branches: [], allowed_ledgers: [], allowed_doctypes: [] };
         }
 
