@@ -64,7 +64,19 @@ const Vouchers = ({ language = 'fa' }) => {
   useEffect(() => {
     const init = async () => {
         setAccessLoading(true);
-        const perms = await getUserPermissions(supabase, 'vouchers');
+        let perms = null;
+        
+        if (window.IS_ADMIN) {
+            perms = {
+                actions: ['view', 'create', 'edit', 'delete', 'import', 'export', 'print', 'attach', 'status_change'],
+                allowed_branches: [],
+                allowed_ledgers: [],
+                allowed_doctypes: []
+            };
+        } else {
+            perms = await getUserPermissions(supabase, 'vouchers');
+        }
+        
         setPermissions(perms);
         setAccessLoading(false);
         fetchLookups(perms);
