@@ -110,6 +110,7 @@ const Roles = ({ t, isRtl }) => {
       ]
     };
     scopes['doc_list'] = scopes['vouchers']; 
+    scopes['doc_review'] = scopes['vouchers']; 
     return scopes;
   }, [dbBranches, dbLedgers, t, isRtl]);
 
@@ -133,7 +134,7 @@ const Roles = ({ t, isRtl }) => {
       const cActionsMap = {};
 
       resData.forEach(r => map.set(r.id, { 
-        id: r.code, // بسیار مهم: برگشت به نام کُد فرمت استاندارد 
+        id: r.code, 
         uuid: r.id, 
         label: { fa: r.title_fa, en: r.title_en }, 
         type: r.type, 

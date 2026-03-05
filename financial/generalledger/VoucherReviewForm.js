@@ -1,6 +1,6 @@
 /* Filename: financial/generalledger/VoucherReviewForm.js */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Edit, Trash2, ArrowRight, ArrowLeft, Save, FileText, CheckCircle, FileWarning, Scale, Copy, X, Printer, Plus, Eye, RotateCcw, Coins, Calculator, CopyPlus, PanelRightClose, PanelRightOpen, Layers, Paperclip, Loader2 } from 'lucide-react';
+import { Edit, Trash2, ArrowRight, ArrowLeft, Save, FileText, CheckCircle, FileWarning, Scale, Copy, X, Printer, Plus, Eye, RotateCcw, Coins, Calculator, CopyPlus, PanelRightClose, PanelRightOpen, Layers, Paperclip } from 'lucide-react';
 
 const normalizeFa = (str) => {
   if (!str) return '';
@@ -446,7 +446,7 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
   if (!currentVoucher || loading) {
       return (
           <div className="h-full flex items-center justify-center bg-slate-50">
-              <Loader2 size={40} className="animate-spin text-indigo-500" />
+              <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
           </div>
       );
   }
@@ -476,8 +476,10 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
           {getStatusBadge(currentVoucher.status)}
         </div>
         <div className="flex items-center gap-2">
-          {perms.actions.includes('attach') && <Button variant="outline" onClick={() => setShowAttachModal(true)} icon={Paperclip}>{t.attachments}</Button>}
-          {perms.actions.includes('print') && <Button variant="outline" onClick={() => setShowPrintModal(true)} icon={Printer}>{t.print}</Button>}
+          {perms.actions.includes('attach') && <Button variant="ghost" size="icon" icon={Paperclip} onClick={() => setShowAttachModal(true)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />}
+          {perms.actions.includes('print') && <Button variant="ghost" size="icon" icon={Printer} onClick={() => setShowPrintModal(true)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />}
+          {(perms.actions.includes('attach') || perms.actions.includes('print')) && <div className="h-6 w-px bg-slate-200 mx-1"></div>}
+          
           {perms.actions.includes('edit') && (
             isReadonly ? (
               <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={RotateCcw}>{t.revertToTemp}</Button>

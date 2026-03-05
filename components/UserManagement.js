@@ -1,3 +1,4 @@
+/* Filename: components/UserManagement.js */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Users, Search, Plus, Edit, Trash2, Key, Shield, 
@@ -68,6 +69,8 @@ const UserManagement = ({ t, isRtl }) => {
   const [users, setUsers] = useState([]);
   const [globalRolePermissions, setGlobalRolePermissions] = useState({});
   const [allSystemForms, setAllSystemForms] = useState([]);
+  const [dbBranches, setDbBranches] = useState([]);
+  const [dbLedgers, setDbLedgers] = useState([]);
 
   const [selectedRows, setSelectedRows] = useState([]);
   const [filterValues, setFilterValues] = useState({ username: '', roleIds: [], isActive: 'all' });
@@ -95,6 +98,12 @@ const UserManagement = ({ t, isRtl }) => {
   }, [isRtl]);
 
   const fetchData = async () => {
+    const { data: bData } = await supabase.schema('gen').from('branches').select('id, title').eq('is_active', true);
+    if (bData) setDbBranches(bData);
+    
+    const { data: lData } = await supabase.schema('gl').from('ledgers').select('id, title').eq('is_active', true);
+    if (lData) setDbLedgers(lData);
+
     const { data: resData } = await supabase.schema('gen').from('resources').select('*');
     if (resData) {
       const map = new Map();
@@ -418,10 +427,21 @@ const UserManagement = ({ t, isRtl }) => {
       { id: 'print', label: t.actPrint || (isRtl ? 'چاپ' : 'Print') }, { id: 'approve', label: t.actApprove || (isRtl ? 'تایید' : 'Approve') }, { id: 'export', label: t.actExport || (isRtl ? 'خروجی' : 'Export') }, { id: 'share', label: t.actShare || (isRtl ? 'اشتراک' : 'Share') },
   ];
 
-  const DATA_SCOPES = { 
-     'doc_list': { label: t.dsDocType || (isRtl ? 'نوع سند' : 'Doc Type'), options: [{value:'عمومی', label: t.dsDocGeneral || (isRtl ? 'عمومی' : 'General')}, {value:'افتتاحیه', label: t.dsDocOpening || (isRtl ? 'افتتاحیه' : 'Opening')}] },
-     'status': { label: t.dsStatus || (isRtl ? 'وضعیت' : 'Status'), options: [{value:'موقت', label: t.dsStatusTemp || (isRtl ? 'موقت' : 'Temp')}, {value:'قطعی', label: t.dsStatusFinal || (isRtl ? 'قطعی' : 'Final')}] }
-  };
+  const DATA_SCOPES = useMemo(() => {
+    const scopes = {
+      'vouchers': [
+        { id: 'allowed_ledgers', label: t.dsLedgers || (isRtl ? 'دفاتر مجاز' : 'Allowed Ledgers'), options: dbLedgers.map(l => ({ value: String(l.id), label: l.title })) },
+        { id: 'allowed_branches', label: t.dsBranches || (isRtl ? 'شعب مجاز' : 'Allowed Branches'), options: dbBranches.map(b => ({ value: String(b.id), label: b.title })) },
+        { id: 'allowed_doctypes', label: t.dsDocTypes || (isRtl ? 'انواع سند سیستمی مجاز' : 'Allowed System Doc Types'), options: [
+            { value: 'sys_general', label: t.sysGeneral || (isRtl ? 'سند عمومی' : 'General') },
+            { value: 'sys_opening', label: t.sysOpening || (isRtl ? 'افتتاحیه' : 'Opening') }
+        ]}
+      ]
+    };
+    scopes['doc_list'] = scopes['vouchers']; 
+    scopes['doc_review'] = scopes['vouchers']; 
+    return scopes;
+  }, [dbBranches, dbLedgers, t, isRtl]);
 
   return (
     <div className={`flex flex-col h-full bg-slate-50/50 p-4 overflow-hidden ${isRtl ? 'font-vazir' : 'font-sans'}`}>
@@ -563,19 +583,19 @@ const UserManagement = ({ t, isRtl }) => {
                                  </div>
                                  <div className="pt-4 border-t border-slate-200">
                                     <div className="text-[11px] font-bold text-slate-500 uppercase mb-3">{t.dataAccess || (isRtl ? 'دسترسی داده' : 'Data Access')}</div>
-                                    {Object.entries(DATA_SCOPES).map(([key, def]) => (
-                                        <div key={key} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-3">
-                                            <span className="text-[11px] font-bold block mb-2 text-slate-700">{def.label}:</span>
+                                    {DATA_SCOPES[selectedPermDetail.id] ? DATA_SCOPES[selectedPermDetail.id].map(scope => (
+                                        <div key={scope.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm mb-3">
+                                            <span className="text-[11px] font-bold block mb-2 text-slate-700">{scope.label}:</span>
                                             <div className="flex flex-wrap gap-2">
-                                                {def.options.map(opt => {
-                                                    const hasAccess = activeSource.scopes?.[key]?.includes(opt.value);
+                                                {scope.options.map(opt => {
+                                                    const hasAccess = activeSource.scopes?.[scope.id]?.includes(opt.value);
                                                     if (isReadOnly) return hasAccess ? <Badge key={opt.value} variant="info">{opt.label}</Badge> : null;
-                                                    return <ToggleChip key={opt.value} label={opt.label} checked={hasAccess} onClick={() => handleUpdateDirectPermission(selectedPermDetail.id, 'scope', key, opt.value)} colorClass="indigo" />
+                                                    return <ToggleChip key={opt.value} label={opt.label} checked={hasAccess} onClick={() => handleUpdateDirectPermission(selectedPermDetail.id, 'scope', scope.id, opt.value)} colorClass="indigo" />
                                                 })}
-                                                {isReadOnly && (!activeSource.scopes?.[key] || activeSource.scopes[key].length === 0) && <span className="text-[10px] text-slate-400">{t.noLimitsDefined || (isRtl ? 'محدودیتی تعریف نشده' : 'No limits defined')}</span>}
+                                                {isReadOnly && (!activeSource.scopes?.[scope.id] || activeSource.scopes[scope.id].length === 0) && <span className="text-[10px] text-slate-400">{t.noLimitsDefined || (isRtl ? 'محدودیتی تعریف نشده' : 'No limits defined')}</span>}
                                             </div>
                                         </div>
-                                    ))}
+                                    )) : <span className="text-[10px] text-slate-400">{isRtl ? 'سطح داده‌ای برای این فرم تعریف نشده است.' : 'No data scopes defined for this form.'}</span>}
                                  </div>
                               </>
                            );
