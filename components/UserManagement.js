@@ -441,6 +441,7 @@ const UserManagement = ({ t, isRtl }) => {
     };
     scopes['doc_list'] = scopes['vouchers']; 
     scopes['doc_review'] = scopes['vouchers']; 
+    scopes['doc_finalize'] = scopes['vouchers']; 
     return scopes;
   }, [dbBranches, dbLedgers, dbDocTypes, t, isRtl]);
 
