@@ -165,6 +165,8 @@ const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals
 
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
+      {/* کادر فیلتر عمومی (سال مالی و دفتر) از اینجا به طور کامل حذف و به هدر سیستم منتقل شد */}
+
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-200">
