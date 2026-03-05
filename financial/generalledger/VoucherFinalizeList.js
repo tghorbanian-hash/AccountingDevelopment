@@ -1,6 +1,6 @@
 /* Filename: financial/generalledger/VoucherFinalizeList.js */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Filter, Printer, Paperclip, Eye, CheckSquare, ShieldCheck } from 'lucide-react';
+import { Filter, Printer, Paperclip, Eye, CheckSquare, ShieldCheck, FileWarning } from 'lucide-react';
 
 const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals, perms, onOpenForm, onListUpdate }) => {
   const isRtl = language === 'fa';
