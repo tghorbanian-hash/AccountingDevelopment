@@ -1,5 +1,6 @@
 /* Filename: financial/generalledger/VoucherFinalize.js */
 import React, { useState, useEffect } from 'react';
+import { Filter, ChevronDown } from 'lucide-react';
 
 const localTranslations = {
   en: {
@@ -35,7 +36,7 @@ const localTranslations = {
     trackingNumber: 'Tracking No.',
     trackingDate: 'Tracking Date',
     quantity: 'Qty',
-    globalFiltersTitle: 'Global System Context',
+    globalFiltersTitle: 'Global Filters',
     dailyNumber: 'Daily No.',
     crossReference: 'Cross Ref.',
     referenceNumber: 'Reference No.',
@@ -94,7 +95,7 @@ const localTranslations = {
     trackingNumber: 'شماره پیگیری',
     trackingDate: 'تاریخ پیگیری',
     quantity: 'مقدار',
-    globalFiltersTitle: 'فیلترهای عمومی سیستم',
+    globalFiltersTitle: 'فیلترهای سراسری',
     dailyNumber: 'شماره روزانه',
     crossReference: 'شماره عطف',
     referenceNumber: 'شماره ارجاع',
@@ -124,8 +125,9 @@ const localTranslations = {
 
 window.VoucherFinalizeTranslations = localTranslations;
 
-const VoucherFinalize = ({ language = 'fa' }) => {
+const VoucherFinalize = ({ language = 'fa', setHeaderNode }) => {
   const t = localTranslations[language] || localTranslations['en'];
+  const isRtl = language === 'fa';
   const supabase = window.supabase;
 
   const [isAppLoading, setIsAppLoading] = useState(true);
@@ -144,7 +146,6 @@ const VoucherFinalize = ({ language = 'fa' }) => {
             const res = await query;
             return res.data || [];
           } catch (e) {
-            console.error("Exception in fetchLookups:", e);
             return [];
           }
         };
@@ -249,6 +250,52 @@ const VoucherFinalize = ({ language = 'fa' }) => {
     };
     initApp();
   }, []);
+
+  // --- Dynamic Header Injection ---
+  useEffect(() => {
+    if (setHeaderNode && lookups && contextVals) {
+      const node = (
+        <div className="flex items-center bg-slate-100/80 hover:bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 transition-colors shadow-[inset_0_1px_3px_rgba(0,0,0,0.05)]">
+          <Filter size={14} className="text-indigo-500 mr-2 rtl:mr-0 rtl:ml-2" />
+          
+          <div className="relative flex items-center group">
+            <select 
+              value={contextVals.fiscal_year_id} 
+              onChange={e => setContextVals({...contextVals, fiscal_year_id: e.target.value})} 
+              className="bg-transparent border-none text-xs font-bold text-slate-600 group-hover:text-indigo-700 focus:ring-0 outline-none cursor-pointer appearance-none py-0 pl-1 pr-5 rtl:pr-1 rtl:pl-5 transition-colors z-10"
+            >
+              {lookups.fiscalYears.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+            </select>
+            <ChevronDown size={12} className="absolute text-slate-400 right-1 rtl:right-auto rtl:left-1 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+          </div>
+
+          <div className="w-px h-4 bg-slate-300 mx-2"></div>
+          
+          {lookups.ledgers.length > 0 ? (
+            <div className="relative flex items-center group">
+              <select 
+                value={contextVals.ledger_id} 
+                onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} 
+                className="bg-transparent border-none text-xs font-bold text-slate-600 group-hover:text-indigo-700 focus:ring-0 outline-none cursor-pointer appearance-none py-0 pl-1 pr-5 rtl:pr-1 rtl:pl-5 transition-colors z-10 max-w-[150px] truncate"
+              >
+                {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+              </select>
+              <ChevronDown size={12} className="absolute text-slate-400 right-1 rtl:right-auto rtl:left-1 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+            </div>
+          ) : (
+            <span className="text-[11px] text-rose-500 font-bold px-1 flex items-center">{isRtl ? 'دفتری مجاز نیست' : 'No ledgers allowed'}</span>
+          )}
+        </div>
+      );
+      setHeaderNode(node);
+    }
+    
+    // Cleanup if component unmounts
+    return () => {
+      if (setHeaderNode) setHeaderNode(null);
+    };
+  }, [lookups, contextVals, setHeaderNode, isRtl, t]);
+
 
   const handleOpenForm = (voucherId, currentList) => {
     setSelectedVoucherId(voucherId);

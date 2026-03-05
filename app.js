@@ -89,15 +89,12 @@ window.USER_PERMISSIONS = new Set();
 window.IS_ADMIN = false;
 
 window.hasAccess = (resource, action = null) => {
-  // If user is Admin, grant full access immediately
   if (window.IS_ADMIN) return true;
-
   const permissions = window.USER_PERMISSIONS;
   if (!permissions) return false;
 
   const resStr = String(resource).trim().toLowerCase();
 
-  // Level 1: Form Access
   if (!action) {
     if (permissions.has(resStr)) return true;
     for (const p of permissions) {
@@ -106,9 +103,7 @@ window.hasAccess = (resource, action = null) => {
     return false;
   }
 
-  // Level 2: Specific Action Check
   const actStr = String(action).trim().toLowerCase();
-  
   if (permissions.has(`${resStr}.${actStr}`)) return true;
   if (permissions.has(`${resStr}.*`)) return true;
 
@@ -119,7 +114,7 @@ const App = () => {
   const translations = window.translations || { en: {}, fa: {} };
   const UI = window.UI || {};
   const { TreeMenu } = UI;
-  const PageDocumentation = window.PageDocumentation; // Load from window
+  const PageDocumentation = window.PageDocumentation; 
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -130,15 +125,17 @@ const App = () => {
   const [activeId, setActiveId] = useState('workspace_gen'); 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
+  // State for dynamic header content injection
+  const [headerNode, setHeaderNode] = useState(null);
+
   const [authView, setAuthView] = useState('login'); 
   const [loginMethod, setLoginMethod] = useState('standard');
   const [loginData, setLoginData] = useState({ identifier: '', password: '' });
   const [recoveryData, setRecoveryData] = useState({ otp: '', newPass: '', confirmPass: '' });
   const [error, setError] = useState('');
 
-  // Documentation States
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
-  const [docType, setDocType] = useState('user'); // 'user' or 'dev'
+  const [docType, setDocType] = useState('user'); 
 
   const t = translations[lang] || {};
   const isRtl = lang === 'fa';
@@ -147,6 +144,11 @@ const App = () => {
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
   }, [lang, isRtl]);
+
+  // Clear header node when switching pages
+  useEffect(() => {
+    setHeaderNode(null);
+  }, [activeId]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -206,9 +208,7 @@ const App = () => {
           if (cleanStored === sha256Hash) {
             isPasswordValid = true;
           }
-        } catch (err) {
-          console.error("SHA-256 Hash check error:", err);
-        }
+        } catch (err) {}
       }
 
       if (!isPasswordValid) {
@@ -217,13 +217,8 @@ const App = () => {
             p_username: loginData.identifier,
             p_password: loginData.password
           });
-          
-          if (!rpcErr && rpcValid === true) {
-            isPasswordValid = true;
-          }
-        } catch (err) {
-          console.error("RPC call failed:", err);
-        }
+          if (!rpcErr && rpcValid === true) isPasswordValid = true;
+        } catch (err) {}
       }
 
       if (isPasswordValid) {
@@ -270,25 +265,19 @@ const App = () => {
     window.IS_ADMIN = false;
   };
 
-  // --- Dynamic Menu & Permissions Logic ---
   useEffect(() => {
     if (!currentUser) return;
 
     const buildMenu = async () => {
       const rawMenu = window.MENU_DATA || [];
-      
-      // Standardize user type string for accurate checking
       const userTypeRaw = currentUser.user_type || currentUser.UserType || '';
       const userTypeClean = String(userTypeRaw).trim().toLowerCase();
-      
-      // Broadened list of valid admin types to ensure 'admin' is caught correctly
       const adminRoles = ['system admin', 'مدیر سیستم', 'admin', 'administrator', 'super admin'];
       const isSysAdmin = adminRoles.includes(userTypeClean);
       
       window.IS_ADMIN = isSysAdmin;
 
       if (isSysAdmin) {
-        // Admins skip all permission queries and get the full menu directly
         setMenuData(rawMenu);
         window.USER_PERMISSIONS = new Set(); 
         if (rawMenu.length > 0 && !activeModuleId) setActiveModuleId(rawMenu[0].id);
@@ -307,18 +296,10 @@ const App = () => {
 
               if (p.actions) {
                 let actionsArray = [];
-                if (Array.isArray(p.actions)) {
-                  actionsArray = p.actions;
-                } else if (typeof p.actions === 'string') {
-                  try {
-                    actionsArray = JSON.parse(p.actions);
-                  } catch (e) {
-                    if (p.actions.includes(',')) {
-                      actionsArray = p.actions.split(',');
-                    } else {
-                      actionsArray = [p.actions];
-                    }
-                  }
+                if (Array.isArray(p.actions)) actionsArray = p.actions;
+                else if (typeof p.actions === 'string') {
+                  try { actionsArray = JSON.parse(p.actions); } 
+                  catch (e) { actionsArray = p.actions.includes(',') ? p.actions.split(',') : [p.actions]; }
                 }
                 
                 if (Array.isArray(actionsArray)) {
@@ -347,13 +328,9 @@ const App = () => {
 
         const filterMenu = (nodes) => {
           return nodes.map(node => {
-            if (!node.children || node.children.length === 0) {
-              return window.hasAccess(node.id) ? node : null;
-            }
+            if (!node.children || node.children.length === 0) return window.hasAccess(node.id) ? node : null;
             const filteredChildren = filterMenu(node.children);
-            if (filteredChildren.length > 0) {
-              return { ...node, children: filteredChildren };
-            }
+            if (filteredChildren.length > 0) return { ...node, children: filteredChildren };
             return null;
           }).filter(Boolean);
         };
@@ -361,11 +338,8 @@ const App = () => {
         const filteredMenu = filterMenu(rawMenu);
         setMenuData(filteredMenu);
         
-        if (filteredMenu.length > 0) {
-           setActiveModuleId(filteredMenu[0].id);
-        } else {
-           setActiveModuleId(''); 
-        }
+        if (filteredMenu.length > 0) setActiveModuleId(filteredMenu[0].id);
+        else setActiveModuleId(''); 
 
       } catch (err) {
         console.error("Error fetching permissions", err);
@@ -389,29 +363,29 @@ const App = () => {
       AutoNumbering, ChartofAccounts, Vouchers, VoucherReview, VoucherFinalize, VoucherList
     } = window;
 
-    if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error: UserProfile Component Not Loaded</div>;
-    if (activeId === 'org_info') return OrganizationInfo ? <OrganizationInfo t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrganizationInfo Component Not Loaded</div>;
-    if (activeId === 'currency_settings') return CurrencySettings ? <CurrencySettings t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: CurrencySettings Component Not Loaded</div>;
-    if (activeId === 'parties') return Parties ? <Parties t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Parties Component Not Loaded</div>;
-    if (activeId === 'cost_centers') return CostCenters ? <CostCenters t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: CostCenters Component Not Loaded</div>;
-    if (activeId === 'projects') return Projects ? <Projects t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Projects Component Not Loaded</div>;
-    if (activeId === 'branches') return Branches ? <Branches t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Branches Component Not Loaded</div>;
-    if (activeId === 'org_chart') return OrgChart ? <OrgChart t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: OrgChart Component Not Loaded</div>;
-    if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Ledgers Component Not Loaded</div>;
-    if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Details Component Not Loaded</div>;
-    if (activeId === 'acc_structure') return ChartofAccounts ? <ChartofAccounts t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: ChartofAccounts Component Not Loaded</div>; 
-    if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
-    if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
-    if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
+    if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'org_info') return OrganizationInfo ? <OrganizationInfo t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'currency_settings') return CurrencySettings ? <CurrencySettings t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'parties') return Parties ? <Parties t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'cost_centers') return CostCenters ? <CostCenters t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'projects') return Projects ? <Projects t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'branches') return Branches ? <Branches t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'org_chart') return OrgChart ? <OrgChart t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'ledgers') return Ledgers ? <Ledgers t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'details') return Details ? <Details t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'acc_structure') return ChartofAccounts ? <ChartofAccounts t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>; 
+    if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
     
-    // --- تغییرات فرم‌های اسناد حسابداری ---
-    if (activeId === 'doc_list') return Vouchers ? <Vouchers language={lang} /> : <div className="p-4 text-red-500">Error: Vouchers (ثبت سند) Component Not Loaded</div>;
-    if (activeId === 'doc_review') return VoucherReview ? <VoucherReview language={lang} /> : <div className="p-4 text-red-500">Error: VoucherReview (بررسی اسناد) Component Not Loaded</div>;
-    if (activeId === 'doc_finalize') return VoucherFinalize ? <VoucherFinalize language={lang} /> : <div className="p-4 text-red-500">Error: VoucherFinalize (قطعی کردن اسناد) Component Not Loaded</div>;
-    if (activeId === 'voucher_list_view') return VoucherList ? <VoucherList language={lang} /> : <div className="p-4 text-red-500">Error: VoucherList (فهرست اسناد) Component Not Loaded</div>;
+    // Passing setHeaderNode to specific components
+    if (activeId === 'doc_list') return Vouchers ? <Vouchers language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'doc_review') return VoucherReview ? <VoucherReview language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'doc_finalize') return VoucherFinalize ? <VoucherFinalize language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'voucher_list_view') return VoucherList ? <VoucherList language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error Component</div>;
 
-    if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
-    if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Roles Component Not Loaded</div>;
+    if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
+    if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error Component</div>;
     if (activeId === 'workspace_gen') return GeneralWorkspace ? <GeneralWorkspace t={t} isRtl={isRtl} /> : <div>Loading...</div>;
     if (activeId === 'dashboards_gen') return KpiDashboard ? <KpiDashboard t={t} isRtl={isRtl} /> : <div>Loading...</div>;
     if (activeId === 'ui_showcase') return ComponentShowcase ? <ComponentShowcase t={t} isRtl={isRtl} /> : <div>Loading...</div>;
@@ -434,26 +408,17 @@ const App = () => {
     if (!LoginPage) return <div className="p-10 text-center">Loading...</div>;
     return (
       <LoginPage 
-        t={t} 
-        isRtl={isRtl} 
-        authView={authView} 
-        setAuthView={setAuthView} 
-        loginMethod={loginMethod} 
-        setLoginMethod={setLoginMethod} 
-        loginData={loginData} 
-        setLoginData={setLoginData} 
-        recoveryData={recoveryData} 
-        setRecoveryData={setRecoveryData} 
-        error={error} 
-        handleLogin={handleLogin} 
+        t={t} isRtl={isRtl} authView={authView} setAuthView={setAuthView} 
+        loginMethod={loginMethod} setLoginMethod={setLoginMethod} 
+        loginData={loginData} setLoginData={setLoginData} 
+        recoveryData={recoveryData} setRecoveryData={setRecoveryData} 
+        error={error} handleLogin={handleLogin} 
         toggleLanguage={() => setLang(l => l === 'en' ? 'fa' : 'en')} 
-        handleVerifyOtp={handleVerifyOtp} 
-        handleUpdatePassword={handleUpdatePassword} 
+        handleVerifyOtp={handleVerifyOtp} handleUpdatePassword={handleUpdatePassword} 
       />
     );
   }
 
-  // Handle Documentation Modal
   const openDocs = (type) => {
     setDocType(type);
     setIsDocModalOpen(true);
@@ -479,22 +444,13 @@ const App = () => {
                 title={moduleName} 
                 className={`
                   relative w-10 h-10 rounded-xl transition-all flex items-center justify-center shrink-0 group
-                  ${isActive 
-                    ? 'bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200' 
-                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}
+                  ${isActive ? 'bg-indigo-50 text-indigo-700 shadow-sm ring-1 ring-indigo-200' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}
                 `}
               >
                 <IconComponent size={20} strokeWidth={isActive ? 2 : 1.5} />
-                
-                {isActive && (
-                  <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>
-                )}
+                {isActive && <span className={`absolute w-1.5 h-1.5 bg-indigo-600 rounded-full top-1.5 ${isRtl ? 'right-1' : 'left-1'}`}></span>}
 
-                <div className={`
-                  absolute ${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 
-                  bg-slate-900 text-white text-[11px] py-1.5 px-3 rounded-md opacity-0 invisible 
-                  group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-[100] shadow-xl font-medium pointer-events-none
-                `}>
+                <div className={`absolute ${isRtl ? 'right-full mr-4' : 'left-full ml-4'} top-1/2 -translate-y-1/2 bg-slate-900 text-white text-[11px] py-1.5 px-3 rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-[100] shadow-xl font-medium pointer-events-none`}>
                   {moduleName}
                   <div className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-[-4px]' : 'left-[-4px]'} w-2 h-2 bg-slate-900 rotate-45`}></div>
                 </div>
@@ -514,12 +470,7 @@ const App = () => {
         </div>
       </aside>
 
-      <aside className={`
-        bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 
-        flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)]
-        ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}
-        h-full
-      `}>
+      <aside className={`bg-white border-${isRtl ? 'l' : 'r'} border-slate-200 flex flex-col transition-all duration-300 ease-in-out overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.01)] ${sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'} h-full`}>
         <div className="h-16 flex items-center px-6 border-b border-slate-100 shrink-0 bg-slate-50/30">
            <h2 className="text-sm font-black text-slate-800 truncate leading-tight">
              {currentModule.label ? currentModule.label[lang] : 'Menu'}
@@ -527,23 +478,11 @@ const App = () => {
         </div>
         
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-          {TreeMenu ? (
-            <TreeMenu 
-              items={currentModule.children || []} 
-              activeId={activeId} 
-              onSelect={setActiveId} 
-              isRtl={isRtl}
-            />
-          ) : (
-             <div className="p-4 text-center text-slate-400 text-xs">Loading Menu Component...</div>
-          )}
+          {TreeMenu ? <TreeMenu items={currentModule.children || []} activeId={activeId} onSelect={setActiveId} isRtl={isRtl} /> : <div className="p-4 text-center text-slate-400 text-xs">Loading Menu...</div>}
         </div>
         
         <div className="p-3 border-t border-slate-100 bg-slate-50/50 shrink-0">
-          <div 
-             onClick={() => setActiveId('user_profile')}
-             className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-100"
-          >
+          <div onClick={() => setActiveId('user_profile')} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-100">
              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-100 to-blue-50 border border-white shadow-sm flex items-center justify-center text-indigo-700 font-black text-xs uppercase">
                {currentUser?.username ? currentUser.username.substring(0,2) : 'US'}
              </div>
@@ -557,49 +496,33 @@ const App = () => {
 
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50 relative">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-20">
-           <div className="flex items-center gap-4">
-             <button 
-               onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
-               className="p-2 -ml-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-             >
+           <div className="flex items-center gap-4 w-1/3">
+             <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-2 -ml-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors">
                 {sidebarCollapsed ? <Menu size={20} /> : <ChevronRightSquare size={20} className={isRtl ? '' : 'rotate-180'} />}
              </button>
-             
              <div className="flex items-center gap-2 text-sm">
                 <span className="text-slate-400 font-medium hidden sm:inline">{currentModule.label ? currentModule.label[lang] : ''}</span>
                 <ChevronRight size={14} className={`text-slate-300 hidden sm:inline ${isRtl ? 'rotate-180' : ''}`} />
-                <span className="text-slate-800 font-bold">{activeId === 'user_profile' ? (t.profileTitle || 'User Profile') : activeId}</span>
+                <span className="text-slate-800 font-bold whitespace-nowrap">{activeId === 'user_profile' ? (t.profileTitle || 'User Profile') : activeId}</span>
              </div>
            </div>
 
-           <div className="flex items-center gap-3">
-              <button 
-                onClick={() => openDocs('user')} 
-                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors"
-                title={isRtl ? 'راهنمای کاربری' : 'User Guide'}
-              >
+           {/* --- Global Header Portal Slot --- */}
+           <div className="flex-1 flex justify-center px-4">
+              {headerNode}
+           </div>
+
+           <div className="flex items-center justify-end gap-3 w-1/3">
+              <button onClick={() => openDocs('user')} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors" title={isRtl ? 'راهنمای کاربری' : 'User Guide'}>
                 <Book size={18} />
               </button>
-              
-              <button 
-                onClick={() => openDocs('dev')} 
-                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
-                title={isRtl ? 'مستندات توسعه (فنی)' : 'Developer Docs'}
-              >
+              <button onClick={() => openDocs('dev')} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors" title={isRtl ? 'مستندات توسعه (فنی)' : 'Developer Docs'}>
                 <Code size={18} />
               </button>
-              
               <div className="h-5 w-px bg-slate-200 mx-1"></div>
-
               <div className="relative hidden md:block">
                  <Search size={16} className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'right-3' : 'left-3'} text-slate-400`} />
-                 <input 
-                    placeholder={t.searchMenu || 'Search...'}
-                    className={`
-                       h-9 bg-slate-100 border-none rounded-full text-xs w-56 focus:w-72 transition-all
-                       ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} focus:ring-2 focus:ring-indigo-100 outline-none
-                    `}
-                 />
+                 <input placeholder={t.searchMenu || 'Search...'} className={`h-9 bg-slate-100 border-none rounded-full text-xs w-48 xl:w-56 focus:w-64 transition-all ${isRtl ? 'pr-9 pl-4' : 'pl-9 pr-4'} focus:ring-2 focus:ring-indigo-100 outline-none`} />
               </div>
               <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors relative">
                  <Bell size={18} />
@@ -615,14 +538,9 @@ const App = () => {
 
       {PageDocumentation && (
         <PageDocumentation 
-          isOpen={isDocModalOpen}
-          onClose={() => setIsDocModalOpen(false)}
-          pageKey={activeId}
-          docType={docType}
-          isAdmin={window.IS_ADMIN}
-          t={t}
-          isRtl={isRtl}
-          userId={currentUser?.id}
+          isOpen={isDocModalOpen} onClose={() => setIsDocModalOpen(false)}
+          pageKey={activeId} docType={docType} isAdmin={window.IS_ADMIN}
+          t={t} isRtl={isRtl} userId={currentUser?.id}
         />
       )}
     </div>

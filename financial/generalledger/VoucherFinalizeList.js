@@ -165,21 +165,6 @@ const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals
 
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
-      <div className="mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-2 text-indigo-800 font-bold text-sm">
-          <Filter size={18} className="text-indigo-500"/>
-          <span>{t.globalFiltersTitle}:</span>
-        </div>
-        <div className="flex gap-3">
-          <select value={contextVals.fiscal_year_id} onChange={e => setContextVals({...contextVals, fiscal_year_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
-            {lookups.fiscalYears.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-          </select>
-          <select value={contextVals.ledger_id} onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
-            {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-          </select>
-        </div>
-      </div>
-
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-200">
