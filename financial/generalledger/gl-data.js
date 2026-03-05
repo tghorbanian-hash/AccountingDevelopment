@@ -30,9 +30,10 @@ export const GL_MENU = {
       id: 'gl_docs',
       label: { en: 'Document Management', fa: 'مدیریت اسناد' },
       children: [
-        { id: 'doc_list', label: { en: 'Document List', fa: 'فهرست اسناد' } },
+        { id: 'doc_list', label: { en: 'Voucher Entry', fa: 'ثبت سند' } },
         { id: 'doc_review', label: { en: 'Document Review', fa: 'بررسی اسناد' } },
         { id: 'doc_finalize', label: { en: 'Finalize Documents', fa: 'قطعی کردن اسناد' } },
+        { id: 'voucher_list_view', label: { en: 'Vouchers List', fa: 'فهرست اسناد' } },
       ]
     },
     {

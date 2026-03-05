@@ -386,7 +386,7 @@ const App = () => {
       KpiDashboard, UserManagement, GeneralWorkspace, ComponentShowcase, LoginPage, 
       Roles, Parties, UserProfile, OrganizationInfo, CurrencySettings, CostCenters, 
       Projects, Branches, OrgChart, Ledgers, Details, FiscalPeriods, DocTypes, 
-      AutoNumbering, ChartofAccounts, Vouchers, VoucherReview
+      AutoNumbering, ChartofAccounts, Vouchers, VoucherReview, VoucherList
     } = window;
 
     if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error: UserProfile Component Not Loaded</div>;
@@ -403,8 +403,12 @@ const App = () => {
     if (activeId === 'fiscal_periods') return FiscalPeriods ? <FiscalPeriods t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: FiscalPeriods Component Not Loaded</div>;
     if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
     if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
-    if (activeId === 'doc_list') return Vouchers ? <Vouchers language={lang} /> : <div className="p-4 text-red-500">Error: Vouchers Component Not Loaded</div>;
-    if (activeId === 'doc_review') return VoucherReview ? <VoucherReview language={lang} /> : <div className="p-4 text-red-500">Error: VoucherReview Component Not Loaded</div>;
+    
+    // --- تغییرات فرم‌های اسناد حسابداری ---
+    if (activeId === 'doc_list') return Vouchers ? <Vouchers language={lang} /> : <div className="p-4 text-red-500">Error: Vouchers (ثبت سند) Component Not Loaded</div>;
+    if (activeId === 'doc_review') return VoucherReview ? <VoucherReview language={lang} /> : <div className="p-4 text-red-500">Error: VoucherReview (قطعی کردن اسناد) Component Not Loaded</div>;
+    if (activeId === 'voucher_list_view') return VoucherList ? <VoucherList language={lang} /> : <div className="p-4 text-red-500">Error: VoucherList (فهرست اسناد) Component Not Loaded</div>;
+
     if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
     if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Roles Component Not Loaded</div>;
     if (activeId === 'workspace_gen') return GeneralWorkspace ? <GeneralWorkspace t={t} isRtl={isRtl} /> : <div>Loading...</div>;
