@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 const Vouchers = ({ language = 'fa' }) => {
-  const { localTranslations, getStatusBadge, processCSVImport, generateCSVTemplate, getUserPermissions } = window.VoucherUtils || {};
+  const { localTranslations, getStatusBadge, processCSVImport, generateCSVTemplate } = window.VoucherUtils || {};
   const VoucherForm = window.VoucherForm;
   
   const t = localTranslations ? (localTranslations[language] || localTranslations['en']) : {};
@@ -60,14 +60,11 @@ const Vouchers = ({ language = 'fa' }) => {
       permissions
   }), [accounts, accountStructures, branches, fiscalYears, ledgers, docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances, permissions]);
 
-  // شناسه یکتای فرم در دیتابیس
-  const DOC_LIST_UUID = '6ba74488-f6f0-4e23-8fc3-9cf6d7477e19';
-
   // --- Initialization & Security ---
   useEffect(() => {
     const init = async () => {
         setAccessLoading(true);
-        let perms = null;
+        let perms = { actions: [], allowed_branches: [], allowed_ledgers: [], allowed_doctypes: [] };
         
         if (window.IS_ADMIN) {
             perms = {
@@ -77,8 +74,46 @@ const Vouchers = ({ language = 'fa' }) => {
                 allowed_doctypes: []
             };
         } else {
-            // حالا هم UUID فرم و هم کد رشته‌ای را می‌فرستیم تا در هر حالتی در دیتابیس پیدا شود
-            perms = await getUserPermissions(supabase, [DOC_LIST_UUID, 'doc_list', 'vouchers']);
+            try {
+                // 1. دریافت مطمئن نشست کاربری و جلوگیری از خطای auth
+                const { data: { session } } = await supabase.auth.getSession();
+                let user = session?.user;
+                if (!user) {
+                    const { data: authData } = await supabase.auth.getUser();
+                    user = authData?.user;
+                }
+
+                if (user) {
+                    // 2. پیدا کردن نقش کاربر از جدول user_roles
+                    const { data: roleData } = await supabase.schema('gen').from('user_roles')
+                        .select('role_id').eq('user_id', user.id).single();
+                    
+                    if (roleData && roleData.role_id) {
+                        // 3. دریافت مستقیم دسترسی‌های فهرست اسناد از جدول permissions (بدون وابستگی به فایل Utils)
+                        const { data: permData, error: permError } = await supabase.schema('gen').from('permissions')
+                            .select('*')
+                            .eq('role_id', roleData.role_id)
+                            .eq('resource_code', 'doc_list')
+                            .maybeSingle();
+
+                        if (permError) {
+                            console.error("Error fetching doc_list permissions:", permError);
+                        }
+
+                        if (permData) {
+                            perms.actions = permData.actions || [];
+                            const ds = permData.data_scopes || {};
+                            perms.allowed_branches = ds.allowed_branches || permData.allowed_branches || [];
+                            perms.allowed_ledgers = ds.allowed_ledgers || permData.allowed_ledgers || [];
+                            perms.allowed_doctypes = ds.allowed_doctypes || permData.allowed_doctypes || [];
+                        }
+                    }
+                } else {
+                    console.error("[Permission] No user session found locally.");
+                }
+            } catch (err) {
+                console.error("Critical error in fetching robust permissions:", err);
+            }
         }
         
         setPermissions(perms);
@@ -260,7 +295,7 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const handleOpenForm = (voucher = null, copy = false) => {
-    if (!voucher && !permissions?.actions.includes('create')) {
+    if (!voucher && !permissions?.actions?.includes('create')) {
         alert(t.accessDenied);
         return;
     }
@@ -270,7 +305,7 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const handleBulkStatus = async (newStatus) => {
-    if (!permissions?.actions.includes('status_change')) {
+    if (!permissions?.actions?.includes('status_change')) {
         alert(t.accessDenied);
         return;
     }
@@ -309,14 +344,14 @@ const Vouchers = ({ language = 'fa' }) => {
   };
 
   const promptDelete = (voucher) => {
-    if (!permissions?.actions.includes('delete')) return;
+    if (!permissions?.actions?.includes('delete')) return;
     if (voucher.status === 'reviewed' || voucher.status === 'final') return;
     setVoucherToDelete(voucher);
     setShowDeleteModal(true);
   };
 
   const handleImportCSV = async (e) => {
-     if (!permissions?.actions.includes('import')) return;
+     if (!permissions?.actions?.includes('import')) return;
      const file = e.target.files[0];
      if (!file) return;
      setLoading(true);
@@ -372,28 +407,12 @@ const Vouchers = ({ language = 'fa' }) => {
       return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-indigo-600 gap-4"><Lock className="animate-pulse" size={48}/><p className="font-bold">{isRtl ? 'در حال بررسی دسترسی‌ها...' : 'Checking permissions...'}</p></div>;
   }
 
-  // Debug Panel Block 
   if (!permissions || !permissions.actions || !permissions.actions.includes('view')) {
       return (
           <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400 gap-4 p-6">
               <Lock size={64}/>
               <h2 className="text-xl font-black">{isRtl ? 'عدم دسترسی' : 'Access Denied'}</h2>
               <p>{isRtl ? 'شما مجوز مشاهده این فرم را ندارید.' : 'You do not have permission to view this page.'}</p>
-              
-              <div className="mt-6 w-full max-w-lg bg-white border border-red-100 p-4 rounded-lg shadow-sm">
-                  <h3 className="text-red-500 font-bold text-sm mb-2 text-center">{isRtl ? 'بخش عیب‌یابی (مخصوص ادمین)' : 'Debug Section'}</h3>
-                  <div className="dir-ltr text-left text-xs text-slate-600 font-mono space-y-2">
-                      <p><strong>Required Action:</strong> "view"</p>
-                      <p><strong>Received Actions:</strong> {JSON.stringify(permissions?.actions || [])}</p>
-                      {(!permissions?.actions || permissions.actions.length === 0) && (
-                          <div className="text-amber-700 font-bold bg-amber-50 p-3 rounded mt-2 border border-amber-200">
-                              Warning: No permissions fetched from DB. 
-                              <br/> 1. Ensure you have assigned permissions to this role in the Roles form.
-                              <br/> 2. Ensure RLS on `permissions` table is not blocking standard users.
-                          </div>
-                      )}
-                  </div>
-              </div>
           </div>
       );
   }
