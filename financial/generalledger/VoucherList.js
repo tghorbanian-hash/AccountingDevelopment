@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Filter, Eye, Printer, Paperclip, FileText, 
-  ChevronRight, ChevronLeft, RefreshCw 
+  RefreshCw, Loader2, FileWarning
 } from 'lucide-react';
 
-const VoucherList = ({ contextVals, lookups, language = 'fa' }) => {
+const VoucherList = ({ language = 'fa' }) => {
   const { localTranslations } = window.VoucherUtils || {};
   const t = localTranslations ? (localTranslations[language] || localTranslations['en']) : {
       search: 'جستجو',
@@ -39,31 +39,15 @@ const VoucherList = ({ contextVals, lookups, language = 'fa' }) => {
   const { formatNumber } = UI.utils || { formatNumber: (v) => v };
   const supabase = window.supabase;
 
-  // --- Security & Data Scoping ---
-  const perms = lookups.permissions || { actions: [], allowed_branches: [], allowed_ledgers: [] };
-  const canView = perms.actions.includes('view') || true; // Assuming list access implies view
-  const canPrint = perms.actions.includes('print');
-  const canAttach = perms.actions.includes('attach');
-
-  const filteredBranches = useMemo(() => {
-      if (perms.allowed_branches && perms.allowed_branches.length > 0) {
-          return lookups.branches.filter(b => perms.allowed_branches.includes(b.id));
-      }
-      return lookups.branches;
-  }, [lookups.branches, perms]);
-
-  const filteredLedgers = useMemo(() => {
-      if (perms.allowed_ledgers && perms.allowed_ledgers.length > 0) {
-          return lookups.ledgers.filter(l => perms.allowed_ledgers.includes(String(l.id)));
-      }
-      return lookups.ledgers;
-  }, [lookups.ledgers, perms]);
-
   // --- States ---
+  const [lookups, setLookups] = useState(null);
+  const [contextVals, setContextVals] = useState(null);
+  const [isAppLoading, setIsAppLoading] = useState(true);
+
   const [vouchers, setVouchers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
-      ledger_id: contextVals.ledger_id || '',
+      ledger_id: '',
       branch_id: '',
       status: '',
       fromDate: '',
@@ -76,16 +60,101 @@ const VoucherList = ({ contextVals, lookups, language = 'fa' }) => {
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
-  // --- Fetch Data ---
+  // --- Initialize Dependencies ---
+  useEffect(() => {
+      const initApp = async () => {
+          if (!supabase) return;
+          try {
+              const fetchSafe = async (schema, table) => {
+                  try {
+                      const { data, error } = await supabase.schema(schema).from(table).select('*');
+                      if (error) console.warn(`Error fetching ${table}:`, error);
+                      return data || [];
+                  } catch (e) {
+                      return [];
+                  }
+              };
+
+              const [
+                  branches, ledgers, accountStructures, accounts, 
+                  allDetailInstances, detailTypes, currencies, 
+                  fiscalYears, fiscalPeriods
+              ] = await Promise.all([
+                  fetchSafe('gen', 'branches'),
+                  fetchSafe('gl', 'ledgers'),
+                  fetchSafe('gl', 'account_structures'),
+                  fetchSafe('gl', 'accounts'),
+                  fetchSafe('gl', 'detail_instances'),
+                  fetchSafe('gl', 'detail_types'),
+                  fetchSafe('gen', 'currencies'),
+                  fetchSafe('gl', 'fiscal_years'),
+                  fetchSafe('gl', 'fiscal_periods')
+              ]);
+
+              let docTypes = [];
+              try {
+                  const { data } = await supabase.schema('gl').from('document_types').select('*');
+                  docTypes = data || [];
+              } catch (e) { }
+
+              let currencyGlobals = {};
+              try {
+                  const { data } = await supabase.schema('gen').from('currency_globals').select('*').limit(1).maybeSingle();
+                  if(data) currencyGlobals = data;
+              } catch(e){}
+
+              const activeYear = fiscalYears.find(y => y.is_active) || fiscalYears[0] || {};
+              const activeLedger = ledgers.find(l => l.is_main) || ledgers[0] || {};
+
+              setContextVals({
+                  fiscal_year_id: activeYear.id,
+                  ledger_id: activeLedger.id
+              });
+
+              setFilters(prev => ({ ...prev, ledger_id: activeLedger.id || '' }));
+
+              const perms = {
+                  actions: ['view', 'print', 'attach'], // List operations default
+                  allowed_branches: [], 
+                  allowed_ledgers: []
+              };
+
+              if (window.USER_PERMISSIONS) {
+                  // If admin or has edit rights, allow editing logic within the form
+                  if (window.IS_ADMIN || window.USER_PERMISSIONS.has('gl_docs.edit')) {
+                      perms.actions.push('edit');
+                  }
+              }
+
+              setLookups({
+                  branches, ledgers, accountStructures, accounts,
+                  allDetailInstances, detailTypes, currencies, currencyGlobals,
+                  fiscalYears, fiscalPeriods, 
+                  docTypes: docTypes.length > 0 ? docTypes : [{id:1, code:'sys_general', title: isRtl ? 'عمومی' : 'General'}],
+                  permissions: perms
+              });
+          } catch (err) {
+              console.error("Error loading lookups:", err);
+          } finally {
+              setIsAppLoading(false);
+          }
+      };
+      initApp();
+  }, [isRtl]);
+
+  // --- Fetch Vouchers Data ---
   const fetchVouchers = async () => {
-    if (!supabase || !canView) return;
+    if (!supabase || !contextVals) return;
     setLoading(true);
     try {
       let query = supabase.schema('gl').from('vouchers')
         .select('*')
-        .eq('fiscal_period_id', contextVals.fiscal_year_id)
         .order('voucher_number', { ascending: false })
         .order('daily_number', { ascending: false });
+
+      if (contextVals.fiscal_year_id) {
+          query = query.eq('fiscal_period_id', contextVals.fiscal_year_id);
+      }
 
       if (filters.ledger_id) query = query.eq('ledger_id', filters.ledger_id);
       if (filters.branch_id) query = query.eq('branch_id', filters.branch_id);
@@ -93,14 +162,6 @@ const VoucherList = ({ contextVals, lookups, language = 'fa' }) => {
       if (filters.fromDate) query = query.gte('voucher_date', filters.fromDate);
       if (filters.toDate) query = query.lte('voucher_date', filters.toDate);
       if (filters.voucherNumber) query = query.eq('voucher_number', filters.voucherNumber);
-
-      // Apply Data Scoping
-      if (perms.allowed_ledgers && perms.allowed_ledgers.length > 0 && !filters.ledger_id) {
-          query = query.in('ledger_id', perms.allowed_ledgers);
-      }
-      if (perms.allowed_branches && perms.allowed_branches.length > 0 && !filters.branch_id) {
-          query = query.in('branch_id', perms.allowed_branches);
-      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -114,12 +175,24 @@ const VoucherList = ({ contextVals, lookups, language = 'fa' }) => {
   };
 
   useEffect(() => {
-      fetchVouchers();
-  }, [contextVals.fiscal_year_id]); // Refresh when fiscal year changes
+      if (contextVals && !isAppLoading) {
+          fetchVouchers();
+      }
+  }, [contextVals, isAppLoading]);
 
   const handleFilterChange = (field, value) => {
       setFilters(prev => ({ ...prev, [field]: value }));
   };
+
+  // --- Early Render for Loading ---
+  if (isAppLoading || !lookups || !contextVals) {
+      return (
+          <div className="h-full flex flex-col items-center justify-center bg-slate-50">
+              <Loader2 size={40} className="animate-spin text-indigo-500 mb-4" />
+              <p className="text-slate-500 font-bold">{isRtl ? 'در حال واکشی اطلاعات پایه...' : 'Loading dependencies...'}</p>
+          </div>
+      );
+  }
 
   // --- Helpers ---
   const getStatusBadgeUI = (status) => {
@@ -145,12 +218,12 @@ const VoucherList = ({ contextVals, lookups, language = 'fa' }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
                 <SelectField label={t.ledger} value={filters.ledger_id} onChange={(e) => handleFilterChange('ledger_id', e.target.value)} isRtl={isRtl}>
                     <option value="">{t.all}</option>
-                    {filteredLedgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+                    {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
                 </SelectField>
                 
                 <SelectField label={t.branch} value={filters.branch_id} onChange={(e) => handleFilterChange('branch_id', e.target.value)} isRtl={isRtl}>
                     <option value="">{t.all}</option>
-                    {filteredBranches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+                    {lookups.branches.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
                 </SelectField>
 
                 <SelectField label={t.status} value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)} isRtl={isRtl}>
@@ -223,12 +296,12 @@ const VoucherList = ({ contextVals, lookups, language = 'fa' }) => {
                                             <button onClick={() => setSelectedVoucherForView(v.id)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title={t.view}>
                                                 <Eye size={16} />
                                             </button>
-                                            {canPrint && (
+                                            {lookups.permissions.actions.includes('print') && (
                                             <button onClick={() => setVoucherToPrint(v)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title={t.print}>
                                                 <Printer size={16} />
                                             </button>
                                             )}
-                                            {canAttach && (
+                                            {lookups.permissions.actions.includes('attach') && (
                                             <button onClick={() => setVoucherForAttachments(v)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title={t.attachments}>
                                                 <Paperclip size={16} />
                                             </button>
@@ -243,7 +316,7 @@ const VoucherList = ({ contextVals, lookups, language = 'fa' }) => {
             </div>
         </div>
 
-        {/* View Modal (Loads VoucherForm in readonly context visually) */}
+        {/* View Modal (Loads VoucherForm inside full screen) */}
         {selectedVoucherForView && (
             <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 overflow-hidden">
                 <div className="bg-white w-full h-full rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
