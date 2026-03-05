@@ -31,9 +31,20 @@ export const GL_MENU = {
       label: { en: 'Document Management', fa: 'مدیریت اسناد' },
       children: [
         { id: 'doc_list', label: { en: 'Voucher Entry', fa: 'ثبت سند' } },
-        { id: 'doc_review', label: { en: 'Document Review', fa: 'بررسی اسناد' } },
+        { id: 'doc_review', label: { en: 'Voucher Review', fa: 'بررسی اسناد' } },
         { id: 'doc_finalize', label: { en: 'Finalize Documents', fa: 'قطعی کردن اسناد' } },
         { id: 'voucher_list_view', label: { en: 'Vouchers List', fa: 'فهرست اسناد' } },
+      ]
+    },
+    {
+      id: 'gl_year_end',
+      label: { en: 'Year-end Operations', fa: 'عملیات پایان سال' },
+      children: [
+        { id: 'ye_templates', label: { en: 'Define Templates', fa: 'تعیین الگوها' } },
+        { id: 'ye_closing_acc_voucher', label: { en: 'Closing Accounts Voucher', fa: 'صدور سند بستن حساب‌ها' } },
+        { id: 'ye_nature_adj_voucher', label: { en: 'Nature Adjustment Voucher', fa: 'صدور سند تعدیل ماهیت' } },
+        { id: 'ye_closing_voucher', label: { en: 'Closing Voucher', fa: 'صدور سند اختتامیه' } },
+        { id: 'ye_opening_voucher', label: { en: 'Opening Voucher', fa: 'صدور سند افتتاحیه' } },
       ]
     },
     {
@@ -42,6 +53,13 @@ export const GL_MENU = {
       children: [
         { id: 'print_doc', label: { en: 'Print Accounting Doc', fa: 'چاپ سند حسابداری' } },
         { id: 'acc_review', label: { en: 'Account Review', fa: 'مرور حساب‌ها' } },
+        { id: 'rep_trial_balance', label: { en: 'Trial Balance Report', fa: 'گزارش تراز حساب‌ها' } },
+        { id: 'rep_matrix', label: { en: 'Matrix Report', fa: 'گزارش ماتریسی' } },
+        { id: 'rep_general_ledger', label: { en: 'General Ledger Report', fa: 'گزارش دفتر کل' } },
+        { id: 'rep_journal', label: { en: 'Journal Report', fa: 'گزارش دفتر روزنامه' } },
+        { id: 'rep_contrary_nature', label: { en: 'Contrary to Nature Report', fa: 'گزارش خلاف ماهیت' } },
+        { id: 'rep_voucher_stats', label: { en: 'Vouchers Statistics Report', fa: 'گزارش آمار اسناد' } },
+        { id: 'rep_voucher_items', label: { en: 'Voucher Items Report', fa: 'گزارش اقلام سند' } },
       ]
     }
   ]
