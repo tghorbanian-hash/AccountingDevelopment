@@ -1115,7 +1115,7 @@ const ChartofAccounts = ({ t, isRtl }) => {
   const checkAccess = (action = null) => {
     if (!window.hasAccess) return false;
     const variations = [
-      'chart_of_accounts', 'chartofaccounts', 'coa', 'ChartofAccounts', 
+      'acc_structure', 'chart_of_accounts', 'chartofaccounts', 'coa', 'ChartofAccounts', 
       'chart_of_account', 'account_structures', 'account_structure', 'accounts'
     ];
     for (const res of variations) {
@@ -1125,11 +1125,11 @@ const ChartofAccounts = ({ t, isRtl }) => {
   };
 
   const canEnterForm = checkAccess(); 
-  const canView   = canEnterForm || checkAccess('view') || checkAccess('read') || checkAccess('show');
-  const canCreate = checkAccess('create') || checkAccess('new') || checkAccess('add') || checkAccess('insert');
-  const canEdit   = checkAccess('edit') || checkAccess('update') || checkAccess('modify');
-  const canDelete = checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
-  const canDesign = checkAccess('design_tree') || checkAccess('designtree');
+  const canView   = window.IS_ADMIN || canEnterForm || checkAccess('view') || checkAccess('read') || checkAccess('show');
+  const canCreate = window.IS_ADMIN || checkAccess('create') || checkAccess('new') || checkAccess('add') || checkAccess('insert');
+  const canEdit   = window.IS_ADMIN || checkAccess('edit') || checkAccess('update') || checkAccess('modify');
+  const canDelete = window.IS_ADMIN || checkAccess('delete') || checkAccess('remove') || checkAccess('destroy');
+  const canDesign = window.IS_ADMIN || checkAccess('design_tree') || checkAccess('designtree') || checkAccess('design');
 
   const [viewMode, setViewMode] = useState('list'); 
   const [activeStructure, setActiveStructure] = useState(null);
