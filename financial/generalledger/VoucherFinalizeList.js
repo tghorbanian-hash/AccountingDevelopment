@@ -1,6 +1,6 @@
 /* Filename: financial/generalledger/VoucherFinalizeList.js */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Filter, Printer, Paperclip, Eye, CheckSquare, ShieldCheck, FileWarning } from 'lucide-react';
+import { Printer, Paperclip, Eye, CheckSquare, ShieldCheck, FileWarning } from 'lucide-react';
 
 const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals, perms, onOpenForm, onListUpdate }) => {
   const isRtl = language === 'fa';
@@ -165,8 +165,8 @@ const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals
 
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
-      {/* کادر فیلتر عمومی (سال مالی و دفتر) از اینجا به طور کامل حذف و به هدر سیستم منتقل شد */}
-
+      {/* هیچ کادر فیلتر عمومی (دفتر و سال مالی) در اینجا وجود ندارد و کاملاً حذف شده است */}
+      
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-200">
@@ -200,7 +200,7 @@ const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals
         <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
       </FilterSection>
 
-      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-4">
         <DataGrid 
           columns={columns} 
           data={vouchers} 

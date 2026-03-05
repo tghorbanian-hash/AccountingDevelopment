@@ -251,7 +251,7 @@ const VoucherFinalize = ({ language = 'fa', setHeaderNode }) => {
     initApp();
   }, []);
 
-  // --- Dynamic Header Injection ---
+  // --- ارسال فیلترها به هدر سیستم (تغییر شیک و حرفه‌ای UX) ---
   useEffect(() => {
     if (setHeaderNode && lookups && contextVals) {
       const node = (
@@ -290,7 +290,6 @@ const VoucherFinalize = ({ language = 'fa', setHeaderNode }) => {
       setHeaderNode(node);
     }
     
-    // Cleanup if component unmounts
     return () => {
       if (setHeaderNode) setHeaderNode(null);
     };
