@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ArrowRight, ArrowLeft, Save, CheckCircle, FileText, Scale, Plus, 
   PanelRightClose, PanelRightOpen, Coins, CopyPlus, Trash2, Copy, Layers, FileWarning, Calculator, X,
-  Printer, Paperclip
+  Printer, Paperclip, ChevronRight, ChevronLeft
 } from 'lucide-react';
 
 const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, language = 'fa' }) => {
@@ -17,7 +17,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const supabase = window.supabase;
 
   // --- Security Check ---
-  // دریافت پرمیشن‌ها از props که توسط Vouchers.js پاس داده شده
   const perms = lookups.permissions;
   const canEdit = perms?.actions.includes('edit');
   const canCreate = perms?.actions.includes('create');
@@ -25,6 +24,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const canAttach = perms?.actions.includes('attach');
 
   // --- States ---
+  const [localVoucherId, setLocalVoucherId] = useState(voucherId);
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [voucherItems, setVoucherItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,13 +35,17 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
+  // Sync prop changes (if any)
+  useEffect(() => {
+     setLocalVoucherId(voucherId);
+  }, [voucherId]);
+
   // --- Computed Lookups for Form (With Data Scoping) ---
   const ledgerStructureCode = useMemo(() => {
      const ledger = lookups.ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
      return String(ledger?.structure || '').trim();
   }, [lookups.ledgers, contextVals.ledger_id]);
 
-  // سطح ۳: فیلتر کردن شعب بر اساس دسترسی
   const filteredBranches = useMemo(() => {
       const allBranches = lookups.branches;
       if (perms?.allowed_branches && perms.allowed_branches.length > 0) {
@@ -50,7 +54,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
       return allBranches;
   }, [lookups.branches, perms]);
 
-  // سطح ۳: فیلتر کردن دفاتر بر اساس دسترسی
   const filteredLedgers = useMemo(() => {
       const allLedgers = lookups.ledgers;
       if (perms?.allowed_ledgers && perms.allowed_ledgers.length > 0) {
@@ -85,12 +88,12 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   useEffect(() => {
     const initializeForm = async () => {
       setLoading(true);
-      if (voucherId) {
+      if (localVoucherId) {
         try {
-          const { data: vData, error: vError } = await supabase.schema('gl').from('vouchers').select('*').eq('id', voucherId).single();
+          const { data: vData, error: vError } = await supabase.schema('gl').from('vouchers').select('*').eq('id', localVoucherId).single();
           if (vError) throw vError;
 
-          const { data: itemsData, error: itemsError } = await supabase.schema('gl').from('voucher_items').select('*').eq('voucher_id', voucherId).order('row_number', { ascending: true });
+          const { data: itemsData, error: itemsError } = await supabase.schema('gl').from('voucher_items').select('*').eq('voucher_id', localVoucherId).order('row_number', { ascending: true });
           if (itemsError) throw itemsError;
 
           let targetVoucher = { ...vData };
@@ -140,7 +143,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         const currentLedger = lookups.ledgers.find(l => String(l.id) === String(initialLedgerId));
         const defaultCurrency = currentLedger?.currency || '';
         
-        // انتخاب شعبه پیش‌فرض بر اساس دسترسی
         const defaultBranch = filteredBranches.find(b => b.is_default) || filteredBranches[0];
         const today = new Date().toISOString().split('T')[0];
 
@@ -184,7 +186,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     };
 
     initializeForm();
-  }, [voucherId, isCopy, contextVals, filteredBranches]);
+  }, [localVoucherId, isCopy, contextVals, filteredBranches]);
 
   // --- Helpers ---
   const getValidDetailTypes = (accountId) => {
@@ -212,6 +214,46 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   };
 
   // --- Action Handlers ---
+  const handleNavigate = async (direction) => {
+      if (!currentVoucher || !currentVoucher.voucher_number || !currentVoucher.fiscal_period_id) return;
+      setLoading(true);
+      try {
+          let query = supabase.schema('gl').from('vouchers')
+              .select('id')
+              .eq('fiscal_period_id', currentVoucher.fiscal_period_id);
+
+          if (currentVoucher.branch_id) {
+              query = query.eq('branch_id', currentVoucher.branch_id);
+          }
+
+          const currentVn = Number(currentVoucher.voucher_number) || 0;
+          const currentDn = Number(currentVoucher.daily_number) || 0;
+
+          if (direction === 'next') {
+              query = query.or(`voucher_number.gt.${currentVn},and(voucher_number.eq.${currentVn},daily_number.gt.${currentDn})`)
+                           .order('voucher_number', { ascending: true })
+                           .order('daily_number', { ascending: true });
+          } else {
+              query = query.or(`voucher_number.lt.${currentVn},and(voucher_number.eq.${currentVn},daily_number.lt.${currentDn})`)
+                           .order('voucher_number', { ascending: false })
+                           .order('daily_number', { ascending: false });
+          }
+
+          const { data, error } = await query.limit(1).maybeSingle();
+
+          if (data && data.id) {
+              setLocalVoucherId(data.id);
+          } else {
+              alert(isRtl ? 'سند دیگری در این مسیر یافت نشد.' : 'No further vouchers found in this direction.');
+          }
+      } catch (err) {
+          console.error('Navigation error:', err);
+          alert(isRtl ? 'خطا در پیمایش اسناد.' : 'Error navigating vouchers.');
+      } finally {
+          setLoading(false);
+      }
+  };
+
   const handleItemFocus = (id) => {
       setFocusedRowId(id);
       setIsHeaderOpen(false);
@@ -412,7 +454,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const handleSaveVoucher = async (status) => {
     if (!supabase) return;
 
-    // کنترل سطح ۲: آیا اجازه ویرایش یا ایجاد دارد؟
     const isNew = !currentVoucher.id || isCopy;
     if (isNew && !canCreate) { alert(t.accessDenied); return; }
     if (!isNew && !canEdit) { alert(t.accessDenied); return; }
@@ -569,7 +610,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         const { error: itemsError } = await supabase.schema('gl').from('voucher_items').insert(itemsToSave);
         if (itemsError) throw itemsError;
       }
-      onClose(true); // Signal refresh
+      onClose(true);
     } catch (error) {
       console.error('Error saving voucher:', error);
       alert('Error saving voucher: ' + error.message);
@@ -616,6 +657,12 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={() => onClose(false)} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
           <div className="h-6 w-px bg-slate-200 mx-1"></div>
+          {currentVoucher.id && !isCopy && (
+             <div className="flex gap-1 mr-2 rtl:mr-0 rtl:ml-2">
+                 <Button variant="ghost" size="icon" onClick={() => handleNavigate('prev')} icon={isRtl ? ChevronRight : ChevronLeft} title={isRtl ? 'سند قبلی' : 'Previous Voucher'} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
+                 <Button variant="ghost" size="icon" onClick={() => handleNavigate('next')} icon={isRtl ? ChevronLeft : ChevronRight} title={isRtl ? 'سند بعدی' : 'Next Voucher'} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
+             </div>
+          )}
           <h2 className="text-lg font-bold text-slate-800">{currentVoucher.id && currentVoucher.status !== 'draft' && !isCopy ? t.edit : t.newVoucher}</h2>
           {currentVoucher.id && getStatusBadgeUI(currentVoucher.status)}
         </div>
@@ -991,7 +1038,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
       )}
 
       {/* Attachments & Print Modals */}
-      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
+      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="full">
          {voucherToPrint && window.VoucherPrint ? (
              <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
          ) : (
