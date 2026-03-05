@@ -274,8 +274,8 @@ const VoucherReview = ({ language = 'fa' }) => {
           });
         }
 
-        const allowedSysCodes = ['sys_opening', 'sys_general', 'sys_closing', 'sys_close_acc'];
-        const allDocTypes = doctypeData.filter(d => d.type === 'user' || allowedSysCodes.includes(d.code));
+        // کلیه انواع اسناد برای نمایش در Dropdown جستجوی پیشرفته
+        const allDocTypes = doctypeData;
 
         const perms = {
           actions: ['view'], 
@@ -292,9 +292,9 @@ const VoucherReview = ({ language = 'fa' }) => {
               if (window.USER_PERMISSIONS.has(`doc_review.${act}`)) perms.actions.push(act);
             });
             const scopes = window.USER_PERMISSIONS.dataScopes?.['doc_review'] || {};
-            perms.allowed_branches = scopes.branches || [];
-            perms.allowed_ledgers = scopes.ledgers || [];
-            perms.allowed_doc_types = scopes.doc_types || [];
+            perms.allowed_branches = scopes.allowed_branches || scopes.branches || [];
+            perms.allowed_ledgers = scopes.allowed_ledgers || scopes.ledgers || [];
+            perms.allowed_doc_types = scopes.allowed_doctypes || scopes.doc_types || [];
           }
         } else {
             perms.actions = ['view', 'edit', 'delete', 'print', 'attach', 'sort']; 
@@ -302,12 +302,12 @@ const VoucherReview = ({ language = 'fa' }) => {
 
         let filteredLedgers = ledData;
         let filteredBranches = brData.filter(b => b.is_active !== false);
+        // برای نمایش در لیست بازشوی فرم، هیچ نوع سندی را فیلتر نمی‌کنیم
         let filteredDocTypes = allDocTypes;
 
         if (!window.IS_ADMIN) {
-          if (perms.allowed_ledgers.length > 0) filteredLedgers = filteredLedgers.filter(l => perms.allowed_ledgers.includes(l.id));
+          if (perms.allowed_ledgers.length > 0) filteredLedgers = filteredLedgers.filter(l => perms.allowed_ledgers.includes(String(l.id)));
           if (perms.allowed_branches.length > 0) filteredBranches = filteredBranches.filter(b => perms.allowed_branches.includes(b.id));
-          if (perms.allowed_doc_types.length > 0) filteredDocTypes = filteredDocTypes.filter(d => perms.allowed_doc_types.includes(d.code));
         }
 
         setLookups({
@@ -355,7 +355,7 @@ const VoucherReview = ({ language = 'fa' }) => {
   if (isAppLoading || !lookups || !contextVals) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-slate-50">
-        <Loader2 size={40} className="animate-spin text-indigo-500 mb-4" />
+        <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
         <p className="text-slate-500 font-bold">{language === 'fa' ? 'در حال بارگذاری...' : 'Loading...'}</p>
       </div>
     );

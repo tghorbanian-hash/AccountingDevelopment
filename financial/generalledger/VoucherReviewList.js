@@ -47,7 +47,13 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
 
       if (!window.IS_ADMIN) {
         if (perms.allowed_branches.length > 0) query = query.in('branch_id', perms.allowed_branches);
-        if (perms.allowed_doc_types.length > 0) query = query.in('voucher_type', perms.allowed_doc_types);
+        
+        // اعمال دسترسی‌های انواع سند (اسناد کاربری همیشه مجاز هستند)
+        if (perms.allowed_doc_types && perms.allowed_doc_types.length > 0) {
+            const userTypes = lookups.docTypes.filter(d => d.type === 'user').map(d => d.code);
+            const combinedAllowed = [...perms.allowed_doc_types, ...userTypes];
+            query = query.in('voucher_type', combinedAllowed);
+        }
       }
 
       if (paramsObj.voucher_number) query = query.eq('voucher_number', paramsObj.voucher_number);
