@@ -125,6 +125,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
   const [data, setData] = useState({
      voucher: null,
      items: [],
+     orgName: '',
      fiscalYearTitle: '',
      ledgerTitle: '',
      baseCurrencyCode: '',
@@ -183,13 +184,16 @@ const VoucherPrint = ({ voucherId, onClose }) => {
 
        const userIds = [vData.created_by, vData.reviewed_by, vData.approved_by].filter(Boolean);
        
-       const [ledRes, brRes, usersRes, allAccRes, fpRes] = await Promise.all([
+       const [ledRes, brRes, usersRes, allAccRes, fpRes, orgRes] = await Promise.all([
           supabase.schema('gl').from('ledgers').select('title, currency').eq('id', vData.ledger_id).single(),
           vData.branch_id ? supabase.schema('gen').from('branches').select('title').eq('id', vData.branch_id).single() : { data: { title: '-' } },
           userIds.length > 0 ? supabase.schema('gen').from('users').select('id, party_id, full_name').in('id', userIds) : { data: [] },
           supabase.schema('gl').from('accounts').select('id, parent_id, level, full_code, title'),
-          supabase.schema('gl').from('fiscal_periods').select('year_id').eq('id', vData.fiscal_period_id).single()
+          supabase.schema('gl').from('fiscal_periods').select('year_id').eq('id', vData.fiscal_period_id).single(),
+          supabase.schema('gen').from('organization_info').select('*').limit(1).maybeSingle()
        ]);
+
+       const orgName = orgRes.data?.name || orgRes.data?.title || '';
 
        let fyTitle = '';
        if (fpRes.data?.year_id) {
@@ -259,6 +263,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
        setData({
            voucher: vData,
            items: mappedItems,
+           orgName: orgName,
            fiscalYearTitle: fyTitle,
            ledgerTitle: ledRes.data?.title || (isRtl ? 'نامشخص' : 'Unknown'),
            baseCurrencyCode: baseCurrencyCode,
@@ -370,7 +375,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
 
   if (!data.voucher) return <div className="p-10 text-center text-red-500">{t.notFound}</div>;
 
-  const { voucher, fiscalYearTitle, ledgerTitle, branchTitle, creatorName, reviewerName, approverName } = data;
+  const { voucher, orgName, fiscalYearTitle, ledgerTitle, branchTitle, creatorName, reviewerName, approverName } = data;
   const renderItems = processItemsForPrint();
 
   const showDetailsCol = printOptions.showDetails && printOptions.showDetailsColumn;
@@ -498,9 +503,10 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                            </div>
                        </div>
                        
-                       <div className="w-1/3 text-center flex flex-col gap-2 items-center">
+                       <div className="w-1/3 text-center flex flex-col gap-1.5 items-center">
                            <h1 className="text-xl font-black tracking-tight">{t.documentTitle}</h1>
-                           <div className="text-xs font-black text-slate-700 px-3 py-0.5 bg-slate-100 border border-slate-300 rounded print-bg-gray">
+                           {orgName && <h2 className="text-xl font-black tracking-tight text-slate-800">{orgName}</h2>}
+                           <div className="text-xs font-black text-slate-700 px-3 py-0.5 bg-slate-100 border border-slate-300 rounded print-bg-gray mt-0.5">
                                {getStatusText(voucher.status)}
                            </div>
                        </div>
