@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, Download, Paperclip, UploadCloud, X, File, Loader } from 'lucide-react';
 
-const VoucherAttachments = ({ voucherId, onClose, isRtl = true }) => {
+const VoucherAttachments = ({ voucherId, onClose, isRtl = true, readOnly = false }) => {
   const supabase = window.supabase;
   const [attachments, setAttachments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -34,12 +34,12 @@ const VoucherAttachments = ({ voucherId, onClose, isRtl = true }) => {
   };
 
   const handleFileUpload = async (e) => {
+    if (readOnly) return;
     const file = e.target.files[0];
     if (!file) return;
 
     setUploading(true);
     try {
-      // 1. Upload to Supabase Storage (Bucket must exist: 'attachments')
       const fileExt = file.name.split('.').pop();
       const fileName = `${voucherId}/${Date.now()}.${fileExt}`;
       
@@ -49,12 +49,10 @@ const VoucherAttachments = ({ voucherId, onClose, isRtl = true }) => {
 
       if (uploadError) throw uploadError;
 
-      // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage
         .from('attachments')
         .getPublicUrl(fileName);
 
-      // 3. Save to Database
       const attachmentData = {
         voucher_id: voucherId,
         file_name: file.name,
@@ -80,18 +78,17 @@ const VoucherAttachments = ({ voucherId, onClose, isRtl = true }) => {
   };
 
   const handleDelete = async (id, fileUrl) => {
+    if (readOnly) return;
     if (!window.confirm(isRtl ? 'آیا از حذف این فایل اطمینان دارید؟' : 'Delete this attachment?')) return;
     
     setLoading(true);
     try {
-      // Extract path from URL to delete from storage
       const urlParts = fileUrl.split('/attachments/');
       if (urlParts.length > 1) {
           const filePath = urlParts[1];
           await supabase.storage.from('attachments').remove([filePath]);
       }
 
-      // Delete from DB
       const { error } = await supabase.schema('gl')
         .from('voucher_attachments')
         .delete()
@@ -117,30 +114,32 @@ const VoucherAttachments = ({ voucherId, onClose, isRtl = true }) => {
 
   return (
     <div className={`flex flex-col gap-4 p-4 ${isRtl ? 'dir-rtl' : 'dir-ltr'}`}>
-      <div className="flex flex-col gap-2">
-         <input 
-            type="file" 
-            className="hidden" 
-            ref={fileInputRef} 
-            onChange={handleFileUpload} 
-         />
-         <div 
-            className="border-2 border-dashed border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-         >
-            {uploading ? (
-               <Loader size={32} className="text-indigo-500 animate-spin" />
-            ) : (
-               <UploadCloud size={32} className="text-indigo-400" />
-            )}
-            <div className="text-sm font-bold text-indigo-800">
-               {uploading ? (isRtl ? 'در حال آپلود...' : 'Uploading...') : (isRtl ? 'برای آپلود فایل جدید کلیک کنید' : 'Click to upload a new file')}
-            </div>
-            <p className="text-xs text-slate-500">
-               {isRtl ? 'فاکتورها، رسیدها و اسناد پشتیبان (حداکثر ۱۰ مگابایت)' : 'Invoices, receipts, and supporting documents (Max 10MB)'}
-            </p>
-         </div>
-      </div>
+      {!readOnly && (
+          <div className="flex flex-col gap-2">
+             <input 
+                type="file" 
+                className="hidden" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+             />
+             <div 
+                className="border-2 border-dashed border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 rounded-xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+             >
+                {uploading ? (
+                   <Loader size={32} className="text-indigo-500 animate-spin" />
+                ) : (
+                   <UploadCloud size={32} className="text-indigo-400" />
+                )}
+                <div className="text-sm font-bold text-indigo-800">
+                   {uploading ? (isRtl ? 'در حال آپلود...' : 'Uploading...') : (isRtl ? 'برای آپلود فایل جدید کلیک کنید' : 'Click to upload a new file')}
+                </div>
+                <p className="text-xs text-slate-500">
+                   {isRtl ? 'فاکتورها، رسیدها و اسناد پشتیبان (حداکثر ۱۰ مگابایت)' : 'Invoices, receipts, and supporting documents (Max 10MB)'}
+                </p>
+             </div>
+          </div>
+      )}
 
       <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar">
          {loading && !uploading && <div className="text-center text-slate-400 text-sm py-4">{isRtl ? 'در حال بارگذاری...' : 'Loading...'}</div>}
@@ -167,9 +166,11 @@ const VoucherAttachments = ({ voucherId, onClose, isRtl = true }) => {
                      <a href={att.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors" title={isRtl ? 'دانلود' : 'Download'}>
                          <Download size={16} />
                      </a>
-                     <button onClick={() => handleDelete(att.id, att.file_url)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title={isRtl ? 'حذف' : 'Delete'}>
-                         <Trash2 size={16} />
-                     </button>
+                     {!readOnly && (
+                         <button onClick={() => handleDelete(att.id, att.file_url)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title={isRtl ? 'حذف' : 'Delete'}>
+                             <Trash2 size={16} />
+                         </button>
+                     )}
                  </div>
              </div>
          ))}
