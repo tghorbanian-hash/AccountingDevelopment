@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, FileText, CheckCircle, FileWarning, Filter, 
-  Copy, Printer, Paperclip, DownloadCloud, FileSpreadsheet, Lock, Ban
+  Copy, Printer, Paperclip, DownloadCloud, FileSpreadsheet, Lock, Ban, ChevronDown
 } from 'lucide-react';
 
-const Vouchers = ({ language = 'fa' }) => {
+const Vouchers = ({ language = 'fa', setHeaderNode }) => {
   const { localTranslations, getStatusBadge, processCSVImport, generateCSVTemplate } = window.VoucherUtils || {};
   const VoucherForm = window.VoucherForm;
   
@@ -18,7 +18,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const fileInputRef = useRef(null);
 
-  // --- Resilient Permission Checks (Like Ledgers.js) ---
+  // --- Resilient Permission Checks ---
   const checkAccess = (action = null) => {
     if (!window.hasAccess) return false;
     const variations = ['doc_list', 'vouchers', '6ba74488-f6f0-4e23-8fc3-9cf6d7477e19'];
@@ -83,7 +83,6 @@ const Vouchers = ({ language = 'fa' }) => {
 
         setAccessLoading(true);
         
-        // استخراج عملیات‌های مجاز با استفاده از متد قدرتمند window.hasAccess
         const actions = [];
         if (checkAccess('view')) actions.push('view');
         if (checkAccess('create')) actions.push('create');
@@ -106,7 +105,6 @@ const Vouchers = ({ language = 'fa' }) => {
             allowed_doctypes: []
         };
         
-        // تلاش برای دریافت Data Scopes از دیتابیس (بدون نیاز به User ID)
         try {
              if (!window.IS_ADMIN) {
                  const { data: permData } = await supabase.schema('gen').from('permissions').select('data_scopes').eq('resource_code', 'doc_list');
@@ -133,6 +131,51 @@ const Vouchers = ({ language = 'fa' }) => {
     };
     init();
   }, []);
+
+  // --- Dynamic Header Injection ---
+  useEffect(() => {
+    if (setHeaderNode && fiscalYears.length > 0 && contextVals) {
+      const node = (
+        <div className="flex items-center bg-slate-100/80 hover:bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 transition-colors shadow-[inset_0_1px_3px_rgba(0,0,0,0.05)]">
+          <Filter size={14} className="text-indigo-500 mr-2 rtl:mr-0 rtl:ml-2" />
+          
+          <div className="relative flex items-center group">
+            <select 
+              value={contextVals.fiscal_year_id} 
+              onChange={e => setContextVals({...contextVals, fiscal_year_id: e.target.value})} 
+              className="bg-transparent border-none text-xs font-bold text-slate-600 group-hover:text-indigo-700 focus:ring-0 outline-none cursor-pointer appearance-none py-0 pl-1 pr-5 rtl:pr-1 rtl:pl-5 transition-colors z-10"
+            >
+              {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+            </select>
+            <ChevronDown size={12} className="absolute text-slate-400 right-1 rtl:right-auto rtl:left-1 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+          </div>
+
+          <div className="w-px h-4 bg-slate-300 mx-2"></div>
+          
+          {ledgers.length > 0 ? (
+            <div className="relative flex items-center group">
+              <select 
+                value={contextVals.ledger_id} 
+                onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} 
+                className="bg-transparent border-none text-xs font-bold text-slate-600 group-hover:text-indigo-700 focus:ring-0 outline-none cursor-pointer appearance-none py-0 pl-1 pr-5 rtl:pr-1 rtl:pl-5 transition-colors z-10 max-w-[150px] truncate"
+              >
+                {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+              </select>
+              <ChevronDown size={12} className="absolute text-slate-400 right-1 rtl:right-auto rtl:left-1 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+            </div>
+          ) : (
+            <span className="text-[11px] text-rose-500 font-bold px-1 flex items-center">{isRtl ? 'دفتری مجاز نیست' : 'No ledgers allowed'}</span>
+          )}
+        </div>
+      );
+      setHeaderNode(node);
+    }
+    
+    return () => {
+      if (setHeaderNode) setHeaderNode(null);
+    };
+  }, [fiscalYears, ledgers, contextVals, setHeaderNode, isRtl]);
+
 
   useEffect(() => {
     if (view === 'list' && contextVals.fiscal_year_id && contextVals.ledger_id && permissions) {
@@ -169,7 +212,6 @@ const Vouchers = ({ language = 'fa' }) => {
         safeFetch(supabase.schema('gen').from('currency_globals').select('*').limit(1))
     ]);
 
-    // سطح ۳: اعمال محدودیت شعب
     if (brData) {
         if (window.IS_ADMIN) {
             setBranches(brData.filter(b => b.is_active !== false));
@@ -186,7 +228,6 @@ const Vouchers = ({ language = 'fa' }) => {
 
     if (fyData) setFiscalYears(fyData);
 
-    // سطح ۳: اعمال محدودیت دفاتر
     let initialLedgerId = '';
     if (ledData) {
         if (window.IS_ADMIN) {
@@ -217,7 +258,6 @@ const Vouchers = ({ language = 'fa' }) => {
         return prev;
     });
 
-    // سطح ۳: اعمال محدودیت نوع سند
     if (doctypeData) {
         const allowedSysCodes = ['sys_general', 'sys_opening'];
         if (window.IS_ADMIN) {
@@ -262,11 +302,10 @@ const Vouchers = ({ language = 'fa' }) => {
         .select('*')
         .eq('fiscal_period_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
-        .in('status', ['draft', 'temporary']) // اعمال فیلتر وضعیتی مختص فرم ثبت سند
+        .in('status', ['draft', 'temporary']) 
         .order('voucher_date', { ascending: false })
         .order('voucher_number', { ascending: false });
       
-      // سطح ۳: سخت‌گیری روی کوئری 
       if (!window.IS_ADMIN) {
           if (permissions.allowed_branches && permissions.allowed_branches.length > 0) {
               query = query.in('branch_id', permissions.allowed_branches);
@@ -311,7 +350,6 @@ const Vouchers = ({ language = 'fa' }) => {
     }
   };
 
-  // --- Handlers ---
   const handleClearSearch = () => {
      const cleared = { voucher_number: '', description: '', from_date: '', to_date: '', status: '', voucher_type: '', account_id: '' };
      setSearchParams(cleared);
@@ -337,7 +375,6 @@ const Vouchers = ({ language = 'fa' }) => {
     setLoading(true);
     try {
         let updatePayload = { status: newStatus };
-        // Since we are not strictly bound to auth.user, we just update status without user IDs for now
         const { error } = await supabase.schema('gl').from('vouchers').update(updatePayload).in('id', selectedIds);
         if (error) throw error;
         setSelectedIds([]);
@@ -387,7 +424,6 @@ const Vouchers = ({ language = 'fa' }) => {
      }
   };
 
-  // --- Computed Data ---
   const validAccountsForLedger = useMemo(() => {
      const ledger = ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
      const ledgerStructure = String(ledger?.structure || '').trim();
@@ -403,7 +439,6 @@ const Vouchers = ({ language = 'fa' }) => {
   const allDraft = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'draft');
   const allTemp = selectedVouchers.length > 0 && selectedVouchers.every(v => v.status === 'temporary');
 
-  // --- Grid Columns ---
   const columns = [
     { field: 'voucher_number', header: t.voucherNumber || 'شماره سند', width: 'w-24', sortable: true },
     { field: 'voucher_date', header: t.date || 'تاریخ', width: 'w-24', sortable: true },
@@ -421,7 +456,6 @@ const Vouchers = ({ language = 'fa' }) => {
     { field: 'cross_reference', header: t.crossReference || 'عطف', width: 'w-24' }
   ];
 
-  // --- Render View Routing ---
   if (accessLoading) {
       return <div className="h-full flex flex-col items-center justify-center bg-slate-50 text-indigo-600 gap-4"><Lock className="animate-pulse" size={48}/><p className="font-bold">{isRtl ? 'در حال بررسی دسترسی‌ها...' : 'Checking permissions...'}</p></div>;
   }
@@ -456,28 +490,9 @@ const Vouchers = ({ language = 'fa' }) => {
       );
   }
 
-  // --- Main List Render ---
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50 ${isRtl ? 'font-vazir' : 'font-sans'}`}>
-      <div className="mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-2 text-indigo-800 font-bold text-sm">
-          <Filter size={18} className="text-indigo-500"/>
-          <span>{t.globalFiltersTitle || (isRtl ? 'فیلترهای سراسری' : 'Global Filters')}:</span>
-        </div>
-        <div className="flex gap-3">
-          <select value={contextVals.fiscal_year_id} onChange={e => setContextVals({...contextVals, fiscal_year_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
-            {fiscalYears.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-          </select>
-          {ledgers.length > 0 ? (
-            <select value={contextVals.ledger_id} onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
-              {ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-            </select>
-          ) : (
-            <span className="text-xs text-red-500 font-bold px-2 flex items-center">{isRtl ? 'دفتری مجاز نیست' : 'No ledgers allowed'}</span>
-          )}
-        </div>
-      </div>
-
+      
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
@@ -538,7 +553,7 @@ const Vouchers = ({ language = 'fa' }) => {
         <InputField label={t.description || 'شرح'} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
       </FilterSection>
 
-      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-4">
         <DataGrid 
           columns={columns} 
           data={vouchers} 

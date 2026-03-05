@@ -1,6 +1,6 @@
 /* Filename: financial/generalledger/VoucherReview.js */
 import React, { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Filter, ChevronDown } from 'lucide-react';
 
 const localTranslations = {
   en: {
@@ -52,7 +52,7 @@ const localTranslations = {
     zeroAmountError: 'Total amount cannot be zero. Please enter debit or credit values.',
     dualEntryError: 'A single row cannot have both debit and credit values.',
     reqFields: 'Description and Account are required for all items.',
-    globalFiltersTitle: 'Global System Context',
+    globalFiltersTitle: 'Global Filters',
     searchAccount: 'Search account code or title...',
     searchDetail: 'Search detail...',
     copyFromAbove: 'Copy from above',
@@ -156,7 +156,7 @@ const localTranslations = {
     zeroAmountError: 'مبلغ کل سند نمی‌تواند صفر باشد. لطفاً مقادیر بدهکار یا بستانکار را وارد کنید.',
     dualEntryError: 'یک ردیف نمی‌تواند همزمان هم بدهکار و هم بستانکار باشد.',
     reqFields: 'شرح و حساب معین برای تمامی اقلام اجباری است.',
-    globalFiltersTitle: 'فیلترهای عمومی سیستم',
+    globalFiltersTitle: 'فیلترهای سراسری',
     searchAccount: 'جستجوی کد یا عنوان معین...',
     searchDetail: 'جستجوی تفصیل...',
     copyFromAbove: 'کپی از ردیف بالا',
@@ -215,8 +215,9 @@ const localTranslations = {
 
 window.VoucherReviewTranslations = localTranslations;
 
-const VoucherReview = ({ language = 'fa' }) => {
+const VoucherReview = ({ language = 'fa', setHeaderNode }) => {
   const t = localTranslations[language] || localTranslations['en'];
+  const isRtl = language === 'fa';
   const supabase = window.supabase;
 
   const [isAppLoading, setIsAppLoading] = useState(true);
@@ -274,7 +275,6 @@ const VoucherReview = ({ language = 'fa' }) => {
           });
         }
 
-        // کلیه انواع اسناد برای نمایش در Dropdown جستجوی پیشرفته
         const allDocTypes = doctypeData;
 
         const perms = {
@@ -302,7 +302,6 @@ const VoucherReview = ({ language = 'fa' }) => {
 
         let filteredLedgers = ledData;
         let filteredBranches = brData.filter(b => b.is_active !== false);
-        // برای نمایش در لیست بازشوی فرم، هیچ نوع سندی را فیلتر نمی‌کنیم
         let filteredDocTypes = allDocTypes;
 
         if (!window.IS_ADMIN) {
@@ -337,6 +336,51 @@ const VoucherReview = ({ language = 'fa' }) => {
     initApp();
   }, []);
 
+  // --- Dynamic Header Injection ---
+  useEffect(() => {
+    if (setHeaderNode && lookups && contextVals) {
+      const node = (
+        <div className="flex items-center bg-slate-100/80 hover:bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 transition-colors shadow-[inset_0_1px_3px_rgba(0,0,0,0.05)]">
+          <Filter size={14} className="text-indigo-500 mr-2 rtl:mr-0 rtl:ml-2" />
+          
+          <div className="relative flex items-center group">
+            <select 
+              value={contextVals.fiscal_year_id} 
+              onChange={e => setContextVals({...contextVals, fiscal_year_id: e.target.value})} 
+              className="bg-transparent border-none text-xs font-bold text-slate-600 group-hover:text-indigo-700 focus:ring-0 outline-none cursor-pointer appearance-none py-0 pl-1 pr-5 rtl:pr-1 rtl:pl-5 transition-colors z-10"
+            >
+              {lookups.fiscalYears.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
+            </select>
+            <ChevronDown size={12} className="absolute text-slate-400 right-1 rtl:right-auto rtl:left-1 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+          </div>
+
+          <div className="w-px h-4 bg-slate-300 mx-2"></div>
+          
+          {lookups.ledgers.length > 0 ? (
+            <div className="relative flex items-center group">
+              <select 
+                value={contextVals.ledger_id} 
+                onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} 
+                className="bg-transparent border-none text-xs font-bold text-slate-600 group-hover:text-indigo-700 focus:ring-0 outline-none cursor-pointer appearance-none py-0 pl-1 pr-5 rtl:pr-1 rtl:pl-5 transition-colors z-10 max-w-[150px] truncate"
+              >
+                {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+              </select>
+              <ChevronDown size={12} className="absolute text-slate-400 right-1 rtl:right-auto rtl:left-1 pointer-events-none group-hover:text-indigo-500 transition-colors" />
+            </div>
+          ) : (
+            <span className="text-[11px] text-rose-500 font-bold px-1 flex items-center">{isRtl ? 'دفتری مجاز نیست' : 'No ledgers allowed'}</span>
+          )}
+        </div>
+      );
+      setHeaderNode(node);
+    }
+    
+    return () => {
+      if (setHeaderNode) setHeaderNode(null);
+    };
+  }, [lookups, contextVals, setHeaderNode, language, t, isRtl]);
+
+
   const handleOpenForm = (voucherId, currentList) => {
     setSelectedVoucherId(voucherId);
     if (currentList) setVouchersList(currentList);
@@ -355,7 +399,7 @@ const VoucherReview = ({ language = 'fa' }) => {
   if (isAppLoading || !lookups || !contextVals) {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-slate-50">
-        <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
+        <Loader2 size={40} className="animate-spin text-indigo-500 mb-4" />
         <p className="text-slate-500 font-bold">{language === 'fa' ? 'در حال بارگذاری...' : 'Loading...'}</p>
       </div>
     );

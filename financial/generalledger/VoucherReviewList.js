@@ -1,6 +1,6 @@
 /* Filename: financial/generalledger/VoucherReviewList.js */
 import React, { useState, useEffect } from 'react';
-import { Edit, Trash2, CheckCircle, FileWarning, Filter, Search, Printer, CheckSquare, Eye, ListOrdered, Paperclip } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, FileWarning, Search, Printer, CheckSquare, Eye, ListOrdered, Paperclip } from 'lucide-react';
 
 const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, perms, onOpenForm, onListUpdate }) => {
   const isRtl = language === 'fa';
@@ -281,20 +281,7 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
 
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
-      <div className="mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-2 text-indigo-800 font-bold text-sm">
-          <Filter size={18} className="text-indigo-500"/>
-          <span>{t.globalFiltersTitle}:</span>
-        </div>
-        <div className="flex gap-3">
-          <select value={contextVals.fiscal_year_id} onChange={e => setContextVals({...contextVals, fiscal_year_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
-            {lookups.fiscalYears.map(f => <option key={f.id} value={f.id}>{f.title}</option>)}
-          </select>
-          <select value={contextVals.ledger_id} onChange={e => setContextVals({...contextVals, ledger_id: e.target.value})} className="bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-3 py-1.5 text-xs font-bold outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200 transition-all">
-            {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-          </select>
-        </div>
-      </div>
+      {/* فیلتر سراسری از اینجا حذف شده است */}
 
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -311,7 +298,7 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
         )}
       </div>
 
-      <FilterSection onSearch={() => fetchVouchers(searchParams)} onClear={handleClearSearch} isRtl={isRtl} title={t.search}>
+      <FilterSection onSearch={() => fetchVouchers(searchParams)} onClear={handleClearSearch} isRtl={isRtl} title={t.search} defaultOpen={false}>
         <InputField label={t.voucherNumber} value={searchParams.voucher_number} onChange={e => setSearchParams({...searchParams, voucher_number: e.target.value})} isRtl={isRtl} dir="ltr" />
         <SelectField label={t.status} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value})} isRtl={isRtl}>
            <option value="">{t.all}</option>
@@ -328,7 +315,7 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
         <InputField label={t.description} value={searchParams.description} onChange={e => setSearchParams({...searchParams, description: e.target.value})} isRtl={isRtl} />
       </FilterSection>
 
-      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex-1 min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-4">
         <DataGrid 
           columns={columns} 
           data={vouchers} 
