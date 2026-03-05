@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { 
   BarChart3, Languages, Bell, Search, 
   ChevronRight, LogOut, LayoutGrid, ChevronRightSquare,
-  Menu, Circle, Book, Code
+  Menu, Circle, Book, Code, HelpCircle
 } from 'lucide-react';
 
 // --- Pure JS SHA-256 Fallback ---
@@ -89,7 +89,6 @@ window.USER_PERMISSIONS = new Set();
 window.IS_ADMIN = false;
 
 window.hasAccess = (resource, action = null) => {
-  // If user is Admin, grant full access immediately
   if (window.IS_ADMIN) return true;
 
   const permissions = window.USER_PERMISSIONS;
@@ -97,7 +96,6 @@ window.hasAccess = (resource, action = null) => {
 
   const resStr = String(resource).trim().toLowerCase();
 
-  // Level 1: Form Access
   if (!action) {
     if (permissions.has(resStr)) return true;
     for (const p of permissions) {
@@ -106,7 +104,6 @@ window.hasAccess = (resource, action = null) => {
     return false;
   }
 
-  // Level 2: Specific Action Check
   const actStr = String(action).trim().toLowerCase();
   
   if (permissions.has(`${resStr}.${actStr}`)) return true;
@@ -119,7 +116,7 @@ const App = () => {
   const translations = window.translations || { en: {}, fa: {} };
   const UI = window.UI || {};
   const { TreeMenu } = UI;
-  const PageDocumentation = window.PageDocumentation; // Load from window
+  const PageDocumentation = window.PageDocumentation; 
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -137,9 +134,8 @@ const App = () => {
   const [recoveryData, setRecoveryData] = useState({ otp: '', newPass: '', confirmPass: '' });
   const [error, setError] = useState('');
 
-  // Documentation States
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
-  const [docType, setDocType] = useState('user'); // 'user' or 'dev'
+  const [docType, setDocType] = useState('user'); 
 
   const t = translations[lang] || {};
   const isRtl = lang === 'fa';
@@ -275,25 +271,21 @@ const App = () => {
     window.IS_ADMIN = false;
   };
 
-  // --- Dynamic Menu & Permissions Logic ---
   useEffect(() => {
     if (!currentUser) return;
 
     const buildMenu = async () => {
       const rawMenu = window.MENU_DATA || [];
       
-      // Standardize user type string for accurate checking
       const userTypeRaw = currentUser.user_type || currentUser.UserType || '';
       const userTypeClean = String(userTypeRaw).trim().toLowerCase();
       
-      // Broadened list of valid admin types to ensure 'admin' is caught correctly
       const adminRoles = ['system admin', 'مدیر سیستم', 'admin', 'administrator', 'super admin'];
       const isSysAdmin = adminRoles.includes(userTypeClean);
       
       window.IS_ADMIN = isSysAdmin;
 
       if (isSysAdmin) {
-        // Admins skip all permission queries and get the full menu directly
         setMenuData(rawMenu);
         window.USER_PERMISSIONS = new Set(); 
         if (rawMenu.length > 0 && !activeModuleId) setActiveModuleId(rawMenu[0].id);
@@ -386,6 +378,34 @@ const App = () => {
     return menuData.find(m => m.id === activeModuleId) || menuData[0] || {};
   }, [activeModuleId, menuData]);
   
+  // تولید مسیر کامل فرم به صورت بازگشتی از درخت منو
+  const breadcrumbPath = useMemo(() => {
+    if (activeId === 'user_profile') return [t.profileTitle || (isRtl ? 'پروفایل کاربری' : 'User Profile')];
+    
+    let path = [];
+    const findPath = (nodes, id, currentPath) => {
+      for (const node of nodes) {
+        const nodeLabel = node.label ? node.label[lang] : node.id;
+        if (node.id === id) {
+          path = [...currentPath, nodeLabel];
+          return true;
+        }
+        if (node.children && node.children.length > 0) {
+          if (findPath(node.children, id, [...currentPath, nodeLabel])) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    if (currentModule && currentModule.children) {
+       findPath(currentModule.children, activeId, []);
+    }
+    
+    return path.length > 0 ? path : [t[activeId] || (isRtl ? 'داشبورد اصلی' : 'Main Dashboard')];
+  }, [activeId, currentModule, lang, isRtl, t]);
+
   const renderContent = () => {
     const { 
       KpiDashboard, UserManagement, GeneralWorkspace, ComponentShowcase, LoginPage, 
@@ -409,7 +429,6 @@ const App = () => {
     if (activeId === 'doc_types') return DocTypes ? <DocTypes t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: DocTypes Component Not Loaded</div>;
     if (activeId === 'auto_num') return AutoNumbering ? <AutoNumbering t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: AutoNumbering Component Not Loaded</div>;
     
-    // --- تغییرات فرم‌های اسناد حسابداری ---
     if (activeId === 'doc_list') return Vouchers ? <Vouchers language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error: Vouchers (ثبت سند) Component Not Loaded</div>;
     if (activeId === 'doc_review') return VoucherReview ? <VoucherReview language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error: VoucherReview (بررسی اسناد) Component Not Loaded</div>;
     if (activeId === 'doc_finalize') return VoucherFinalize ? <VoucherFinalize language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error: VoucherFinalize (قطعی کردن اسناد) Component Not Loaded</div>;
@@ -458,7 +477,6 @@ const App = () => {
     );
   }
 
-  // Handle Documentation Modal
   const openDocs = (type) => {
     setDocType(type);
     setIsDocModalOpen(true);
@@ -570,27 +588,24 @@ const App = () => {
                 {sidebarCollapsed ? <Menu size={20} /> : <ChevronRightSquare size={20} className={isRtl ? '' : 'rotate-180'} />}
              </button>
              
-             <div className="flex items-center gap-2 text-sm">
-                <span className="text-slate-400 font-medium hidden sm:inline">{currentModule.label ? currentModule.label[lang] : ''}</span>
-                <ChevronRight size={14} className={`text-slate-300 hidden sm:inline ${isRtl ? 'rotate-180' : ''}`} />
-                <span className="text-slate-800 font-bold whitespace-nowrap">{activeId === 'user_profile' ? (t.profileTitle || 'User Profile') : activeId}</span>
+             {/* مسیر سلسله مراتبی منو بدون نمایش حوزه و کد */}
+             <div className="flex items-center gap-2 text-sm font-medium">
+               {breadcrumbPath.map((item, index) => (
+                 <React.Fragment key={index}>
+                   {index > 0 && <ChevronRight size={14} className={`text-slate-300 shrink-0 ${isRtl ? 'rotate-180' : ''}`} />}
+                   <span className={index === breadcrumbPath.length - 1 ? "text-slate-800 font-bold" : "text-slate-400 hidden sm:inline"}>
+                     {item}
+                   </span>
+                 </React.Fragment>
+               ))}
              </div>
            </div>
 
-           {/* --- محل قرارگیری فیلترهای سراسری --- */}
            <div className="flex-1 flex justify-center px-4">
               {headerNode}
            </div>
 
            <div className="flex items-center justify-end gap-3 w-1/3">
-              <button 
-                onClick={() => openDocs('user')} 
-                className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors"
-                title={isRtl ? 'راهنمای کاربری' : 'User Guide'}
-              >
-                <Book size={18} />
-              </button>
-              
               <button 
                 onClick={() => openDocs('dev')} 
                 className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
@@ -611,6 +626,16 @@ const App = () => {
                     `}
                  />
               </div>
+
+              {/* آیکون راهنمای کاربری تغییر یافته و منتقل شده کنار زنگوله */}
+              <button 
+                onClick={() => openDocs('user')} 
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 hover:text-indigo-600 transition-colors"
+                title={isRtl ? 'راهنمای کاربری' : 'User Guide'}
+              >
+                <HelpCircle size={18} />
+              </button>
+
               <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors relative">
                  <Bell size={18} />
                  <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
