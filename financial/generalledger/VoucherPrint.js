@@ -153,11 +153,13 @@ const VoucherPrint = ({ voucherId, onClose }) => {
     const style = document.createElement('style');
     style.innerHTML = `
       @media print {
-        @page { size: A4 landscape; margin: 8mm; }
-        html, body, #root { 
-            height: auto !important; 
-            overflow: visible !important; 
-            background-color: white !important;
+        @page { size: A4 landscape; margin: 5mm; }
+        body * { visibility: hidden; }
+        #printable-voucher, #printable-voucher * { visibility: visible; }
+        #printable-voucher { 
+           position: absolute; left: 0; top: 0; width: 100%; 
+           padding: 0; background: white; margin: 0;
+           box-sizing: border-box;
         }
         .no-print { display: none !important; }
         .print-border { border: 1px solid #000 !important; }
@@ -416,6 +418,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
              <OptionCheckbox label={t.sumGroupAccount} optKey="sumGroupAccount" />
              <div className="h-px bg-slate-100 my-1"></div>
              
+             {/* Details Settings Nested */}
              <div className="flex flex-col gap-1 bg-slate-50 p-2 rounded border border-slate-100">
                  <OptionCheckbox label={t.showDetails} optKey="showDetails" />
                  <div className={`mr-6 rtl:mr-6 rtl:ml-0 ml-6 transition-opacity duration-200 ${printOptions.showDetails ? 'opacity-100' : 'opacity-40'}`}>
@@ -428,8 +431,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
           </div>
        </div>
 
-       {/* print:overflow-visible and print:h-auto remove the scroll restrictions for printing */}
-       <div className="flex flex-col h-full min-w-0 bg-slate-200 overflow-y-auto custom-scrollbar relative z-0 print:overflow-visible print:h-auto print:bg-white">
+       <div className="flex flex-col h-full min-w-0 bg-slate-200 overflow-y-auto custom-scrollbar relative z-0">
            <div className="no-print flex items-center justify-between bg-white border-b border-slate-300 p-4 shrink-0 shadow-sm sticky top-0 z-10">
               <div className="text-slate-600 text-sm font-bold flex items-center gap-2">
                  <Printer size={18} /> {t.previewTitle}
@@ -446,7 +448,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
               </div>
            </div>
 
-           <div className="p-4 md:p-8 flex justify-center print:p-0 print:m-0">
+           <div className="p-4 md:p-8 flex justify-center">
                <div id="printable-voucher" className="bg-white text-black shadow-lg mx-auto w-full max-w-[297mm] p-6 print:shadow-none print:max-w-none print:w-full print:p-0">
                    <div className="flex items-start justify-between border-b-2 border-slate-800 pb-4 mb-4 print-border-b">
                        <div className="w-1/3 flex flex-col gap-1 text-[11px]">
@@ -495,31 +497,27 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                        </div>
                    )}
 
-                   {/* table-fixed ensures widths are respected and table stays within 100% of parent width */}
-                   <table className="w-full text-[9px] mb-8 border-collapse border border-slate-800 print-border leading-tight table-fixed">
-                       <thead className="bg-slate-100 print-bg-gray font-bold text-center text-[10px]">
+                   <table className="w-full text-[10px] mb-8 border-collapse border border-slate-800 print-border leading-tight table-auto">
+                       <thead className="bg-slate-100 print-bg-gray font-bold text-center">
                            <tr>
-                               <th rowSpan={2} className="border border-slate-800 p-1 w-[3%] print-border">{t.row}</th>
-                               <th rowSpan={2} className="border border-slate-800 p-1 w-[6%] print-border">{t.accountCode}</th>
-                               <th rowSpan={2} className="border border-slate-800 p-1 w-[15%] print-border">{t.accountTitle}</th>
-                               {showDetailsCol && <th rowSpan={2} className="border border-slate-800 p-1 w-[12%] print-border">{t.detailsColumn}</th>}
+                               <th rowSpan={2} className="border border-slate-800 p-1 w-8 print-border">{t.row}</th>
+                               <th rowSpan={2} className="border border-slate-800 p-1 w-20 print-border">{t.accountCode}</th>
+                               <th rowSpan={2} className="border border-slate-800 p-1 min-w-[120px] print-border">{t.accountTitle}</th>
+                               {showDetailsCol && <th rowSpan={2} className="border border-slate-800 p-1 min-w-[100px] print-border">{t.detailsColumn}</th>}
+                               <th rowSpan={2} className="border border-slate-800 p-1 w-full print-border">{t.rowDescription}</th>
+                               {(printOptions.showTracking || printOptions.showQuantity) && <th rowSpan={2} className="border border-slate-800 p-1 w-20 print-border">{t.trackingQty}</th>}
                                
-                               {/* Description takes "auto" which means all remaining width */}
-                               <th rowSpan={2} className="border border-slate-800 p-1 w-auto print-border">{t.rowDescription}</th>
-                               
-                               {(printOptions.showTracking || printOptions.showQuantity) && <th rowSpan={2} className="border border-slate-800 p-1 w-[7%] print-border">{t.trackingQty}</th>}
-                               
-                               {printOptions.showBaseCurrency && <th colSpan={3} className="border border-slate-800 p-1 w-[20%] print-border">{t.baseGroup}</th>}
-                               {printOptions.showOpCurrency && <th colSpan={3} className="border border-slate-800 p-1 w-[20%] print-border">{t.opGroup}</th>}
+                               {printOptions.showBaseCurrency && <th colSpan={3} className="border border-slate-800 p-1 print-border">{t.baseGroup}</th>}
+                               {printOptions.showOpCurrency && <th colSpan={3} className="border border-slate-800 p-1 print-border">{t.opGroup}</th>}
                            </tr>
                            <tr>
-                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-[4%] print-border">{t.currencySimple}</th>}
-                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-[8%] print-border">{t.debitSimple}</th>}
-                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-[8%] print-border">{t.creditSimple}</th>}
+                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-12 print-border">{t.currencySimple}</th>}
+                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-24 print-border">{t.debitSimple}</th>}
+                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-24 print-border">{t.creditSimple}</th>}
                                
-                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-[4%] print-border">{t.currencySimple}</th>}
-                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-[8%] print-border">{t.debitSimple}</th>}
-                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-[8%] print-border">{t.creditSimple}</th>}
+                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-12 print-border">{t.currencySimple}</th>}
+                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-24 print-border">{t.debitSimple}</th>}
+                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-24 print-border">{t.creditSimple}</th>}
                            </tr>
                        </thead>
                        <tbody>
@@ -528,17 +526,17 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                                    const showSum = (it.rowType === 'group_header' && printOptions.sumGroupAccount) || (it.rowType === 'general_header' && printOptions.sumGeneralAccount);
                                    
                                    return (
-                                       <tr key={`header-${idx}`} className={it.rowType === 'group_header' ? 'bg-slate-200 print-bg-gray font-bold text-[10px]' : 'bg-slate-100 print-bg-gray font-bold text-[10px]'}>
+                                       <tr key={`header-${idx}`} className={it.rowType === 'group_header' ? 'bg-slate-200 print-bg-gray font-bold' : 'bg-slate-100 print-bg-gray font-bold'}>
                                            <td colSpan={showSum ? baseTextSpan : totalColsCount} className={`border border-slate-800 p-1.5 print-border ${isRtl ? 'text-right' : 'text-left'}`}>
                                                {it.title}
                                            </td>
                                            {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 print-border"></td>}
-                                           {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter whitespace-nowrap">{formatNum(it.debit)}</td>}
-                                           {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter whitespace-nowrap">{formatNum(it.credit)}</td>}
+                                           {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr whitespace-nowrap">{formatNum(it.debit)}</td>}
+                                           {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr whitespace-nowrap">{formatNum(it.credit)}</td>}
                                            
                                            {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1 print-border"></td>}
-                                           {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter whitespace-nowrap">{formatNum(it.op_debit)}</td>}
-                                           {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter whitespace-nowrap">{formatNum(it.op_credit)}</td>}
+                                           {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr whitespace-nowrap">{formatNum(it.op_debit)}</td>}
+                                           {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr whitespace-nowrap">{formatNum(it.op_credit)}</td>}
                                        </tr>
                                    );
                                }
@@ -552,51 +550,51 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                                               {it.account_title}
                                           </div>
                                           {printOptions.showDetails && !printOptions.showDetailsColumn && it.details_array.length > 0 && (
-                                              <div className={`text-[8px] text-slate-600 mt-1 flex flex-col gap-0.5 ${it.credit > 0 && isRtl ? 'pr-4' : (it.credit > 0 && !isRtl ? 'pl-4' : '')}`}>
+                                              <div className={`text-[9px] text-slate-600 mt-1 flex flex-col gap-0.5 ${it.credit > 0 && isRtl ? 'pr-4' : (it.credit > 0 && !isRtl ? 'pl-4' : '')}`}>
                                                   {it.details_array.map((d, i) => <div key={i}>{d}</div>)}
                                               </div>
                                           )}
                                        </td>
                                        
                                        {showDetailsCol && (
-                                       <td className="border border-slate-800 p-1 print-border align-top text-[8px] text-slate-700">
+                                       <td className="border border-slate-800 p-1 print-border align-top text-[9px] text-slate-700">
                                           {it.details_array.map((d, i) => <div key={i} className="mb-0.5 last:mb-0 break-words">{d}</div>)}
                                        </td>
                                        )}
 
-                                       <td className="border border-slate-800 p-1 print-border align-top break-words">{it.description}</td>
+                                       <td className="border border-slate-800 p-1 print-border align-top break-words min-w-[150px]">{it.description}</td>
                                        
                                        {(printOptions.showTracking || printOptions.showQuantity) && (
-                                       <td className="border border-slate-800 p-1 text-center font-mono text-[8.5px] print-border align-top whitespace-nowrap">
+                                       <td className="border border-slate-800 p-1 text-center font-mono text-[9px] print-border align-top whitespace-nowrap">
                                            {printOptions.showTracking && it.tracking_number ? <div>{t.trackingPrefix} {it.tracking_number} {it.tracking_date ? <br/> : ''} {it.tracking_date ? `(${it.tracking_date})` : ''}</div> : null}
                                            {printOptions.showQuantity && it.quantity ? <div className="mt-0.5">{t.qtyPrefix} {formatNum(it.quantity)}</div> : null}
                                        </td>
                                        )}
                                        
-                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-center font-mono print-border align-top whitespace-nowrap">{data.baseCurrencyCode}</td>}
-                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold print-border dir-ltr align-top tracking-tighter whitespace-nowrap">{it.debit > 0 ? formatNum(it.debit) : '-'}</td>}
-                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold print-border dir-ltr align-top tracking-tighter whitespace-nowrap">{it.credit > 0 ? formatNum(it.credit) : '-'}</td>}
+                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-center font-mono text-[9px] print-border align-top whitespace-nowrap">{data.baseCurrencyCode}</td>}
+                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold print-border dir-ltr align-top whitespace-nowrap">{it.debit > 0 ? formatNum(it.debit) : '-'}</td>}
+                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold print-border dir-ltr align-top whitespace-nowrap">{it.credit > 0 ? formatNum(it.credit) : '-'}</td>}
                                        
-                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-center font-mono print-border align-top whitespace-nowrap">{it.currency_code_display}</td>}
-                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold text-slate-600 print-border dir-ltr align-top tracking-tighter whitespace-nowrap">{it.op_debit > 0 ? formatNum(it.op_debit) : '-'}</td>}
-                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold text-slate-600 print-border dir-ltr align-top tracking-tighter whitespace-nowrap">{it.op_credit > 0 ? formatNum(it.op_credit) : '-'}</td>}
+                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-center font-mono text-[9px] print-border align-top whitespace-nowrap">{it.currency_code_display}</td>}
+                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold text-slate-600 print-border dir-ltr align-top whitespace-nowrap">{it.op_debit > 0 ? formatNum(it.op_debit) : '-'}</td>}
+                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold text-slate-600 print-border dir-ltr align-top whitespace-nowrap">{it.op_credit > 0 ? formatNum(it.op_credit) : '-'}</td>}
                                    </tr>
                                );
                            })}
                        </tbody>
-                       <tfoot className="bg-slate-100 print-bg-gray font-black text-[10px]">
+                       <tfoot className="bg-slate-100 print-bg-gray font-black">
                            <tr>
                                <td colSpan={baseTextSpan} className={`border border-slate-800 p-1.5 print-border ${isRtl ? 'text-left' : 'text-right'}`}>{t.total}</td>
                                
                                {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 print-border"></td>}
-                               {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter whitespace-nowrap">{formatNum(voucher.total_debit)}</td>}
-                               {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter whitespace-nowrap">{formatNum(voucher.total_credit)}</td>}
+                               {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr whitespace-nowrap">{formatNum(voucher.total_debit)}</td>}
+                               {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr whitespace-nowrap">{formatNum(voucher.total_credit)}</td>}
                                
                                {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 print-border"></td>}
-                               {printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr text-slate-700 tracking-tighter whitespace-nowrap">
+                               {printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr text-slate-700 whitespace-nowrap">
                                    {formatNum(renderItems.reduce((acc, it) => acc + (it.rowType === 'item' ? (Number(it.op_debit) || 0) : 0), 0))}
                                </td>}
-                               {printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr text-slate-700 tracking-tighter whitespace-nowrap">
+                               {printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr text-slate-700 whitespace-nowrap">
                                    {formatNum(renderItems.reduce((acc, it) => acc + (it.rowType === 'item' ? (Number(it.op_credit) || 0) : 0), 0))}
                                </td>}
                            </tr>
@@ -604,7 +602,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                    </table>
 
                    {printOptions.showSignatures && (
-                   <div className="flex items-start justify-between mt-12 pt-4 px-8 text-[11px] no-print-break">
+                   <div className="flex items-start justify-between mt-12 pt-4 px-8 text-[11px]">
                        <div className="text-center w-1/3">
                            <div className="font-bold text-slate-600 mb-12">{t.issuer}</div>
                            <div className="border-t border-slate-400 border-dashed pt-2 mx-8 font-bold text-slate-800">
