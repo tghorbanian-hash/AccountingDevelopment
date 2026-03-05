@@ -28,11 +28,11 @@ export const GL_MENU = {
     },
     {
       id: 'gl_docs',
-      label: { en: 'Document Management', fa: 'مدیریت اسناد' },
+      label: { en: 'Voucher Management', fa: 'مدیریت اسناد' },
       children: [
         { id: 'doc_list', label: { en: 'Voucher Entry', fa: 'ثبت سند' } },
         { id: 'doc_review', label: { en: 'Voucher Review', fa: 'بررسی اسناد' } },
-        { id: 'doc_finalize', label: { en: 'Finalize Documents', fa: 'قطعی کردن اسناد' } },
+        { id: 'doc_finalize', label: { en: 'Voucher Finalize', fa: 'قطعی کردن اسناد' } },
         { id: 'voucher_list_view', label: { en: 'Vouchers List', fa: 'فهرست اسناد' } },
       ]
     },
@@ -83,10 +83,10 @@ export const GL_TRANS = {
     description: "Description",
     save_success: "Settings saved successfully.",
 
-    // Document Management
-    acc_mgmt_title: "Accounting Document Management",
-    acc_mgmt_subtitle: "List of all financial documents with search and batch operation capabilities",
-    grid_title: "Document List",
+    // Voucher Management
+    acc_mgmt_title: "Accounting Voucher Management",
+    acc_mgmt_subtitle: "List of all financial vouchers with search and batch operation capabilities",
+    grid_title: "Voucher List",
     col_docNo: "Doc No",
     col_date: "Date",
     col_dept: "Department",
@@ -102,20 +102,20 @@ export const GL_TRANS = {
     filter_toDoc: "To Doc No",
     filter_fromDate: "From Date",
     filter_toDate: "To Date",
-    filter_status: "Document Status",
+    filter_status: "Voucher Status",
     filter_costCenter: "Cost Center",
     filter_subsidiary: "Subsidiary Account",
     filter_allStatus: "All Statuses",
-    modal_newDoc: "New Document",
-    modal_editDoc: "Edit Document",
-    modal_warning: "Note: Changes to final documents require financial manager approval.",
+    modal_newDoc: "New Voucher",
+    modal_editDoc: "Edit Voucher",
+    modal_warning: "Note: Changes to final vouchers require financial manager approval.",
     field_docType: "Document Type",
     field_general: "General",
     field_opening: "Opening",
     field_party: "Party",
     field_selectParty: "Select Person...",
-    field_amount: "Document Amount",
-    field_isActive: "Active Document",
+    field_amount: "Voucher Amount",
+    field_isActive: "Active Voucher",
 
     // Ledgers Page
     ledgers_title: "Ledgers Management",
@@ -203,10 +203,10 @@ export const GL_TRANS = {
 
     // Auto Numbering Page
     an_title: "Auto Numbering Settings",
-    an_subtitle: "Configure numbering logic for Details, Accounts, and Documents",
+    an_subtitle: "Configure numbering logic for Details, Accounts, and Vouchers",
     an_tab_details: "Detail Numbering",
     an_tab_accounts: "Account Numbering",
-    an_tab_docs: "Document Numbering",
+    an_tab_docs: "Voucher Numbering",
     
     // AN - Details
     an_dt_type: "Detail Type",
@@ -266,7 +266,7 @@ export const GL_TRANS = {
     description: "توضیحات",
     save_success: "تنظیمات با موفقیت ذخیره شد.",
 
-    // Document Management
+    // Voucher Management
     acc_mgmt_title: "مدیریت اسناد حسابداری",
     acc_mgmt_subtitle: "لیست کلیه اسناد مالی با قابلیت جستجو و عملیات گروهی",
     grid_title: "لیست اسناد",
