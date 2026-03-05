@@ -262,6 +262,7 @@ const Vouchers = ({ language = 'fa' }) => {
         .select('*')
         .eq('fiscal_period_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
+        .in('status', ['draft', 'temporary']) // اعمال فیلتر وضعیتی مختص فرم ثبت سند
         .order('voucher_date', { ascending: false })
         .order('voucher_number', { ascending: false });
       
@@ -363,7 +364,7 @@ const Vouchers = ({ language = 'fa' }) => {
 
   const promptDelete = (voucher) => {
     if (!permissions?.actions?.includes('delete')) return;
-    if (voucher.status === 'reviewed' || voucher.status === 'final') return;
+    if (voucher.status === 'reviewed' || voucher.status === 'finalized') return;
     setVoucherToDelete(voucher);
     setShowDeleteModal(true);
   };
@@ -514,8 +515,6 @@ const Vouchers = ({ language = 'fa' }) => {
            <option value="">{t.all || 'همه'}</option>
            <option value="draft">{t.statusDraft || 'یادداشت'}</option>
            <option value="temporary">{t.statusTemporary || 'موقت'}</option>
-           <option value="reviewed">{t.statusReviewed || 'بررسی شده'}</option>
-           <option value="final">{t.statusFinal || 'قطعی'}</option>
         </SelectField>
         <InputField type="date" label={t.fromDate || 'از تاریخ'} value={searchParams.from_date} onChange={e => setSearchParams({...searchParams, from_date: e.target.value})} isRtl={isRtl} />
         <InputField type="date" label={t.toDate || 'تا تاریخ'} value={searchParams.to_date} onChange={e => setSearchParams({...searchParams, to_date: e.target.value})} isRtl={isRtl} />

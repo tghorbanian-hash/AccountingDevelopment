@@ -418,8 +418,10 @@ const VoucherPrint = ({ voucherId, onClose }) => {
     switch(status) {
        case 'temporary': return t.statusTemporary;
        case 'reviewed': return t.statusReviewed;
+       case 'finalized': 
        case 'final': return t.statusFinal;
-       case 'draft': default: return t.statusDraft;
+       case 'draft': 
+       default: return t.statusDraft;
     }
   };
 
