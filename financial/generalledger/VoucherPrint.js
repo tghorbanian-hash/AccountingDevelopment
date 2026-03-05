@@ -282,8 +282,6 @@ const VoucherPrint = ({ voucherId, onClose }) => {
       const items = data.items || [];
       let sorted = [...items];
       
-      // Default Sort by Row Number. 
-      // If user checks "Group by Account", we MUST sort by Account Code first, else groups will be broken.
       if (printOptions.showGeneralAccount || printOptions.showGroupAccount) {
           sorted.sort((a, b) => {
               const codeDiff = (a.account_code || '').localeCompare(b.account_code || '');
@@ -379,21 +377,19 @@ const VoucherPrint = ({ voucherId, onClose }) => {
   const baseTextSpan = 4 + (showDetailsCol ? 1 : 0) + ((printOptions.showTracking || printOptions.showQuantity) ? 1 : 0);
   const totalColsCount = baseTextSpan + (printOptions.showBaseCurrency ? 3 : 0) + (printOptions.showOpCurrency ? 3 : 0);
 
-  // Dynamic Column Width Engine (Percentage based weights)
-  // Ensures table width is exactly 100% and proportions adapt fluidly.
   const colsConfig = [
-    { key: 'row', weight: 4.5, show: true },                  // +10%
+    { key: 'row', weight: 4.5, show: true },                  
     { key: 'code', weight: 7, show: true },
-    { key: 'title', weight: 15, show: true },                 // -25%
-    { key: 'details', weight: 12, show: showDetailsCol },     // -15%
-    { key: 'desc', weight: 16, show: true },                  // -15%
-    { key: 'tracking', weight: 9.5, show: printOptions.showTracking || printOptions.showQuantity }, // + increased
+    { key: 'title', weight: 15, show: true },                 
+    { key: 'details', weight: 12, show: showDetailsCol },     
+    { key: 'desc', weight: 16, show: true },                  
+    { key: 'tracking', weight: 9.5, show: printOptions.showTracking || printOptions.showQuantity }, 
     { key: 'base_curr', weight: 3.5, show: printOptions.showBaseCurrency }, 
-    { key: 'base_deb', weight: 11.5, show: printOptions.showBaseCurrency }, // + increased
-    { key: 'base_cred', weight: 11.5, show: printOptions.showBaseCurrency }, // + increased
+    { key: 'base_deb', weight: 11.5, show: printOptions.showBaseCurrency }, 
+    { key: 'base_cred', weight: 11.5, show: printOptions.showBaseCurrency }, 
     { key: 'op_curr', weight: 3.5, show: printOptions.showOpCurrency },
-    { key: 'op_deb', weight: 11.5, show: printOptions.showOpCurrency }, // + increased
-    { key: 'op_cred', weight: 11.5, show: printOptions.showOpCurrency }, // + increased
+    { key: 'op_deb', weight: 11.5, show: printOptions.showOpCurrency }, 
+    { key: 'op_cred', weight: 11.5, show: printOptions.showOpCurrency }, 
   ];
 
   const totalWeight = colsConfig.filter(c => c.show).reduce((sum, c) => sum + c.weight, 0);
@@ -538,7 +534,6 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                        </div>
                    )}
 
-                   {/* table-fixed explicitly enforces percentage widths without expanding content */}
                    <table className="w-full text-[9px] mb-8 border-collapse border border-slate-800 print-border leading-tight table-fixed">
                        <thead className="bg-slate-100 print-bg-gray font-bold text-center text-[10px]">
                            <tr>
@@ -575,12 +570,12 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                                                {it.title}
                                            </td>
                                            {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 print-border"></td>}
-                                           {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter truncate">{formatNum(it.debit)}</td>}
-                                           {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter truncate">{formatNum(it.credit)}</td>}
+                                           {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter break-all">{formatNum(it.debit)}</td>}
+                                           {showSum && printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter break-all">{formatNum(it.credit)}</td>}
                                            
                                            {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1 print-border"></td>}
-                                           {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter truncate">{formatNum(it.op_debit)}</td>}
-                                           {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter truncate">{formatNum(it.op_credit)}</td>}
+                                           {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter break-all">{formatNum(it.op_debit)}</td>}
+                                           {showSum && printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter break-all">{formatNum(it.op_credit)}</td>}
                                        </tr>
                                    );
                                }
@@ -609,19 +604,19 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                                        <td className="border border-slate-800 p-1 print-border align-top break-words">{it.description}</td>
                                        
                                        {(printOptions.showTracking || printOptions.showQuantity) && (
-                                       <td className="border border-slate-800 p-1 text-center font-mono text-[8.5px] print-border align-top break-words">
+                                       <td className="border border-slate-800 p-1 text-center font-mono text-[8.5px] print-border align-top break-all">
                                            {printOptions.showTracking && it.tracking_number ? <div>{t.trackingPrefix} {it.tracking_number} {it.tracking_date ? <br/> : ''} {it.tracking_date ? `(${it.tracking_date})` : ''}</div> : null}
                                            {printOptions.showQuantity && it.quantity ? <div className="mt-0.5">{t.qtyPrefix} {formatNum(it.quantity)}</div> : null}
                                        </td>
                                        )}
                                        
-                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-center font-mono print-border align-top truncate">{data.baseCurrencyCode}</td>}
-                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold print-border dir-ltr align-top tracking-tighter truncate">{it.debit > 0 ? formatNum(it.debit) : '-'}</td>}
-                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold print-border dir-ltr align-top tracking-tighter truncate">{it.credit > 0 ? formatNum(it.credit) : '-'}</td>}
+                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-center font-mono print-border align-top break-all">{data.baseCurrencyCode}</td>}
+                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold print-border dir-ltr align-top tracking-tighter break-all">{it.debit > 0 ? formatNum(it.debit) : '-'}</td>}
+                                       {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold print-border dir-ltr align-top tracking-tighter break-all">{it.credit > 0 ? formatNum(it.credit) : '-'}</td>}
                                        
-                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-center font-mono print-border align-top truncate">{it.currency_code_display}</td>}
-                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold text-slate-600 print-border dir-ltr align-top tracking-tighter truncate">{it.op_debit > 0 ? formatNum(it.op_debit) : '-'}</td>}
-                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold text-slate-600 print-border dir-ltr align-top tracking-tighter truncate">{it.op_credit > 0 ? formatNum(it.op_credit) : '-'}</td>}
+                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-center font-mono print-border align-top break-all">{it.currency_code_display}</td>}
+                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold text-slate-600 print-border dir-ltr align-top tracking-tighter break-all">{it.op_debit > 0 ? formatNum(it.op_debit) : '-'}</td>}
+                                       {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 text-right font-mono font-bold text-slate-600 print-border dir-ltr align-top tracking-tighter break-all">{it.op_credit > 0 ? formatNum(it.op_credit) : '-'}</td>}
                                    </tr>
                                );
                            })}
@@ -631,14 +626,14 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                                <td colSpan={baseTextSpan} className={`border border-slate-800 p-1.5 print-border ${isRtl ? 'text-left' : 'text-right'}`}>{t.total}</td>
                                
                                {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1 print-border"></td>}
-                               {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter truncate">{formatNum(voucher.total_debit)}</td>}
-                               {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter truncate">{formatNum(voucher.total_credit)}</td>}
+                               {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter break-all">{formatNum(voucher.total_debit)}</td>}
+                               {printOptions.showBaseCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr tracking-tighter break-all">{formatNum(voucher.total_credit)}</td>}
                                
                                {printOptions.showOpCurrency && <td className="border border-slate-800 p-1 print-border"></td>}
-                               {printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr text-slate-700 tracking-tighter truncate">
+                               {printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr text-slate-700 tracking-tighter break-all">
                                    {formatNum(renderItems.reduce((acc, it) => acc + (it.rowType === 'item' ? (Number(it.op_debit) || 0) : 0), 0))}
                                </td>}
-                               {printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr text-slate-700 tracking-tighter truncate">
+                               {printOptions.showOpCurrency && <td className="border border-slate-800 p-1.5 text-right font-mono print-border dir-ltr text-slate-700 tracking-tighter break-all">
                                    {formatNum(renderItems.reduce((acc, it) => acc + (it.rowType === 'item' ? (Number(it.op_credit) || 0) : 0), 0))}
                                </td>}
                            </tr>
