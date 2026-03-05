@@ -494,30 +494,29 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                        </div>
                    )}
 
-                   <table className="w-full text-[9px] mb-8 border-collapse border border-slate-800 print-border leading-tight table-auto">
+                   <table className="w-full text-[9px] mb-8 border-collapse border border-slate-800 print-border leading-tight table-fixed">
                        <thead className="bg-slate-100 print-bg-gray font-bold text-center text-[10px]">
                            <tr>
-                               <th rowSpan={2} className="border border-slate-800 p-1 w-[20px] print-border">{t.row}</th>
-                               <th rowSpan={2} className="border border-slate-800 p-1 whitespace-nowrap print-border">{t.accountCode}</th>
-                               <th rowSpan={2} className="border border-slate-800 p-1 min-w-[100px] max-w-[180px] print-border">{t.accountTitle}</th>
-                               {showDetailsCol && <th rowSpan={2} className="border border-slate-800 p-1 min-w-[90px] max-w-[150px] print-border">{t.detailsColumn}</th>}
+                               <th rowSpan={2} className="border border-slate-800 p-1 w-[3%] print-border">{t.row}</th>
+                               <th rowSpan={2} className="border border-slate-800 p-1 w-[6%] print-border">{t.accountCode}</th>
+                               <th rowSpan={2} className="border border-slate-800 p-1 w-[25%] print-border">{t.accountTitle}</th>
+                               {showDetailsCol && <th rowSpan={2} className="border border-slate-800 p-1 w-[20%] print-border">{t.detailsColumn}</th>}
                                
-                               {/* w-full forces description to take all remaining flexible space */}
-                               <th rowSpan={2} className="border border-slate-800 p-1 w-full print-border">{t.rowDescription}</th>
+                               <th rowSpan={2} className="border border-slate-800 p-1 w-auto print-border">{t.rowDescription}</th>
                                
-                               {(printOptions.showTracking || printOptions.showQuantity) && <th rowSpan={2} className="border border-slate-800 p-1 whitespace-nowrap print-border">{t.trackingQty}</th>}
+                               {(printOptions.showTracking || printOptions.showQuantity) && <th rowSpan={2} className="border border-slate-800 p-1 w-[7%] print-border">{t.trackingQty}</th>}
                                
-                               {printOptions.showBaseCurrency && <th colSpan={3} className="border border-slate-800 p-1 print-border">{t.baseGroup}</th>}
-                               {printOptions.showOpCurrency && <th colSpan={3} className="border border-slate-800 p-1 print-border">{t.opGroup}</th>}
+                               {printOptions.showBaseCurrency && <th colSpan={3} className="border border-slate-800 p-1 w-[20%] print-border">{t.baseGroup}</th>}
+                               {printOptions.showOpCurrency && <th colSpan={3} className="border border-slate-800 p-1 w-[20%] print-border">{t.opGroup}</th>}
                            </tr>
                            <tr>
-                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-[30px] print-border">{t.currencySimple}</th>}
-                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 whitespace-nowrap min-w-[70px] print-border">{t.debitSimple}</th>}
-                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 whitespace-nowrap min-w-[70px] print-border">{t.creditSimple}</th>}
+                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-[4%] print-border">{t.currencySimple}</th>}
+                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-[8%] print-border">{t.debitSimple}</th>}
+                               {printOptions.showBaseCurrency && <th className="border border-slate-800 p-1 w-[8%] print-border">{t.creditSimple}</th>}
                                
-                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-[30px] print-border">{t.currencySimple}</th>}
-                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 whitespace-nowrap min-w-[70px] print-border">{t.debitSimple}</th>}
-                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 whitespace-nowrap min-w-[70px] print-border">{t.creditSimple}</th>}
+                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-[4%] print-border">{t.currencySimple}</th>}
+                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-[8%] print-border">{t.debitSimple}</th>}
+                               {printOptions.showOpCurrency && <th className="border border-slate-800 p-1 w-[8%] print-border">{t.creditSimple}</th>}
                            </tr>
                        </thead>
                        <tbody>
@@ -562,7 +561,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                                        </td>
                                        )}
 
-                                       <td className="border border-slate-800 p-1 print-border align-top break-words min-w-[120px]">{it.description}</td>
+                                       <td className="border border-slate-800 p-1 print-border align-top break-words">{it.description}</td>
                                        
                                        {(printOptions.showTracking || printOptions.showQuantity) && (
                                        <td className="border border-slate-800 p-1 text-center font-mono text-[8.5px] print-border align-top whitespace-nowrap">
