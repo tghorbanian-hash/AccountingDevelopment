@@ -1049,20 +1049,17 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
          )}
       </Modal>
 
-      {/* Print Full Screen Overlay */}
-      {!!voucherToPrint && (
-          <div className="fixed inset-0 z-[9999] bg-slate-50 flex flex-col w-screen h-screen overflow-hidden">
-             {window.VoucherPrint ? (
-                 <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
-             ) : (
-                 <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4 h-full">
-                    <FileWarning size={48} className="text-amber-400" />
-                    <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
-                    <Button variant="outline" onClick={() => setVoucherToPrint(null)}>{t.cancel || 'بستن'}</Button>
-                 </div>
-             )}
-          </div>
-      )}
+      {/* Print Modal */}
+      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="full">
+         {voucherToPrint && window.VoucherPrint ? (
+             <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
+         ) : (
+             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                <FileWarning size={48} className="text-amber-400" />
+                <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
+             </div>
+         )}
+      </Modal>
 
     </div>
   );
