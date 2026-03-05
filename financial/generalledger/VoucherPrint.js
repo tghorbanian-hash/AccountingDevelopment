@@ -184,22 +184,19 @@ const VoucherPrint = ({ voucherId, onClose }) => {
 
        const userIds = [vData.created_by, vData.reviewed_by, vData.approved_by].filter(Boolean);
        
-       const [ledRes, brRes, usersRes, allAccRes, fpRes, orgRes] = await Promise.all([
+       const [ledRes, brRes, usersRes, allAccRes, fyRes, orgRes, currGlobalsRes] = await Promise.all([
           supabase.schema('gl').from('ledgers').select('title, currency').eq('id', vData.ledger_id).single(),
           vData.branch_id ? supabase.schema('gen').from('branches').select('title').eq('id', vData.branch_id).single() : { data: { title: '-' } },
           userIds.length > 0 ? supabase.schema('gen').from('users').select('id, party_id, full_name').in('id', userIds) : { data: [] },
           supabase.schema('gl').from('accounts').select('id, parent_id, level, full_code, title'),
-          supabase.schema('gl').from('fiscal_periods').select('year_id').eq('id', vData.fiscal_period_id).single(),
-          supabase.schema('gen').from('organization_info').select('*').limit(1).maybeSingle()
+          vData.fiscal_year_id ? supabase.schema('gl').from('fiscal_years').select('title').eq('id', vData.fiscal_year_id).single() : { data: null },
+          supabase.schema('gen').from('organization_info').select('*').limit(1).maybeSingle(),
+          supabase.schema('gen').from('currency_globals').select('op_currency').limit(1).maybeSingle()
        ]);
 
        const orgName = orgRes.data?.name || orgRes.data?.title || '';
-
-       let fyTitle = '';
-       if (fpRes.data?.year_id) {
-          const { data: fyData } = await supabase.schema('gl').from('fiscal_years').select('title').eq('id', fpRes.data.year_id).single();
-          fyTitle = fyData?.title || '';
-       }
+       const fyTitle = fyRes.data?.title || '';
+       const opCurrGlobal = currGlobalsRes.data?.op_currency || '-';
 
        const accountsMap = new Map();
        (allAccRes.data || []).forEach(a => accountsMap.set(a.id, a));
@@ -242,7 +239,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
 
            const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
            const selectedDetails = detailsObj.selected_details || {};
-           const currencyCode = detailsObj.currency_code || '-';
+           const currencyCode = item.currency_code || detailsObj.currency_code || opCurrGlobal;
            
            const detailArray = Object.values(selectedDetails).map(dId => {
                const d = detailsMap.get(dId);
@@ -513,7 +510,7 @@ const VoucherPrint = ({ voucherId, onClose }) => {
                            </div>
                        </div>
                        
-                       <div className="w-1/3 flex flex-col gap-1 text-[11px] items-end">
+                       <div className="w-1/3 flex flex-col gap-1 text-[11px items-end">
                            <div className="flex items-center gap-1">
                                <span className="font-bold">{t.voucherNumber}</span> 
                                <span className="font-mono dir-ltr inline-block text-[13px] font-bold">{voucher.voucher_number || '-'}</span>

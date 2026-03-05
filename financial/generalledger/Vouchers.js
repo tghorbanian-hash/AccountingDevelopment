@@ -18,7 +18,6 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
 
   const fileInputRef = useRef(null);
 
-  // --- Resilient Permission Checks ---
   const checkAccess = (action = null) => {
     if (!window.hasAccess) return false;
     const variations = ['doc_list', 'vouchers', '6ba74488-f6f0-4e23-8fc3-9cf6d7477e19'];
@@ -31,17 +30,14 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
   const canEnterForm = checkAccess(); 
   const canView   = canEnterForm || checkAccess('view') || checkAccess('read') || checkAccess('show');
 
-  // --- Security States ---
   const [permissions, setPermissions] = useState(null);
   const [accessLoading, setAccessLoading] = useState(true);
 
-  // --- Main States ---
   const [view, setView] = useState('list');
   const [loading, setLoading] = useState(false);
   const [currentVoucherId, setCurrentVoucherId] = useState(null);
   const [isCopying, setIsCopying] = useState(false);
   
-  // --- Data States ---
   const [vouchers, setVouchers] = useState([]);
   const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
   const [searchParams, setSearchParams] = useState({ 
@@ -49,17 +45,16 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
   });
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // --- Modals ---
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState(null);
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
-  // --- Lookups States ---
   const [accounts, setAccounts] = useState([]);
   const [accountStructures, setAccountStructures] = useState([]);
   const [branches, setBranches] = useState([]);
   const [fiscalYears, setFiscalYears] = useState([]);
+  const [fiscalPeriods, setFiscalPeriods] = useState([]);
   const [ledgers, setLedgers] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
   const [currencies, setCurrencies] = useState([]);
@@ -68,12 +63,11 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
   const [allDetailInstances, setAllDetailInstances] = useState([]);
 
   const lookups = useMemo(() => ({
-      accounts, accountStructures, branches, fiscalYears, ledgers, 
+      accounts, accountStructures, branches, fiscalYears, fiscalPeriods, ledgers, 
       docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances,
       permissions
-  }), [accounts, accountStructures, branches, fiscalYears, ledgers, docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances, permissions]);
+  }), [accounts, accountStructures, branches, fiscalYears, fiscalPeriods, ledgers, docTypes, currencies, currencyGlobals, detailTypes, allDetailInstances, permissions]);
 
-  // --- Initialization & Security ---
   useEffect(() => {
     const init = async () => {
         if (!canView && !window.IS_ADMIN) {
@@ -132,7 +126,6 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
     init();
   }, []);
 
-  // --- Dynamic Header Injection ---
   useEffect(() => {
     if (setHeaderNode && fiscalYears.length > 0 && contextVals) {
       const node = (
@@ -185,7 +178,6 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
     }
   }, [view, contextVals, permissions]);
 
-  // --- Fetch Methods ---
   const fetchLookups = async (perms) => {
     if (!supabase) return;
     
@@ -200,7 +192,7 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
         }
     };
 
-    const [brData, fyData, ledData, structData, dtData, diData, doctypeData, currData, currGlobalsData] = await Promise.all([
+    const [brData, fyData, ledData, structData, dtData, diData, doctypeData, currData, currGlobalsData, fpData] = await Promise.all([
         safeFetch(supabase.schema('gen').from('branches').select('*')),
         safeFetch(supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false })),
         safeFetch(supabase.schema('gl').from('ledgers').select('id, code, title, currency, structure, metadata').eq('is_active', true).order('title')),
@@ -209,7 +201,8 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
         safeFetch(supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)),
         safeFetch(supabase.schema('gl').from('doc_types').select('id, code, title, type').eq('is_active', true)),
         safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true)),
-        safeFetch(supabase.schema('gen').from('currency_globals').select('*').limit(1))
+        safeFetch(supabase.schema('gen').from('currency_globals').select('*').limit(1)),
+        safeFetch(supabase.schema('gl').from('fiscal_periods').select('id, year_id, start_date, end_date, status'))
     ]);
 
     if (brData) {
@@ -227,6 +220,7 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
     }
 
     if (fyData) setFiscalYears(fyData);
+    if (fpData) setFiscalPeriods(fpData);
 
     let initialLedgerId = '';
     if (ledData) {
@@ -300,7 +294,7 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
     try {
       let query = supabase.schema('gl').from('vouchers')
         .select('*')
-        .eq('fiscal_period_id', contextVals.fiscal_year_id)
+        .eq('fiscal_year_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
         .in('status', ['draft', 'temporary']) 
         .order('voucher_date', { ascending: false })

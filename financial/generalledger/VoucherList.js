@@ -39,7 +39,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
   const { formatNumber } = UI.utils || { formatNumber: (v) => v };
   const supabase = window.supabase;
 
-  // --- States ---
   const [lookups, setLookups] = useState(null);
   const [contextVals, setContextVals] = useState(null);
   const [isAppLoading, setIsAppLoading] = useState(true);
@@ -54,12 +53,10 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
       voucherNumber: ''
   });
 
-  // Modals States
   const [selectedVoucherForView, setSelectedVoucherForView] = useState(null);
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
-  // --- Initialize Dependencies ---
   useEffect(() => {
       const initApp = async () => {
           if (!supabase) return;
@@ -111,19 +108,17 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
               });
 
               const perms = {
-                  actions: ['view', 'print', 'attach'], // List operations default
+                  actions: ['view', 'print', 'attach'], 
                   allowed_branches: [], 
                   allowed_ledgers: []
               };
 
               if (window.USER_PERMISSIONS) {
-                  // If admin or has edit rights, allow editing logic within the form
                   if (window.IS_ADMIN || window.USER_PERMISSIONS.has('gl_docs.edit')) {
                       perms.actions.push('edit');
                   }
               }
 
-              // Apply ledger/branch filtering based on permissions if not Admin
               let filteredLedgers = ledgers;
               if (!window.IS_ADMIN && perms.allowed_ledgers.length > 0) {
                   filteredLedgers = ledgers.filter(l => perms.allowed_ledgers.includes(String(l.id)));
@@ -145,7 +140,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
       initApp();
   }, [isRtl]);
 
-  // --- Dynamic Header Injection ---
   useEffect(() => {
     if (setHeaderNode && lookups && contextVals) {
       const node = (
@@ -189,7 +183,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
     };
   }, [lookups, contextVals, setHeaderNode, isRtl]);
 
-  // --- Fetch Vouchers Data ---
   const fetchVouchers = async () => {
     if (!supabase || !contextVals || !contextVals.fiscal_year_id || !contextVals.ledger_id) {
         setVouchers([]);
@@ -200,7 +193,7 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
     try {
       let query = supabase.schema('gl').from('vouchers')
         .select('*')
-        .eq('fiscal_period_id', contextVals.fiscal_year_id)
+        .eq('fiscal_year_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
         .order('voucher_number', { ascending: false })
         .order('daily_number', { ascending: false });
@@ -232,7 +225,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
       setFilters(prev => ({ ...prev, [field]: value }));
   };
 
-  // --- Early Render for Loading ---
   if (isAppLoading || !lookups || !contextVals) {
       return (
           <div className="h-full flex flex-col items-center justify-center bg-slate-50">
@@ -242,7 +234,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
       );
   }
 
-  // --- Helpers ---
   const getStatusBadgeUI = (status) => {
     const config = {
         'draft': { label: t.statusDraft, bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' },
@@ -258,7 +249,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
   return (
     <div className={`h-full flex flex-col bg-slate-50/50 p-4 md:p-6 ${isRtl ? 'dir-rtl' : 'dir-ltr'}`}>
         
-        {/* Filters Top Bar */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-4 shrink-0">
             <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold">
                 <Filter size={18} className="text-indigo-600" />
@@ -290,7 +280,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
             </div>
         </div>
 
-        {/* Data Grid */}
         <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0 overflow-hidden">
             <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
                 <div className="flex items-center gap-2 font-bold text-slate-700">
@@ -360,7 +349,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
             </div>
         </div>
 
-        {/* View Modal (Loads VoucherForm inside full screen) */}
         {selectedVoucherForView && (
             <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 overflow-hidden">
                 <div className="bg-white w-full h-full rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -389,7 +377,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
             </div>
         )}
 
-        {/* Print Modal */}
         <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.print || 'چاپ سند'} size="full">
             {voucherToPrint && window.VoucherPrint ? (
                 <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
@@ -401,7 +388,6 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
             )}
         </Modal>
 
-        {/* Attachments Modal */}
         <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
             {voucherForAttachments && window.VoucherAttachments ? (
                 <window.VoucherAttachments 

@@ -16,14 +16,12 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const { formatNumber, parseNumber } = UI.utils || { formatNumber: (v)=>v, parseNumber: (v)=>v };
   const supabase = window.supabase;
 
-  // --- Security Check ---
   const perms = lookups.permissions;
   const canEdit = perms?.actions.includes('edit');
   const canCreate = perms?.actions.includes('create');
   const canPrint = perms?.actions.includes('print');
   const canAttach = perms?.actions.includes('attach');
 
-  // --- States ---
   const [localVoucherId, setLocalVoucherId] = useState(voucherId);
   const [currentVoucher, setCurrentVoucher] = useState(null);
   const [voucherItems, setVoucherItems] = useState([]);
@@ -35,12 +33,10 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
-  // Sync prop changes (if any)
   useEffect(() => {
      setLocalVoucherId(voucherId);
   }, [voucherId]);
 
-  // --- Computed Lookups for Form (With Data Scoping) ---
   const ledgerStructureCode = useMemo(() => {
      const ledger = lookups.ledgers.find(l => String(l.id) === String(contextVals.ledger_id));
      return String(ledger?.structure || '').trim();
@@ -84,7 +80,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
      return (typeof ledger?.metadata === 'string' ? JSON.parse(ledger.metadata) : ledger?.metadata) || {};
   }, [lookups.ledgers, contextVals.ledger_id]);
 
-  // --- Initialization Effect ---
   useEffect(() => {
     const initializeForm = async () => {
       setLoading(true);
@@ -103,7 +98,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                ...item, 
                id: isCopy ? 'temp_' + Date.now() + '_' + index : item.id,
                voucher_id: isCopy ? null : item.voucher_id,
-               currency_code: detailsObj.currency_code || '',
+               currency_code: item.currency_code || detailsObj.currency_code || '',
                details_dict: detailsObj.selected_details || {},
                op_rate: item.op_rate ?? 1, op_is_reverse: item.op_is_reverse ?? false, op_debit: item.op_debit ?? 0, op_credit: item.op_credit ?? 0,
                rep1_rate: item.rep1_rate ?? 1, rep1_is_reverse: item.rep1_is_reverse ?? false, rep1_debit: item.rep1_debit ?? 0, rep1_credit: item.rep1_credit ?? 0,
@@ -113,7 +108,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
 
           if (isCopy) {
               const today = new Date().toISOString().split('T')[0];
-              const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, targetVoucher.ledger_id, targetVoucher.fiscal_period_id, targetVoucher.branch_id, supabase);
+              const { nextDaily, nextCross, nextVoucher } = await fetchAutoNumbers(today, targetVoucher.ledger_id, contextVals.fiscal_year_id, targetVoucher.branch_id, supabase);
               targetVoucher = {
                   ...targetVoucher,
                   id: null,
@@ -125,6 +120,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                   reference_number: '',
                   reviewed_by: null,
                   approved_by: null,
+                  fiscal_year_id: contextVals.fiscal_year_id
               };
               setIsHeaderOpen(true);
           } else {
@@ -158,7 +154,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
           daily_number: nextDaily,
           cross_reference: nextCross,
           reference_number: '',
-          fiscal_period_id: initialFyId,
+          fiscal_year_id: initialFyId,
           ledger_id: initialLedgerId,
           branch_id: defaultBranch?.id || ''
         });
@@ -188,7 +184,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     initializeForm();
   }, [localVoucherId, isCopy, contextVals, filteredBranches]);
 
-  // --- Helpers ---
   const getValidDetailTypes = (accountId) => {
      if (!accountId) return [];
      const account = lookups.accounts.find(a => String(a.id) === String(accountId));
@@ -213,14 +208,13 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
       return lookups.currencies.find(c => c.code === code)?.title || code;
   };
 
-  // --- Action Handlers ---
   const handleNavigate = async (direction) => {
-      if (!currentVoucher || !currentVoucher.voucher_number || !currentVoucher.fiscal_period_id) return;
+      if (!currentVoucher || !currentVoucher.voucher_number || !currentVoucher.fiscal_year_id) return;
       setLoading(true);
       try {
           let query = supabase.schema('gl').from('vouchers')
               .select('id')
-              .eq('fiscal_period_id', currentVoucher.fiscal_period_id);
+              .eq('fiscal_year_id', currentVoucher.fiscal_year_id);
 
           if (currentVoucher.branch_id) {
               query = query.eq('branch_id', currentVoucher.branch_id);
@@ -463,7 +457,22 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
        return;
     }
 
-    const periodCheck = await validateFiscalPeriod(currentVoucher.voucher_date, currentVoucher.fiscal_period_id, supabase, t);
+    const activeDate = currentVoucher.voucher_date;
+    const activeYearId = contextVals.fiscal_year_id;
+
+    const targetPeriod = lookups.fiscalPeriods?.find(p => 
+        String(p.year_id) === String(activeYearId) && 
+        p.start_date <= activeDate && 
+        p.end_date >= activeDate
+    );
+
+    if (!targetPeriod) {
+        alert(isRtl ? 'دوره‌ای برای تاریخ سند در سال مالی انتخاب شده یافت نشد.' : 'No fiscal period found for this date in the selected year.');
+        setLoading(false);
+        return;
+    }
+
+    const periodCheck = await validateFiscalPeriod(activeDate, targetPeriod.id, supabase, t);
     if (!periodCheck.valid) {
         alert(periodCheck.msg);
         return;
@@ -472,7 +481,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     if (currentVoucher.subsidiary_number && currentVoucher.subsidiary_number.trim() !== '') {
         const query = supabase.schema('gl').from('vouchers')
             .select('id')
-            .eq('fiscal_period_id', currentVoucher.fiscal_period_id)
+            .eq('fiscal_year_id', activeYearId)
             .eq('subsidiary_number', currentVoucher.subsidiary_number.trim());
         if (currentVoucher.id) query.neq('id', currentVoucher.id);
         const { data: subData } = await query;
@@ -537,6 +546,8 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
 
       const voucherData = { 
         ...currentVoucher, status,
+        fiscal_year_id: activeYearId,
+        fiscal_period_id: targetPeriod.id,
         total_debit: totalDebit, total_credit: totalCredit,
         subsidiary_number: cleanData(currentVoucher.subsidiary_number),
         reference_number: cleanData(currentVoucher.reference_number),
@@ -555,7 +566,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         if (error) throw error;
         await supabase.schema('gl').from('voucher_items').delete().eq('voucher_id', savedVoucherId);
       } else {
-        const { nextDaily, nextCross, nextVoucher, config } = await fetchAutoNumbers(voucherData.voucher_date, voucherData.ledger_id, voucherData.fiscal_period_id, voucherData.branch_id, supabase);
+        const { nextDaily, nextCross, nextVoucher, config } = await fetchAutoNumbers(voucherData.voucher_date, voucherData.ledger_id, voucherData.fiscal_year_id, voucherData.branch_id, supabase);
         voucherData.daily_number = nextDaily;
         voucherData.cross_reference = nextCross;
         voucherData.created_by = currentUserId;
@@ -573,16 +584,15 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         if (scope !== 'none' && config) {
             const resetYear = meta.resetYear !== false;
             let lastNums = meta.lastNumbers || {};
-            const fyId = voucherData.fiscal_period_id;
             const branchId = voucherData.branch_id;
             const savedVoucherNum = Number(voucherData.voucher_number); 
 
             if (scope === 'ledger') {
-                if (resetYear) lastNums[fyId] = savedVoucherNum; else lastNums.global = savedVoucherNum;
+                if (resetYear) lastNums[activeYearId] = savedVoucherNum; else lastNums.global = savedVoucherNum;
             } else if (scope === 'branch') {
                 if (resetYear) {
-                    if (!lastNums[fyId]) lastNums[fyId] = {};
-                    lastNums[fyId][branchId] = savedVoucherNum;
+                    if (!lastNums[activeYearId]) lastNums[activeYearId] = {};
+                    lastNums[activeYearId][branchId] = savedVoucherNum;
                 } else {
                     lastNums[branchId] = savedVoucherNum;
                 }
@@ -600,7 +610,8 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
           debit: parseNumber(item.debit), credit: parseNumber(item.credit), description: item.description,
           tracking_number: cleanData(item.tracking_number), tracking_date: cleanData(item.tracking_date),
           quantity: parseNumber(item.quantity) === 0 ? null : parseNumber(item.quantity),
-          details: { currency_code: item.currency_code, selected_details: item.details_dict || {} },
+          currency_code: cleanData(item.currency_code),
+          details: { selected_details: item.details_dict || {} },
           op_rate: parseNumber(item.op_rate), op_is_reverse: item.op_is_reverse, op_debit: parseNumber(item.op_debit), op_credit: parseNumber(item.op_credit),
           rep1_rate: parseNumber(item.rep1_rate), rep1_is_reverse: item.rep1_is_reverse, rep1_debit: parseNumber(item.rep1_debit), rep1_credit: parseNumber(item.rep1_credit),
           rep2_rate: parseNumber(item.rep2_rate), rep2_is_reverse: item.rep2_is_reverse, rep2_debit: parseNumber(item.rep2_debit), rep2_credit: parseNumber(item.rep2_credit),
@@ -619,12 +630,10 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     }
   };
 
-  // --- Early Returns ---
   if (loading || !currentVoucher) {
       return <div className="h-full flex items-center justify-center bg-slate-50"><div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div></div>;
   }
 
-  // --- Render Computations ---
   let totalDebit = 0, totalCredit = 0, opTotalDebit = 0, opTotalCredit = 0, rep1TotalDebit = 0, rep1TotalCredit = 0, rep2TotalDebit = 0, rep2TotalCredit = 0;
   voucherItems.forEach(item => {
       totalDebit += parseNumber(item.debit); totalCredit += parseNumber(item.credit);
@@ -636,7 +645,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const isBalanced = totalDebit === totalCredit;
   const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final' || (!canEdit && currentVoucher.id && !isCopy);
   const isVoucherNoManual = currentLedgerMeta.uniquenessScope === 'none';
-  const currentFiscalYearTitle = lookups.fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || '';
+  const currentFiscalYearTitle = lookups.fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_year_id || contextVals.fiscal_year_id))?.title || '';
   const currentLedgerTitle = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || '';
 
   const getStatusBadgeUI = (status) => {
@@ -652,7 +661,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
 
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`} onClick={() => setFocusedRowId(null)}>
-      {/* Top Toolbar */}
       <div className="mb-4 flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={() => onClose(false)} icon={isRtl ? ArrowRight : ArrowLeft}>{t.backToList}</Button>
@@ -684,7 +692,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
       </div>
 
       <div className="flex-1 overflow-auto flex flex-col gap-3">
-        {/* Header Accordion */}
         <Accordion 
           title={t.headerInfo} 
           isOpen={isHeaderOpen} 
@@ -705,7 +712,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                 const newBranch = e.target.value;
                 setCurrentVoucher({...currentVoucher, branch_id: newBranch});
                 if (!currentVoucher.id || currentVoucher.status === 'draft') {
-                   fetchAutoNumbers(currentVoucher.voucher_date, currentVoucher.ledger_id, currentVoucher.fiscal_period_id, newBranch, supabase).then(({nextVoucher}) => {
+                   fetchAutoNumbers(currentVoucher.voucher_date, currentVoucher.ledger_id, contextVals.fiscal_year_id, newBranch, supabase).then(({nextVoucher}) => {
                        if (currentLedgerMeta.uniquenessScope === 'branch') setCurrentVoucher(prev => ({...prev, voucher_number: nextVoucher}));
                    });
                 }
@@ -724,7 +731,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                const newDate = e.target.value;
                setCurrentVoucher({...currentVoucher, voucher_date: newDate});
                if (!currentVoucher.id || currentVoucher.status === 'draft') {
-                   fetchAutoNumbers(newDate, currentVoucher.ledger_id, currentVoucher.fiscal_period_id, currentVoucher.branch_id, supabase).then(({nextDaily}) => {
+                   fetchAutoNumbers(newDate, currentVoucher.ledger_id, contextVals.fiscal_year_id, currentVoucher.branch_id, supabase).then(({nextDaily}) => {
                        setCurrentVoucher(prev => ({...prev, daily_number: nextDaily}));
                    });
                }
@@ -741,7 +748,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         </Accordion>
 
         <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4">
-          {/* Main Items Grid */}
           <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-center p-3 bg-slate-50 border-b border-slate-200 shrink-0">
                 <h3 className="text-sm font-bold text-slate-800">{t.items}</h3>
@@ -778,7 +784,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                         const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
                         const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
 
-                        // Compact View
                         if (!isEditing) {
                             const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
                             const hasForeignCurrency = item.currency_code !== currentLedger?.currency || parseNumber(item.op_rate) !== 1 || parseNumber(item.rep1_rate) !== 1 || parseNumber(item.rep2_rate) !== 1;
@@ -813,7 +818,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                             );
                         }
 
-                        // Full Edit View
                         return (
                            <div key={item.id} className={`my-2 mx-1 bg-white rounded-lg border transition-all duration-200 border-indigo-400 shadow-md ring-1 ring-indigo-100 w-full lg:w-[calc(100%-8px)] shrink-0 min-w-[800px]`} onClick={(e) => e.stopPropagation()}>
                               <div className="flex flex-col md:flex-row gap-0">
@@ -826,7 +830,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                                  </div>
                                  
                                  <div className="flex-1 p-2 flex flex-col gap-1.5">
-                                    {/* ROW 1 */}
                                     <div className="grid grid-cols-12 gap-x-3 gap-y-2 items-end">
                                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
                                           <div className="text-[10px] font-bold text-slate-500">{t.account}</div>
@@ -872,7 +875,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                                        </div>
                                     </div>
 
-                                    {/* ROW 2 (Conditional) */}
                                     {showRow2 && (
                                        <div className="grid grid-cols-12 gap-x-3 gap-y-2 p-2 bg-slate-50/80 rounded border border-slate-100 mt-0.5">
                                           <div className="col-span-12 lg:col-span-5 flex flex-col gap-1">
@@ -913,7 +915,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
               </div>
           </div>
 
-          {/* Summary Sidebar */}
           {isSummaryOpen && (
               <div className="w-full lg:w-[280px] shrink-0 bg-slate-50 border-t lg:border-t-0 lg:border-r rtl:border-r-0 rtl:border-l border-slate-200 flex flex-col overflow-y-auto custom-scrollbar" onClick={(e) => e.stopPropagation()}>
                   <div className="p-3 border-b border-slate-200 bg-white flex justify-between items-center z-10 shrink-0">
@@ -956,7 +957,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         </div>
       </div>
       
-      {/* Currency Conversion Modal */}
       {currencyModalIndex !== null && voucherItems[currencyModalIndex] && (
           <Modal isOpen={true} onClose={() => setCurrencyModalIndex(null)} title={`${t.currencyConversions} - ${t.row} ${voucherItems[currencyModalIndex].row_number}`} size="lg" footer={<Button variant="primary" onClick={() => setCurrencyModalIndex(null)}>{isRtl ? 'تایید و بستن' : 'Confirm & Close'}</Button>}>
               <div className="p-4 bg-slate-50/50 flex flex-col gap-4">
@@ -1037,7 +1037,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
           </Modal>
       )}
 
-      {/* Attachments Modal */}
       <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
          {voucherForAttachments && window.VoucherAttachments ? (
              <window.VoucherAttachments voucherId={voucherForAttachments.id} onClose={() => setVoucherForAttachments(null)} />
@@ -1049,7 +1048,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
          )}
       </Modal>
 
-      {/* Print Modal */}
       <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="full">
          {voucherToPrint && window.VoucherPrint ? (
              <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
