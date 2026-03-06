@@ -191,12 +191,22 @@ const VoucherList = ({ language = 'fa', setHeaderNode }) => {
     
     setLoading(true);
     try {
+      // پیدا کردن دوره‌های مالی معتبر برای سال مالی انتخاب شده
+      const validPeriodIds = lookups.fiscalPeriods
+        .filter(p => String(p.year_id) === String(contextVals.fiscal_year_id))
+        .map(p => p.id);
+
       let query = supabase.schema('gl').from('vouchers')
         .select('*')
-        .eq('fiscal_year_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
-        .order('voucher_number', { ascending: false })
-        .order('daily_number', { ascending: false });
+        .order('voucher_number', { ascending: false, nullsFirst: true }) // اسناد بدون شماره (موقت) در ابتدا نمایش داده شوند
+        .order('created_at', { ascending: false });
+
+      if (validPeriodIds.length > 0) {
+        query = query.in('fiscal_period_id', validPeriodIds);
+      } else {
+        query = query.in('fiscal_period_id', [-1]); // اگر دوره‌ای برای این سال تعریف نشده بود، لیست خالی برگردد
+      }
 
       if (filters.branch_id) query = query.eq('branch_id', filters.branch_id);
       if (filters.status) query = query.eq('status', filters.status);
