@@ -45,8 +45,9 @@ const CurrencySettings = ({ t, isRtl }) => {
   // 3. Conversions (DB Map)
   const [conversions, setConversions] = useState({});
 
-  // 4. History Log
+  // 4. History Log & Selection
   const [historyLog, setHistoryLog] = useState([]);
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isLoadingRates, setIsLoadingRates] = useState(false);
   const [isApplyingRates, setIsApplyingRates] = useState(false);
@@ -179,13 +180,12 @@ const CurrencySettings = ({ t, isRtl }) => {
     if (!canUpdateRates) return alert(isRtl ? 'دسترسی غیرمجاز' : 'Access Denied');
     setIsLoadingRates(true);
     try {
-      // Mock API logic: Fetch rates for auto currencies and log them ONLY in history.
       const autoCurrencies = currencies.filter(c => c.method === 'auto' && c.code !== 'USD');
       if (autoCurrencies.length > 0) {
         const historyInserts = [];
         
         autoCurrencies.forEach(curr => {
-          const newRate = (Math.random() * 100).toFixed(4); // Fake rate from external API
+          const newRate = (Math.random() * 100).toFixed(4); 
           historyInserts.push({ source_code: 'USD', target_code: curr.code, rate: newRate });
         });
 
@@ -193,10 +193,8 @@ const CurrencySettings = ({ t, isRtl }) => {
            await supabase.schema('gen').from('currency_rate_history').insert(historyInserts);
         }
 
-        alert(t.curr_api_success || (isRtl ? 'نرخ‌های جدید از منبع دریافت و در تاریخچه ثبت شد.' : 'New rates fetched and logged in history.'));
-        if (isHistoryOpen) {
-           await fetchHistory();
-        }
+        alert(t.curr_api_success || (isRtl ? 'نرخ‌های جدید دریافت و در تاریخچه ثبت شد.' : 'New rates fetched and logged in history.'));
+        await fetchHistory();
       } else {
         alert(isRtl ? 'ارز اتوماتیکی برای دریافت نرخ یافت نشد.' : 'No auto currencies found to fetch.');
       }
@@ -207,30 +205,27 @@ const CurrencySettings = ({ t, isRtl }) => {
     }
   };
 
-  const handleApplyLatestRates = async () => {
+  const handleApplySelectedRates = async () => {
      if (!canUpdateRates) return alert(isRtl ? 'دسترسی غیرمجاز' : 'Access Denied');
+     if (selectedHistoryIds.length === 0) {
+        return alert(isRtl ? 'هیچ رکوردی از تاریخچه انتخاب نشده است.' : 'No history records selected.');
+     }
+
      setIsApplyingRates(true);
      try {
-       const autoCurrencies = currencies.filter(c => c.method === 'auto');
-       if(autoCurrencies.length === 0) {
-          alert(isRtl ? 'هیچ ارز اتوماتیکی یافت نشد.' : 'No auto currencies found.');
-          setIsApplyingRates(false);
-          return;
-       }
-
+       const selectedLogs = historyLog.filter(h => selectedHistoryIds.includes(h.id));
        let appliedCount = 0;
        const rateUpserts = [];
 
-       // History is ordered by created_at DESC, so the first match is the latest
-       autoCurrencies.forEach(curr => {
-          const latestLog = historyLog.find(h => h.target === curr.code);
-          if (latestLog) {
-             rateUpserts.push({ source_code: latestLog.source, target_code: curr.code, rate: latestLog.rate });
+       selectedLogs.forEach(log => {
+          const targetCurr = currencies.find(c => c.code === log.target);
+          
+          if (targetCurr && targetCurr.method === 'auto') {
+             rateUpserts.push({ source_code: log.source, target_code: log.target, rate: log.rate });
              
-             // Auto generate reciprocal rate if required
-             if (curr.reciprocal) {
-                const inverseRate = (1 / latestLog.rate).toFixed(6);
-                rateUpserts.push({ source_code: curr.code, target_code: latestLog.source, rate: inverseRate });
+             if (targetCurr.reciprocal) {
+                const inverseRate = (1 / log.rate).toFixed(6);
+                rateUpserts.push({ source_code: log.target, target_code: log.source, rate: inverseRate });
              }
              appliedCount++;
           }
@@ -242,12 +237,13 @@ const CurrencySettings = ({ t, isRtl }) => {
                 .upsert({ source_code: r.source_code, target_code: r.target_code, rate: r.rate }, { onConflict: 'source_code, target_code' });
           }
           await fetchConversions();
-          alert(`${isRtl ? 'نرخ اتوماتیک بروز شد برای:' : 'Auto rates updated for:'} ${appliedCount} ${isRtl ? 'ارز' : 'currency(ies)'}`);
+          setSelectedHistoryIds([]);
+          alert(`${isRtl ? 'نرخ‌ها با موفقیت بروزرسانی شد برای:' : 'Rates updated successfully for:'} ${appliedCount} ${isRtl ? 'ارز اتوماتیک' : 'auto currency(ies)'}`);
        } else {
-          alert(isRtl ? 'نرخ جدیدی در تاریخچه برای ارزهای اتوماتیک یافت نشد.' : 'No new rates found in history for auto currencies.');
+          alert(isRtl ? 'هیچ یک از رکوردهای انتخاب شده مربوط به ارزهای اتوماتیک نبودند.' : 'None of the selected records correspond to auto currencies.');
        }
      } catch(err) {
-       console.error('Error applying latest rates:', err);
+       console.error('Error applying selected rates:', err);
        alert(isRtl ? 'خطا در اعمال نرخ‌ها' : 'Error applying rates');
      } finally {
        setIsApplyingRates(false);
@@ -257,6 +253,7 @@ const CurrencySettings = ({ t, isRtl }) => {
   const handleOpenHistory = async () => {
     if (!canViewHistory) return alert(isRtl ? 'دسترسی غیرمجاز' : 'Access Denied');
     await fetchHistory();
+    setSelectedHistoryIds([]);
     setIsHistoryOpen(true);
   };
 
@@ -341,6 +338,7 @@ const CurrencySettings = ({ t, isRtl }) => {
         try {
           await supabase.schema('gen').from('currency_rate_history').delete().eq('id', id);
           fetchHistory();
+          setSelectedHistoryIds(prev => prev.filter(selId => selId !== id));
         } catch(err) {
           console.error(err);
         }
@@ -364,11 +362,9 @@ const CurrencySettings = ({ t, isRtl }) => {
     const targetCode = newConvTarget;
 
     try {
-      // Upsert Main Rate
       await supabase.schema('gen').from('currency_rates')
          .upsert({ source_code: sourceCode, target_code: targetCode, rate: rate }, { onConflict: 'source_code, target_code' });
       
-      // Upsert Reciprocal Rate if current source is set as reciprocal
       if (selectedForConv.reciprocal) {
          const inverseRate = 1 / rate;
          await supabase.schema('gen').from('currency_rates')
@@ -387,10 +383,8 @@ const CurrencySettings = ({ t, isRtl }) => {
   const handleDeleteConversion = async (targetCode) => {
     const sourceCode = selectedForConv.code;
     try {
-      // Delete the explicit rate
       await supabase.schema('gen').from('currency_rates').delete().match({ source_code: sourceCode, target_code: targetCode });
       
-      // If the source was reciprocal, we should probably delete the reverse too to keep it clean
       if (selectedForConv.reciprocal) {
          await supabase.schema('gen').from('currency_rates').delete().match({ source_code: targetCode, target_code: sourceCode });
       }
@@ -465,6 +459,42 @@ const CurrencySettings = ({ t, isRtl }) => {
   ];
 
   const historyColumns = [
+    {
+       field: '_select',
+       header: (
+          <div className="flex justify-center">
+             <input 
+               type="checkbox" 
+               className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+               checked={historyLog.length > 0 && selectedHistoryIds.length === historyLog.length}
+               onChange={(e) => {
+                  if (e.target.checked) {
+                     setSelectedHistoryIds(historyLog.map(h => h.id));
+                  } else {
+                     setSelectedHistoryIds([]);
+                  }
+               }}
+             />
+          </div>
+       ),
+       width: 'w-12',
+       render: (row) => (
+          <div className="flex justify-center">
+             <input 
+               type="checkbox" 
+               className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+               checked={selectedHistoryIds.includes(row.id)}
+               onChange={(e) => {
+                  if (e.target.checked) {
+                     setSelectedHistoryIds([...selectedHistoryIds, row.id]);
+                  } else {
+                     setSelectedHistoryIds(selectedHistoryIds.filter(id => id !== row.id));
+                  }
+               }}
+             />
+          </div>
+       )
+    },
     { field: 'date', header: t.curr_date || (isRtl ? 'تاریخ' : 'Date'), width: 'w-24', className: 'font-mono' },
     { field: 'time', header: t.curr_time || (isRtl ? 'زمان' : 'Time'), width: 'w-24', className: 'font-mono' },
     { field: 'source', header: t.curr_source || (isRtl ? 'مبدا' : 'Source'), width: 'w-20', className: 'font-mono text-center font-bold' },
@@ -494,10 +524,9 @@ const CurrencySettings = ({ t, isRtl }) => {
         </div>
         <div className="flex gap-2">
            {canViewHistory && (
-              <Button variant="outline" icon={History} onClick={handleOpenHistory}>{t.curr_history || (isRtl ? 'تاریخچه نرخ‌ها' : 'Rates History')}</Button>
-           )}
-           {canUpdateRates && (
-              <Button variant="primary" icon={DownloadCloud} onClick={handleFetchRatesAPI} isLoading={isLoadingRates}>{t.curr_fetch_api || (isRtl ? 'دریافت از بانک مرکزی (API)' : 'Fetch from API')}</Button>
+              <Button variant="outline" icon={History} onClick={handleOpenHistory}>
+                 {t.curr_history || (isRtl ? 'تاریخچه نرخ‌ها' : 'Rates History')}
+              </Button>
            )}
         </div>
       </div>
@@ -676,7 +705,6 @@ const CurrencySettings = ({ t, isRtl }) => {
                        {selectedForConv && conversions[selectedForConv.code]?.length > 0 ? (
                           conversions[selectedForConv.code].map((conv, idx) => {
                              const targetCurr = currencies.find(c => c.code === conv.target);
-                             // If the target currency is reciprocal but the current one is not, we treat this side as inherited and locked.
                              const isInherited = targetCurr?.reciprocal && !selectedForConv.reciprocal;
 
                              return (
@@ -731,10 +759,21 @@ const CurrencySettings = ({ t, isRtl }) => {
         size="lg"
         footer={
            <div className="flex justify-between w-full items-center">
-              <div>
+              <div className="flex gap-2">
                  {canUpdateRates && (
-                    <Button variant="primary" icon={RefreshCw} onClick={handleApplyLatestRates} isLoading={isApplyingRates}>
-                       {t.curr_apply_latest || (isRtl ? 'اعمال آخرین نرخ‌های اتوماتیک' : 'Apply Latest Auto Rates')}
+                    <Button variant="outline" icon={DownloadCloud} onClick={handleFetchRatesAPI} isLoading={isLoadingRates}>
+                       {t.curr_fetch_api || (isRtl ? 'دریافت نرخ‌های جدید' : 'Fetch New Rates')}
+                    </Button>
+                 )}
+                 {canUpdateRates && (
+                    <Button 
+                       variant="primary" 
+                       icon={RefreshCw} 
+                       onClick={handleApplySelectedRates} 
+                       isLoading={isApplyingRates}
+                       disabled={selectedHistoryIds.length === 0}
+                    >
+                       {t.curr_apply_selected || (isRtl ? 'بروزرسانی نرخ‌های انتخاب شده' : 'Update Selected Rates')}
                     </Button>
                  )}
               </div>
@@ -742,15 +781,22 @@ const CurrencySettings = ({ t, isRtl }) => {
            </div>
         }
       >
-         <div className="h-96">
-            <DataGrid 
-              columns={historyColumns} 
-              data={historyLog} 
-              isRtl={isRtl} 
-              actions={(row) => (
-                canDelete ? <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHistory(row.id)} /> : null
-              )}
-            />
+         <div className="h-96 flex flex-col">
+            <div className="mb-3 text-xs text-slate-500 font-medium">
+               {isRtl 
+                 ? 'نرخ‌های جدید را دریافت کنید، سپس موارد مورد نظر را انتخاب کرده و دکمه بروزرسانی را کلیک کنید تا در تبدیل ارزها اعمال شوند.' 
+                 : 'Fetch new rates, then select the rows and click update to apply them to conversions.'}
+            </div>
+            <div className="flex-1 overflow-hidden min-h-0 border border-slate-200 rounded-xl">
+               <DataGrid 
+                 columns={historyColumns} 
+                 data={historyLog} 
+                 isRtl={isRtl} 
+                 actions={(row) => (
+                   canDelete ? <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHistory(row.id)} /> : null
+                 )}
+               />
+            </div>
          </div>
       </Modal>
 
