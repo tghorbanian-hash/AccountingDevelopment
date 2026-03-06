@@ -258,6 +258,7 @@ const VoucherItemsGrid = ({
 
     const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
     const defaultCurrency = currentLedger?.currency || '';
+
     const emptyRowIndex = voucherItems.findIndex(item => parseNumber(item.debit) === 0 && parseNumber(item.credit) === 0);
 
     if (emptyRowIndex !== -1) {
@@ -321,19 +322,15 @@ const VoucherItemsGrid = ({
              return;
         }
 
-        const fromCurrObj = lookups.currencies.find(c => c.code === fromCode);
-        const toCurrObj = lookups.currencies.find(c => c.code === toCode);
-        
-        // نام جدول در دیتابیس دقیقاً با s تنظیم شده است
         const TABLE_NAME = 'currency_rates'; 
-        const FROM_FIELD = 'from_currency_id'; 
-        const TO_FIELD = 'to_currency_id';     
+        const FROM_FIELD = 'source_code'; 
+        const TO_FIELD = 'target_code';     
         
-        const queryFromVal = fromCurrObj?.id; 
-        const queryToVal = toCurrObj?.id;
+        const queryFromVal = fromCode; 
+        const queryToVal = toCode;
 
         if (!queryFromVal || !queryToVal) {
-             alert(isRtl ? 'آیدی ارز در اطلاعات پایه یافت نشد.' : 'Currency ID not found.');
+             alert(isRtl ? 'کد ارز یافت نشد.' : 'Currency code not found.');
              setFetchingRate(false);
              return;
         }
@@ -342,8 +339,12 @@ const VoucherItemsGrid = ({
         let isReverse = false;
 
         const { data, error } = await supabase.schema('gen').from(TABLE_NAME)
-            .select('rate').eq(FROM_FIELD, queryFromVal).eq(TO_FIELD, queryToVal)
-            .order('created_at', { ascending: false }).limit(1).maybeSingle();
+            .select('rate')
+            .eq(FROM_FIELD, queryFromVal)
+            .eq(TO_FIELD, queryToVal)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
         if (error) throw error;
 
@@ -351,8 +352,12 @@ const VoucherItemsGrid = ({
             rate = data.rate;
         } else {
             const { data: revData, error: revErr } = await supabase.schema('gen').from(TABLE_NAME)
-                .select('rate').eq(FROM_FIELD, queryToVal).eq(TO_FIELD, queryFromVal)
-                .order('created_at', { ascending: false }).limit(1).maybeSingle();
+                .select('rate')
+                .eq(FROM_FIELD, queryToVal)
+                .eq(TO_FIELD, queryFromVal)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
             
             if (revErr) throw revErr;
             if (revData && revData.rate) { rate = revData.rate; isReverse = true; }
@@ -366,11 +371,13 @@ const VoucherItemsGrid = ({
         }
     } catch (e) {
         console.error('Auto rate fetch failed:', e);
-        alert(isRtl ? 'خطای اتصال به دیتابیس: لطفاً از صحت نام ستون‌های from_currency_id و to_currency_id در جدول currency_rates اطمینان حاصل کنید.' : 'Error fetching rate. Check console.');
+        alert(isRtl ? 'خطای اتصال به دیتابیس در خواندن نرخ ارز.' : 'Error fetching rate. Check console.');
     } finally {
         setFetchingRate(false);
     }
   };
+
+  const ledgerCurrencyLabel = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency || lookups.currencyGlobals?.op_currency;
 
   return (
     <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0" onClick={(e) => e.stopPropagation()}>
@@ -562,13 +569,12 @@ const VoucherItemsGrid = ({
                               </tr>
                           </thead>
                           <tbody>
-                              {lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency && (() => {
-                                  const ledgerCur = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency;
-                                  const isMatch = voucherItems[currencyModalIndex].currency_code === ledgerCur;
+                              {ledgerCurrencyLabel && (() => {
+                                  const isMatch = voucherItems[currencyModalIndex].currency_code === ledgerCurrencyLabel;
                                   return (
                                       <tr className="border-b border-slate-100 hover:bg-slate-50">
                                           <td className="py-2 px-3 font-bold text-slate-700">{t.opCurrency}</td>
-                                          <td className="py-2 px-3">{getCurrencyTitle(ledgerCur)}</td>
+                                          <td className="py-2 px-3">{getCurrencyTitle(ledgerCurrencyLabel)}</td>
                                           <td className="py-2 px-3">
                                               <div className="flex items-center gap-1 h-7">
                                                 <input type="text" className={`w-full flex-1 border rounded h-full px-2 text-left dir-ltr outline-none ${isMatch || isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].op_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'op_rate', e.target.value)} disabled={isMatch || isReadonly} />
