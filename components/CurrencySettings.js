@@ -332,15 +332,23 @@ const CurrencySettings = ({ t, isRtl }) => {
     }
   };
 
-  const handleDeleteHistory = async (id) => {
+  const handleDeleteHistory = async (idOrIds) => {
      if (!canDelete) return;
-     if(confirm(t.confirm_delete_single || 'Delete log?')) {
+     const idsToDelete = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+     if (idsToDelete.length === 0) return;
+
+     const message = idsToDelete.length > 1 
+       ? (t.confirm_delete_multi || (isRtl ? 'آیا از حذف رکوردهای انتخاب شده اطمینان دارید؟' : 'Delete selected logs?'))
+       : (t.confirm_delete_single || (isRtl ? 'آیا از حذف این رکورد اطمینان دارید؟' : 'Delete log?'));
+
+     if(confirm(message)) {
         try {
-          await supabase.schema('gen').from('currency_rate_history').delete().eq('id', id);
+          const { error } = await supabase.schema('gen').from('currency_rate_history').delete().in('id', idsToDelete);
+          if (error) throw error;
           fetchHistory();
-          setSelectedHistoryIds(prev => prev.filter(selId => selId !== id));
+          setSelectedHistoryIds(prev => prev.filter(selId => !idsToDelete.includes(selId)));
         } catch(err) {
-          console.error(err);
+          console.error('Error deleting history:', err);
         }
      }
   };
@@ -771,6 +779,7 @@ const CurrencySettings = ({ t, isRtl }) => {
                        setSelectedHistoryIds(prev => prev.filter(selectedId => selectedId !== id));
                     }
                  }}
+                 onDelete={handleDeleteHistory}
                  actions={(row) => (
                    canDelete ? <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHistory(row.id)} /> : null
                  )}
