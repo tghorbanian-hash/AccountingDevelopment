@@ -495,7 +495,8 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
         let rate = null;
         let isReverse = false;
 
-        const { data, error } = await supabase.schema('gen').from('exchange_rates')
+        // تغییر نام جدول به currency_rates (یا currency_rate بسته به دیتابیس شما)
+        const { data, error } = await supabase.schema('gen').from('currency_rates')
             .select('rate')
             .eq('from_currency', fromCode)
             .eq('to_currency', toCode)
@@ -506,7 +507,8 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
         if (data && data.rate) {
             rate = data.rate;
         } else {
-            const { data: revData } = await supabase.schema('gen').from('exchange_rates')
+            // بررسی حالت معکوس در جدول currency_rates
+            const { data: revData } = await supabase.schema('gen').from('currency_rates')
                 .select('rate')
                 .eq('from_currency', toCode)
                 .eq('to_currency', fromCode)
@@ -524,11 +526,11 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
             handleItemChange(currencyModalIndex, `${type}_rate`, rate);
             handleItemChange(currencyModalIndex, `${type}_is_reverse`, isReverse);
         } else {
-            alert(isRtl ? `نرخی برای تبدیل ${fromCode} به ${toCode} یافت نشد.` : `No rate found for ${fromCode} to ${toCode}.`);
+            alert(isRtl ? `نرخی برای تبدیل ${fromCode} به ${toCode} در سیستم یافت نشد.` : `No rate found for ${fromCode} to ${toCode}.`);
         }
     } catch (e) {
         console.warn('Auto rate fetch failed:', e);
-        alert(isRtl ? 'خطا در دریافت نرخ. لطفا جدول exchange_rates را بررسی کنید.' : 'Error fetching rate. Please check exchange_rates table.');
+        alert(isRtl ? 'خطا در دریافت نرخ. لطفا اطمینان حاصل کنید که نام جدول و فیلدها صحیح است.' : 'Error fetching rate.');
     } finally {
         setFetchingRate(false);
     }
