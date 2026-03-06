@@ -26,7 +26,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     actions: isRtl ? 'عملیات' : 'Actions',
     viewDoc: isRtl ? 'مشاهده سند' : 'View Document',
     
-    // Tabs
     tabBranch: isRtl ? 'شعبه' : 'Branch',
     tabGroup: isRtl ? 'گروه حساب' : 'Account Group',
     tabCol: isRtl ? 'حساب کل' : 'General Ledger',
@@ -36,7 +35,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     tabTracking: isRtl ? 'پیگیری' : 'Tracking',
     tabTransactions: isRtl ? 'ریز گردش' : 'Transactions',
 
-    // Main Filters
     ledger: isRtl ? 'دفتر مالی' : 'Ledger',
     mainCurrency: isRtl ? 'ارز گزارش' : 'Report Currency',
     fiscalYear: isRtl ? 'سال مالی' : 'Fiscal Year',
@@ -54,7 +52,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     moreFilters: isRtl ? 'فیلترهای بیشتر' : 'More Filters',
     lessFilters: isRtl ? 'فیلترهای کمتر' : 'Less Filters',
 
-    // Adv Filters
     advFeatures: isRtl ? 'ویژگی‌های حساب' : 'Account Features',
     featCurrency: isRtl ? 'ارزی' : 'Currency Feat',
     featTracking: isRtl ? 'پیگیری' : 'Tracking Feat',
@@ -75,7 +72,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     active: isRtl ? 'فعال' : 'Active',
     inactive: isRtl ? 'غیرفعال' : 'Inactive',
 
-    // Grid Columns
     colCode: isRtl ? 'کد' : 'Code',
     colTitle: isRtl ? 'عنوان' : 'Title',
     colDetailType: isRtl ? 'نوع تفصیل' : 'Detail Type',
@@ -106,21 +102,17 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [lookups, setLookups] = useState(null);
 
-  // Clear global header node
   useEffect(() => {
      if (setHeaderNode) setHeaderNode(null);
      return () => { if (setHeaderNode) setHeaderNode(null); };
   }, [setHeaderNode]);
 
-  // Raw Data State
   const [rawData, setRawData] = useState([]); 
 
-  // View States
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [baseCurrencyMode, setBaseCurrencyMode] = useState('op'); 
   const [showWithBalanceOnly, setShowWithBalanceOnly] = useState(false);
   
-  // Filter States
   const defaultMainFilters = {
       ledgerId: '', fiscalYearId: '', timeRangeType: 'period', fromPeriodId: '', toPeriodId: '',
       fromDate: '', toDate: '', docType: '', accountType: ''
@@ -142,7 +134,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       };
   }, [mainFilters.ledgerId, mainFilters.fiscalYearId]);
 
-  // View Navigation
   const tabs = [
       { id: 'branch', label: t.tabBranch },
       { id: 'group', label: t.tabGroup },
@@ -157,6 +148,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
   const [drillPath, setDrillPath] = useState({});
   const [selectedVoucherId, setSelectedVoucherId] = useState(null);
   const [voucherToPrint, setVoucherToPrint] = useState(null);
+  const [isMainPrintOpen, setIsMainPrintOpen] = useState(false);
 
   // --- Init App ---
   useEffect(() => {
@@ -171,12 +163,13 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
             };
 
             const [
-                branches, ledgers, accounts, allDetailInstances, detailTypes, docTypes, 
+                branches, ledgers, accounts, accountStructures, allDetailInstances, detailTypes, docTypes, 
                 currencies, fiscalYears, fiscalPeriods, users
             ] = await Promise.all([
                 fetchSafe('gen', 'branches'),
                 fetchSafe('gl', 'ledgers'),
                 fetchSafe('gl', 'accounts'),
+                fetchSafe('gl', 'account_structures'), // Fixed: Added to prevent VoucherForm crash
                 fetchSafe('gl', 'detail_instances'),
                 fetchSafe('gl', 'detail_types'),
                 fetchSafe('gl', 'doc_types'), 
@@ -192,7 +185,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                 if(data) currencyGlobals = data;
             } catch(e){}
 
-            // Build account hierarchy map
             const accMap = {};
             accounts.forEach(a => accMap[a.id] = a);
             accounts.forEach(a => {
@@ -224,8 +216,9 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
             }));
 
             setLookups({
-                branches, ledgers, accounts, accMap, allDetailInstances, detailTypes,
-                docTypes, currencies, currencyGlobals, fiscalYears, fiscalPeriods, users
+                branches, ledgers, accounts, accountStructures, accMap, allDetailInstances, detailTypes,
+                docTypes, currencies, currencyGlobals, fiscalYears, fiscalPeriods, users,
+                permissions: { actions: ['view', 'print', 'attach'], allowed_branches: [], allowed_ledgers: [] } // Fixed: Added permissions
             });
         } catch (err) {
             console.error("Init error:", err);
@@ -289,7 +282,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
 
           let finalData = data || [];
 
-          // Post-process account features and type
           if (mainFilters.accountType || advFilters.accStatus || advFilters.featCurrency || advFilters.featTracking || advFilters.featQty) {
               finalData = finalData.filter(row => {
                   const acc = lookups.accMap[row.account_id];
@@ -338,7 +330,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
 
       let filteredData = rawData;
 
-      // Cross-Filtering logic
       const rowMatchesPath = (d, tabKey, selectedIds) => {
           if (!selectedIds || selectedIds.length === 0) return true;
           if (tabKey === 'branch') return selectedIds.includes(d.vouchers.branch_id);
@@ -355,7 +346,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
           return true;
       };
 
-      // Apply drill down filters EXCEPT for the current active tab
       Object.keys(drillPath).forEach(tabKey => {
           if (tabKey !== activeTab) { 
               filteredData = filteredData.filter(d => rowMatchesPath(d, tabKey, drillPath[tabKey]));
@@ -374,7 +364,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
               else if (baseCurrencyMode === 'rep2') { dAmount = parseNumber(d.rep2_debit); cAmount = parseNumber(d.rep2_credit); }
               
               return {
-                  id: d.id, // Unique item ID
+                  id: d.id,
                   voucher_id: d.vouchers.id, 
                   doc_no: d.vouchers.voucher_number, 
                   date: d.vouchers.voucher_date,
@@ -511,7 +501,13 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
               { field: 'debit', header: t.colDebit, width: 'w-32', className: 'text-left dir-ltr font-mono text-slate-800', render: (r) => formatNumber(r.debit) },
               { field: 'credit', header: t.colCredit, width: 'w-32', className: 'text-left dir-ltr font-mono text-slate-800', render: (r) => formatNumber(r.credit) },
               { field: 'balance', header: t.colBalance, width: 'w-32', className: 'text-left dir-ltr font-mono font-bold text-indigo-700', render: (r) => formatNumber(r.balance) },
-              { field: 'nature', header: t.colNature, width: 'w-16', className: 'text-center font-bold text-slate-500' }
+              { field: 'nature', header: t.colNature, width: 'w-16', className: 'text-center font-bold text-slate-500' },
+              { field: 'actions', header: t.actions, width: 'w-24', className: 'text-center', render: (r) => (
+                  <div className="flex items-center justify-center gap-1">
+                      <Button variant="ghost" size="iconSm" icon={Eye} onClick={() => setSelectedVoucherId(r.voucher_id)} title={t.viewDoc} className="text-slate-400 hover:text-indigo-600" />
+                      <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => setVoucherToPrint(r.voucher_id)} title={t.print} className="text-slate-400 hover:text-indigo-600" />
+                  </div>
+              )}
           ];
       }
 
@@ -597,6 +593,10 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                  <p className="text-xs text-slate-500 font-medium mt-1">{t.subtitle}</p>
               </div>
            </div>
+           <div className="flex gap-2">
+              <Button variant="outline" icon={Printer} title={t.print} className="hidden sm:flex" onClick={() => setIsMainPrintOpen(true)} />
+              <Button variant="outline" icon={Download} title={t.export} className="hidden sm:flex" />
+           </div>
         </div>
 
         {/* 6-Column Integrated Filter Section */}
@@ -604,7 +604,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
             <FilterSection onSearch={fetchReportData} onClear={handleClearSearch} isRtl={isRtl} title={t.search} defaultOpen={true}>
                 <div className="col-span-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     
-                    {/* Basic 6 Fields */}
                     <SelectField label={t.ledger} value={mainFilters.ledgerId} onChange={e => setMainFilters({...mainFilters, ledgerId: e.target.value})} isRtl={isRtl}>
                         <option value="" disabled>-</option>
                         {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
@@ -651,7 +650,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                         </div>
                     )}
 
-                    {/* Only with balance checkbox */}
                     <div className="col-span-full flex items-center h-8">
                         <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] font-bold text-slate-700 bg-indigo-50/50 px-3 py-1.5 rounded-lg border border-indigo-100">
                             <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500" checked={showWithBalanceOnly} onChange={e => setShowWithBalanceOnly(e.target.checked)} />
@@ -770,12 +768,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                           selectedIds={activeTab !== 'transactions' ? (drillPath[activeTab] || []) : undefined}
                           onSelectRow={activeTab !== 'transactions' ? handleRowSelect : undefined}
                           onSelectAll={activeTab !== 'transactions' ? handleSelectAll : undefined}
-                          actions={activeTab === 'transactions' ? (r) => (
-                              <div className="flex gap-1 justify-center items-center">
-                                  <Button variant="ghost" size="iconSm" icon={Eye} onClick={() => setSelectedVoucherId(r.voucher_id)} title={t.viewDoc} className="text-slate-400 hover:text-indigo-600" />
-                                  <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => setVoucherToPrint(r.voucher_id)} title={t.print} className="text-slate-400 hover:text-indigo-600" />
-                              </div>
-                          ) : undefined}
                        />
                        
                        {/* Exactly Aligned Custom Footer */}
@@ -785,7 +777,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                                  <div className="w-20 shrink-0"></div> {/* doc_no */}
                                  <div className="w-24 shrink-0"></div> {/* date */}
                                  <div className="w-48 shrink-0"></div> {/* account */}
-                                 <div className="w-64 shrink-0 font-black text-slate-700 px-3 flex justify-end items-center">{t.sum}:</div> {/* description -> Right aligned sum label */}
+                                 <div className="w-64 shrink-0 font-black text-slate-700 px-3 flex justify-end items-center">{t.sum}:</div> {/* description */}
                                  <div className="w-32 shrink-0 text-left dir-ltr font-mono font-black text-indigo-800 px-3 flex items-center">{formatNumber(totalSums.debit)}</div>
                                  <div className="w-32 shrink-0 text-left dir-ltr font-mono font-black text-indigo-800 px-3 flex items-center">{formatNumber(totalSums.credit)}</div>
                                  <div className="w-32 shrink-0"></div> {/* balance */}
@@ -810,42 +802,37 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
             </div>
         </div>
 
-        {/* Voucher View Modal */}
-        {selectedVoucherId && (
-            <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 overflow-hidden">
-                <div className="bg-white w-full h-full rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                    <div className="flex-1 overflow-hidden relative">
-                        {window.VoucherForm ? (
-                            <window.VoucherForm 
-                                voucherId={selectedVoucherId} 
-                                isCopy={false} 
-                                contextVals={currentContextVals} 
-                                lookups={lookups} 
-                                language={language}
-                                onClose={() => setSelectedVoucherId(null)} 
-                            />
-                        ) : (
-                            <div className="p-10 flex flex-col items-center justify-center text-slate-500 h-full">
-                                <p>VoucherForm Component Not Found</p>
-                                <Button variant="outline" className="mt-4" onClick={() => setSelectedVoucherId(null)}>{t.cancel}</Button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+        {/* --- MODALS --- */}
+        {selectedVoucherId && window.AccountReviewVoucherModal && (
+            <window.AccountReviewVoucherModal 
+                isOpen={!!selectedVoucherId} 
+                voucherId={selectedVoucherId} 
+                contextVals={currentContextVals} 
+                lookups={lookups} 
+                language={language} 
+                onClose={() => setSelectedVoucherId(null)} 
+                t={t}
+            />
         )}
 
-        {/* Voucher Print Modal */}
-        <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.print} size="full">
-            {voucherToPrint && window.VoucherPrint ? (
+        {voucherToPrint && window.VoucherPrint && (
+            <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.print} size="lg">
                 <window.VoucherPrint voucherId={voucherToPrint} onClose={() => setVoucherToPrint(null)} />
-            ) : (
-                <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
-                    <p>VoucherPrint Component Not Found</p>
-                    <Button variant="outline" className="mt-4" onClick={() => setVoucherToPrint(null)}>{t.cancel}</Button>
-                </div>
-            )}
-        </Modal>
+            </Modal>
+        )}
+
+        {isMainPrintOpen && window.AccountReviewPrint && (
+            <window.AccountReviewPrint 
+                isOpen={isMainPrintOpen} 
+                onClose={() => setIsMainPrintOpen(false)} 
+                data={transactionsWithBalance} 
+                columns={getColumns()} 
+                totalSums={totalSums} 
+                activeTab={activeTab} 
+                t={t} 
+                isRtl={isRtl} 
+            />
+        )}
     </div>
   );
 };
