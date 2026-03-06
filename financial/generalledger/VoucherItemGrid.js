@@ -325,19 +325,14 @@ const VoucherItemsGrid = ({
         const FROM_FIELD = 'source_code'; 
         const TO_FIELD = 'target_code';     
         
+        // ارسال مستقیم حروف متنی (مثل USD و IRR) به دیتابیس
         const queryFromVal = fromCode; 
         const queryToVal = toCode;
-
-        if (!queryFromVal || !queryToVal) {
-             alert(isRtl ? 'کد ارز یافت نشد.' : 'Currency code not found.');
-             setFetchingRate(false);
-             return;
-        }
 
         let rate = null;
         let isReverse = false;
 
-        // حذف سورت بر اساس created_at
+        // حذف کامل دستور order که باعث خطای 400 می‌شد
         const { data, error } = await supabase.schema('gen').from(TABLE_NAME)
             .select('rate')
             .eq(FROM_FIELD, queryFromVal)
@@ -350,7 +345,7 @@ const VoucherItemsGrid = ({
         if (data && data.rate) {
             rate = data.rate;
         } else {
-            // چک کردن حالت معکوس
+            // بررسی حالت معکوس
             const { data: revData, error: revErr } = await supabase.schema('gen').from(TABLE_NAME)
                 .select('rate')
                 .eq(FROM_FIELD, queryToVal)
