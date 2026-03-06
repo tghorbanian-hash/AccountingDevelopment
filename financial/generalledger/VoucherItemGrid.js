@@ -1,4 +1,4 @@
-/* Filename: financial/generalledger/VoucherItemsGrid.js */
+/* Filename: financial/generalledger/VoucherItemGrid.js */
 import React, { useState, useEffect, useRef } from 'react';
 import { Scale, Plus, PanelRightClose, PanelRightOpen, Coins, CopyPlus, Trash2, Copy, Layers, FileText, Calculator, X, RefreshCw } from 'lucide-react';
 
@@ -431,7 +431,16 @@ const VoucherItemsGrid = ({
                               </div>
                               <div className="w-[70px] shrink-0 flex items-center justify-center gap-1.5 bg-slate-50 border border-slate-100 rounded px-1.5 py-1 text-slate-500 font-bold whitespace-nowrap">
                                   <span>{getCurrencyTitle(item.currency_code)}</span>
-                                  {hasForeignCurrency && <Coins size={14} className="text-purple-500 shrink-0" title={t.currencyConversions} />}
+                                  {(isFxVoucher || hasForeignCurrency) && (
+                                      <button 
+                                          type="button" 
+                                          onClick={(e) => { e.stopPropagation(); setCurrencyModalIndex(index); }} 
+                                          className="text-purple-500 hover:text-purple-700 hover:bg-purple-100 p-0.5 rounded transition-colors focus:outline-none shrink-0" 
+                                          title={t.currencyConversions}
+                                      >
+                                          <Coins size={14} />
+                                      </button>
+                                  )}
                               </div>
                               <div className="w-[280px] shrink-0 text-slate-600 truncate" title={item.description || '-'}>{item.description || '-'}</div>
                               <div className="flex-1 flex flex-wrap items-center gap-2 min-w-[200px]">
@@ -539,7 +548,7 @@ const VoucherItemsGrid = ({
         </div>
 
         {currencyModalIndex !== null && voucherItems[currencyModalIndex] && (
-          <Modal isOpen={true} onClose={() => setCurrencyModalIndex(null)} title={`${t.currencyConversions} - ${t.row} ${voucherItems[currencyModalIndex].row_number}`} size="lg" footer={<Button variant="primary" onClick={() => setCurrencyModalIndex(null)}>{isRtl ? 'تایید و بستن' : 'Confirm & Close'}</Button>}>
+          <Modal isOpen={true} onClose={() => setCurrencyModalIndex(null)} title={`${t.currencyConversions} - ${t.row} ${voucherItems[currencyModalIndex].row_number}`} size="lg" footer={<Button variant={isReadonly ? 'ghost' : 'primary'} onClick={() => setCurrencyModalIndex(null)}>{isReadonly ? (isRtl ? 'بستن' : 'Close') : (isRtl ? 'تایید و بستن' : 'Confirm & Close')}</Button>}>
               <div className="p-4 bg-slate-50/50 flex flex-col gap-4">
                   <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm text-sm">
                       <div className="flex items-center gap-2">
