@@ -69,7 +69,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     creator: isRtl ? 'صادر کننده' : 'Creator',
     reviewer: isRtl ? 'بررسی کننده' : 'Reviewer',
     trackingNo: isRtl ? 'شماره پیگیری' : 'Tracking No',
-    headerDesc: isRtl ? 'شرح سند' : 'Header Desc',
+    headerDesc: isRtl ? 'شرح سربرگ' : 'Header Desc',
     itemDesc: isRtl ? 'شرح قلم' : 'Item Desc',
     all: isRtl ? 'همه' : 'All',
     active: isRtl ? 'فعال' : 'Active',
@@ -87,7 +87,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     colNature: isRtl ? 'ماهیت' : 'Nature',
     colDate: isRtl ? 'تاریخ' : 'Date',
     colDocNo: isRtl ? 'ش.سند' : 'Doc No',
-    colDesc: isRtl ? 'شرح' : 'Description',
+    colDesc: isRtl ? 'شرح قلم' : 'Description',
     sum: isRtl ? 'جمع کل' : 'Total',
     
     statusTemp: isRtl ? 'موقت' : 'Temporary',
@@ -96,7 +96,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
   };
 
   const tabSingular = isRtl ? {
-      branch: 'شعبه', group: 'گروه', col: 'حساب کل', moe: 'معین', detail: 'تفصیل', currency: 'ارز', tracking: 'پیگیری'
+      branch: 'شعبه', group: 'گروه', col: 'کل', moe: 'معین', detail: 'تفصیل', currency: 'ارز', tracking: 'پیگیری'
   } : {
       branch: 'Branch', group: 'Group', col: 'General', moe: 'Subsidiary', detail: 'Detail', currency: 'Currency', tracking: 'Tracking'
   };
@@ -134,6 +134,13 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       trackingNo: '', headerDesc: '', itemDesc: ''
   };
   const [advFilters, setAdvFilters] = useState(defaultAdvFilters);
+
+  const currentContextVals = useMemo(() => {
+      return {
+          ledger_id: mainFilters.ledgerId,
+          fiscal_year_id: mainFilters.fiscalYearId
+      };
+  }, [mainFilters.ledgerId, mainFilters.fiscalYearId]);
 
   // View Navigation
   const tabs = [
@@ -367,7 +374,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
               else if (baseCurrencyMode === 'rep2') { dAmount = parseNumber(d.rep2_debit); cAmount = parseNumber(d.rep2_credit); }
               
               return {
-                  id: d.id, // Explicit ID for DataGrid selection engine
+                  id: d.id, // Unique item ID
                   voucher_id: d.vouchers.id, 
                   doc_no: d.vouchers.voucher_number, 
                   date: d.vouchers.voucher_date,
@@ -392,7 +399,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
           if (activeTab === 'branch') {
               const bId = d.vouchers.branch_id;
               const b = lookups.branches.find(x => x.id === bId);
-              keys.push({ id: bId, code: b?.code || '-', title: b?.title || 'No Branch' });
+              keys.push({ id: bId || 'no-branch', code: b?.code || '-', title: b?.title || 'No Branch' });
           } else if (activeTab === 'group') {
               const grp = lookups.accMap[d.account_id]?.parentGroup;
               if (grp) keys.push({ id: grp.id, code: grp.full_code || grp.code, title: grp.title });
@@ -423,7 +430,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
 
           keys.forEach(k => {
               if (!aggMap.has(k.id)) {
-                  // Ensure explicit "id" is set for DataGrid component
                   aggMap.set(k.id, { id: k.id, code: k.code, title: k.title, extra: k.extra, debit: 0, credit: 0 });
               }
               const group = aggMap.get(k.id);
@@ -462,25 +468,32 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       });
   }, [reportData, activeTab, isRtl]);
 
-  const handleRowSelect = (id) => {
+  const handleRowSelect = (id, checked) => {
       if (activeTab === 'transactions') return; 
-      
-      const newPath = { ...drillPath };
-      if (!newPath[activeTab]) newPath[activeTab] = [];
-      
-      if (newPath[activeTab].includes(id)) {
-          newPath[activeTab] = newPath[activeTab].filter(x => x !== id);
-      } else {
-          newPath[activeTab].push(id);
-      }
-      setDrillPath(newPath);
+      setDrillPath(prev => {
+          const current = prev[activeTab] || [];
+          return {
+              ...prev,
+              [activeTab]: checked ? [...current, id] : current.filter(x => x !== id)
+          };
+      });
+  };
+
+  const handleSelectAll = (checked) => {
+      if (activeTab === 'transactions') return;
+      setDrillPath(prev => ({
+          ...prev,
+          [activeTab]: checked ? reportData.map(r => r.id) : []
+      }));
   };
 
   const removeDrillFilter = (tab, id) => {
-      const newPath = { ...drillPath };
-      newPath[tab] = newPath[tab].filter(x => x !== id);
-      if (newPath[tab].length === 0) delete newPath[tab];
-      setDrillPath(newPath);
+      setDrillPath(prev => {
+          const newPath = { ...prev };
+          newPath[tab] = newPath[tab].filter(x => x !== id);
+          if (newPath[tab].length === 0) delete newPath[tab];
+          return newPath;
+      });
   };
 
   // --- UI Renders ---
@@ -491,20 +504,14 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
   const getColumns = () => {
       if (activeTab === 'transactions') {
           return [
-              { field: 'doc_no', header: t.colDocNo, width: 'w-20', className: 'text-center font-mono font-bold text-indigo-700 hover:underline cursor-pointer', render: (r) => <span onClick={()=>setSelectedVoucherId(r.voucher_id)}>{r.doc_no || '-'}</span> },
+              { field: 'doc_no', header: t.colDocNo, width: 'w-20', className: 'text-center font-mono font-bold text-slate-700' },
               { field: 'date', header: t.colDate, width: 'w-24', className: 'text-center font-mono text-slate-600 dir-ltr' },
               { field: 'account', header: t.tabMoe, width: 'w-48', className: 'truncate', render: (r) => <span title={r.account}>{r.account}</span> },
               { field: 'description', header: t.colDesc, width: 'w-64', className: 'truncate', render: (r) => <span title={r.description}>{r.description}</span> },
               { field: 'debit', header: t.colDebit, width: 'w-32', className: 'text-left dir-ltr font-mono text-slate-800', render: (r) => formatNumber(r.debit) },
               { field: 'credit', header: t.colCredit, width: 'w-32', className: 'text-left dir-ltr font-mono text-slate-800', render: (r) => formatNumber(r.credit) },
               { field: 'balance', header: t.colBalance, width: 'w-32', className: 'text-left dir-ltr font-mono font-bold text-indigo-700', render: (r) => formatNumber(r.balance) },
-              { field: 'nature', header: t.colNature, width: 'w-16', className: 'text-center font-bold text-slate-500' },
-              { field: 'actions', header: t.actions, width: 'w-24', className: 'text-center', render: (r) => (
-                  <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="iconSm" icon={Eye} onClick={() => setSelectedVoucherId(r.voucher_id)} title={t.viewDoc} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" />
-                      <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => setVoucherToPrint(r.voucher_id)} title={t.print} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" />
-                  </div>
-              )}
+              { field: 'nature', header: t.colNature, width: 'w-16', className: 'text-center font-bold text-slate-500' }
           ];
       }
 
@@ -590,142 +597,135 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                  <p className="text-xs text-slate-500 font-medium mt-1">{t.subtitle}</p>
               </div>
            </div>
-           <div className="flex gap-2">
-              <Button variant="outline" icon={Printer} title={t.print} className="hidden sm:flex" />
-              <Button variant="outline" icon={Download} title={t.export} className="hidden sm:flex" />
-           </div>
         </div>
 
-        {/* Filters Section (Integrated 6 Columns) */}
-        <div className="shrink-0 mb-4 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold">
-                <Layers size={18} className="text-indigo-600" />
-                <h2 className="text-sm">{t.search}</h2>
-            </div>
+        {/* 6-Column Integrated Filter Section */}
+        <div className="shrink-0 mb-4">
+            <FilterSection onSearch={fetchReportData} onClear={handleClearSearch} isRtl={isRtl} title={t.search} defaultOpen={true}>
+                <div className="col-span-full grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    
+                    {/* Basic 6 Fields */}
+                    <SelectField label={t.ledger} value={mainFilters.ledgerId} onChange={e => setMainFilters({...mainFilters, ledgerId: e.target.value})} isRtl={isRtl}>
+                        <option value="" disabled>-</option>
+                        {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+                    </SelectField>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
-                {/* --- Row 1 & 2: Basic Filters (9 items -> fits nicely in 6 cols spanning 1.5 rows) --- */}
-                <SelectField label={t.ledger} value={mainFilters.ledgerId} onChange={e => setMainFilters({...mainFilters, ledgerId: e.target.value})} isRtl={isRtl}>
-                    <option value="" disabled>-</option>
-                    {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-                </SelectField>
+                    <SelectField label={t.fiscalYear} value={mainFilters.fiscalYearId} onChange={e => setMainFilters({...mainFilters, fiscalYearId: e.target.value})} isRtl={isRtl}>
+                        <option value="" disabled>-</option>
+                        {lookups.fiscalYears.map(y => <option key={y.id} value={y.id}>{y.title}</option>)}
+                    </SelectField>
 
-                <SelectField label={t.fiscalYear} value={mainFilters.fiscalYearId} onChange={e => setMainFilters({...mainFilters, fiscalYearId: e.target.value})} isRtl={isRtl}>
-                    <option value="" disabled>-</option>
-                    {lookups.fiscalYears.map(y => <option key={y.id} value={y.id}>{y.title}</option>)}
-                </SelectField>
+                    <SelectField label={t.mainCurrency} value={baseCurrencyMode} onChange={e => setBaseCurrencyMode(e.target.value)} isRtl={isRtl}>
+                        <option value="op">{isRtl ? 'عملیاتی' : 'Operational'} ({lookups.currencyGlobals?.op_currency})</option>
+                        {lookups.currencyGlobals?.rep1_currency && <option value="rep1">{isRtl ? 'گزارشگری ۱' : 'Reporting 1'} ({lookups.currencyGlobals.rep1_currency})</option>}
+                        {lookups.currencyGlobals?.rep2_currency && <option value="rep2">{isRtl ? 'گزارشگری ۲' : 'Reporting 2'} ({lookups.currencyGlobals.rep2_currency})</option>}
+                    </SelectField>
 
-                <SelectField label={t.timeRangeType} value={mainFilters.timeRangeType} onChange={e => setMainFilters({...mainFilters, timeRangeType: e.target.value})} isRtl={isRtl}>
-                    <option value="period">{t.periodRange}</option>
-                    <option value="date">{t.dateRange}</option>
-                </SelectField>
+                    <SelectField label={t.accountType} value={mainFilters.accountType} onChange={e => setMainFilters({...mainFilters, accountType: e.target.value})} isRtl={isRtl}>
+                        <option value="">{t.all}</option>
+                        <option value="دائم">{isRtl ? 'دائم' : 'Permanent'}</option>
+                        <option value="موقت">{isRtl ? 'موقت' : 'Temporary'}</option>
+                        <option value="انتظامی">{isRtl ? 'انتظامی' : 'Disciplinary'}</option>
+                    </SelectField>
 
-                {mainFilters.timeRangeType === 'period' ? (
-                    <>
-                       <SelectField label={t.fromPeriod} value={mainFilters.fromPeriodId} onChange={e => setMainFilters({...mainFilters, fromPeriodId: e.target.value})} isRtl={isRtl}>
-                           <option value="">{t.all}</option>
-                           {lookups.fiscalPeriods.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                       </SelectField>
-                       <SelectField label={t.toPeriod} value={mainFilters.toPeriodId} onChange={e => setMainFilters({...mainFilters, toPeriodId: e.target.value})} isRtl={isRtl}>
-                           <option value="">{t.all}</option>
-                           {lookups.fiscalPeriods.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                       </SelectField>
-                    </>
-                ) : (
-                    <>
-                       <InputField type="date" label={t.fromDate} value={mainFilters.fromDate} onChange={e => setMainFilters({...mainFilters, fromDate: e.target.value})} isRtl={isRtl} />
-                       <InputField type="date" label={t.toDate} value={mainFilters.toDate} onChange={e => setMainFilters({...mainFilters, toDate: e.target.value})} isRtl={isRtl} />
-                    </>
-                )}
+                    <SelectField label={t.timeRangeType} value={mainFilters.timeRangeType} onChange={e => setMainFilters({...mainFilters, timeRangeType: e.target.value})} isRtl={isRtl}>
+                        <option value="period">{t.periodRange}</option>
+                        <option value="date">{t.dateRange}</option>
+                    </SelectField>
 
-                <SelectField label={t.docType} value={mainFilters.docType} onChange={e => setMainFilters({...mainFilters, docType: e.target.value})} isRtl={isRtl}>
-                    <option value="">{t.all}</option>
-                    {lookups.docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
-                </SelectField>
+                    {mainFilters.timeRangeType === 'period' ? (
+                        <div className="grid grid-cols-2 gap-2">
+                           <SelectField label={t.fromPeriod} value={mainFilters.fromPeriodId} onChange={e => setMainFilters({...mainFilters, fromPeriodId: e.target.value})} isRtl={isRtl}>
+                               <option value="">{t.all}</option>
+                               {lookups.fiscalPeriods.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                           </SelectField>
+                           <SelectField label={t.toPeriod} value={mainFilters.toPeriodId} onChange={e => setMainFilters({...mainFilters, toPeriodId: e.target.value})} isRtl={isRtl}>
+                               <option value="">{t.all}</option>
+                               {lookups.fiscalPeriods.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                           </SelectField>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                           <InputField type="date" label={t.fromDate} value={mainFilters.fromDate} onChange={e => setMainFilters({...mainFilters, fromDate: e.target.value})} isRtl={isRtl} />
+                           <InputField type="date" label={t.toDate} value={mainFilters.toDate} onChange={e => setMainFilters({...mainFilters, toDate: e.target.value})} isRtl={isRtl} />
+                        </div>
+                    )}
 
-                <SelectField label={t.mainCurrency} value={baseCurrencyMode} onChange={e => setBaseCurrencyMode(e.target.value)} isRtl={isRtl}>
-                    <option value="op">{isRtl ? 'عملیاتی' : 'Operational'} ({lookups.currencyGlobals?.op_currency})</option>
-                    {lookups.currencyGlobals?.rep1_currency && <option value="rep1">{isRtl ? 'گزارشگری ۱' : 'Reporting 1'} ({lookups.currencyGlobals.rep1_currency})</option>}
-                    {lookups.currencyGlobals?.rep2_currency && <option value="rep2">{isRtl ? 'گزارشگری ۲' : 'Reporting 2'} ({lookups.currencyGlobals.rep2_currency})</option>}
-                </SelectField>
+                    {/* Only with balance checkbox */}
+                    <div className="col-span-full flex items-center h-8">
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] font-bold text-slate-700 bg-indigo-50/50 px-3 py-1.5 rounded-lg border border-indigo-100">
+                            <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500" checked={showWithBalanceOnly} onChange={e => setShowWithBalanceOnly(e.target.checked)} />
+                            {t.showWithBalanceOnly}
+                        </label>
+                    </div>
 
-                <SelectField label={t.accountType} value={mainFilters.accountType} onChange={e => setMainFilters({...mainFilters, accountType: e.target.value})} isRtl={isRtl}>
-                    <option value="">{t.all}</option>
-                    <option value="دائم">{isRtl ? 'دائم' : 'Permanent'}</option>
-                    <option value="موقت">{isRtl ? 'موقت' : 'Temporary'}</option>
-                    <option value="انتظامی">{isRtl ? 'انتظامی' : 'Disciplinary'}</option>
-                </SelectField>
+                    {/* Expandable Advanced Filters */}
+                    {showAdvanced && (
+                        <>
+                           <div className="col-span-full border-t border-dashed border-slate-200 my-2"></div>
+                           
+                           <SelectField label={t.docType} value={mainFilters.docType} onChange={e => setMainFilters({...mainFilters, docType: e.target.value})} isRtl={isRtl}>
+                               <option value="">{t.all}</option>
+                               {lookups.docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
+                           </SelectField>
 
-                <div className="flex items-center h-9 pb-1">
-                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-700">
-                        <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" checked={showWithBalanceOnly} onChange={e => setShowWithBalanceOnly(e.target.checked)} />
-                        {t.showWithBalanceOnly}
-                    </label>
+                           <div className="lg:col-span-2 flex items-center flex-wrap gap-4 p-2 bg-slate-50 border border-slate-200 rounded h-9 mt-[18px]">
+                               <span className="font-bold text-slate-500 text-[10px] tracking-wider">{t.advFeatures}:</span>
+                               <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featCurrency} onChange={e => setAdvFilters({...advFilters, featCurrency: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />{t.featCurrency}</label>
+                               <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featTracking} onChange={e => setAdvFilters({...advFilters, featTracking: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />{t.featTracking}</label>
+                               <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featQty} onChange={e => setAdvFilters({...advFilters, featQty: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />{t.featQty}</label>
+                           </div>
+
+                           <InputField label={t.docNoFrom} value={advFilters.docNoFrom} onChange={e => setAdvFilters({...advFilters, docNoFrom: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                           <InputField label={t.docNoTo} value={advFilters.docNoTo} onChange={e => setAdvFilters({...advFilters, docNoTo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                           <InputField label={t.crossNoFrom} value={advFilters.crossNoFrom} onChange={e => setAdvFilters({...advFilters, crossNoFrom: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                           
+                           <InputField label={t.crossNoTo} value={advFilters.crossNoTo} onChange={e => setAdvFilters({...advFilters, crossNoTo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                           <InputField label={t.subNo} value={advFilters.subNo} onChange={e => setAdvFilters({...advFilters, subNo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                           <SelectField label={t.docStatus} value={advFilters.docStatus} onChange={e => setAdvFilters({...advFilters, docStatus: e.target.value})} isRtl={isRtl}>
+                               <option value="">{t.all}</option>
+                               <option value="temporary">{t.statusTemp}</option>
+                               <option value="reviewed">{t.statusRev}</option>
+                               <option value="finalized">{t.statusFin}</option>
+                           </SelectField>
+                           
+                           <SelectField label={t.accStatus} value={advFilters.accStatus} onChange={e => setAdvFilters({...advFilters, accStatus: e.target.value})} isRtl={isRtl}>
+                               <option value="">{t.all}</option>
+                               <option value="active">{t.active}</option>
+                               <option value="inactive">{t.inactive}</option>
+                           </SelectField>
+
+                           <SelectField label={t.creator} value={advFilters.creatorId} onChange={e => setAdvFilters({...advFilters, creatorId: e.target.value})} isRtl={isRtl}>
+                               <option value="">{t.all}</option>
+                               {lookups?.users?.map(u => <option key={u.id} value={u.id}>{u.title || u.email || u.username}</option>)}
+                           </SelectField>
+
+                           <SelectField label={t.reviewer} value={advFilters.reviewerId} onChange={e => setAdvFilters({...advFilters, reviewerId: e.target.value})} isRtl={isRtl}>
+                               <option value="">{t.all}</option>
+                               {lookups?.users?.map(u => <option key={u.id} value={u.id}>{u.title || u.email || u.username}</option>)}
+                           </SelectField>
+
+                           <InputField label={t.trackingNo} value={advFilters.trackingNo} onChange={e => setAdvFilters({...advFilters, trackingNo: e.target.value})} isRtl={isRtl} dir="ltr" />
+                           <InputField label={t.headerDesc} value={advFilters.headerDesc} onChange={e => setAdvFilters({...advFilters, headerDesc: e.target.value})} isRtl={isRtl} />
+                           <div className="lg:col-span-4"><InputField label={t.itemDesc} value={advFilters.itemDesc} onChange={e => setAdvFilters({...advFilters, itemDesc: e.target.value})} isRtl={isRtl} /></div>
+                        </>
+                    )}
+
+                    {/* Expand/Collapse Toggle inside grid */}
+                    <div className="col-span-full mt-1">
+                        <button type="button" onClick={() => setShowAdvanced(!showAdvanced)} className="text-indigo-600 hover:text-indigo-800 text-[11px] font-bold flex items-center gap-1 transition-colors">
+                            {showAdvanced ? t.lessFilters : t.moreFilters}
+                            {showAdvanced ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                        </button>
+                    </div>
                 </div>
-
-                {/* --- Row 3+: Advanced Filters (Expandable) --- */}
-                {showAdvanced && (
-                    <>
-                       <div className="lg:col-span-2 xl:col-span-3 flex items-center flex-wrap gap-4 p-2 bg-slate-50 border border-slate-200 rounded h-9">
-                           <span className="font-bold text-slate-500 text-[10px] tracking-wider">{t.advFeatures}:</span>
-                           <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featCurrency} onChange={e => setAdvFilters({...advFilters, featCurrency: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />{t.featCurrency}</label>
-                           <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featTracking} onChange={e => setAdvFilters({...advFilters, featTracking: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />{t.featTracking}</label>
-                           <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featQty} onChange={e => setAdvFilters({...advFilters, featQty: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />{t.featQty}</label>
-                       </div>
-
-                       <InputField label={t.docNoFrom} value={advFilters.docNoFrom} onChange={e => setAdvFilters({...advFilters, docNoFrom: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
-                       <InputField label={t.docNoTo} value={advFilters.docNoTo} onChange={e => setAdvFilters({...advFilters, docNoTo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
-                       <InputField label={t.crossNoFrom} value={advFilters.crossNoFrom} onChange={e => setAdvFilters({...advFilters, crossNoFrom: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
-                       <InputField label={t.crossNoTo} value={advFilters.crossNoTo} onChange={e => setAdvFilters({...advFilters, crossNoTo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
-                       <InputField label={t.subNo} value={advFilters.subNo} onChange={e => setAdvFilters({...advFilters, subNo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
-                       
-                       <SelectField label={t.docStatus} value={advFilters.docStatus} onChange={e => setAdvFilters({...advFilters, docStatus: e.target.value})} isRtl={isRtl}>
-                           <option value="">{t.all}</option>
-                           <option value="temporary">{t.statusTemp}</option>
-                           <option value="reviewed">{t.statusRev}</option>
-                           <option value="finalized">{t.statusFin}</option>
-                       </SelectField>
-                       
-                       <SelectField label={t.accStatus} value={advFilters.accStatus} onChange={e => setAdvFilters({...advFilters, accStatus: e.target.value})} isRtl={isRtl}>
-                           <option value="">{t.all}</option>
-                           <option value="active">{t.active}</option>
-                           <option value="inactive">{t.inactive}</option>
-                       </SelectField>
-
-                       <SelectField label={t.creator} value={advFilters.creatorId} onChange={e => setAdvFilters({...advFilters, creatorId: e.target.value})} isRtl={isRtl}>
-                           <option value="">{t.all}</option>
-                           {lookups?.users?.map(u => <option key={u.id} value={u.id}>{u.title || u.email || u.username}</option>)}
-                       </SelectField>
-
-                       <SelectField label={t.reviewer} value={advFilters.reviewerId} onChange={e => setAdvFilters({...advFilters, reviewerId: e.target.value})} isRtl={isRtl}>
-                           <option value="">{t.all}</option>
-                           {lookups?.users?.map(u => <option key={u.id} value={u.id}>{u.title || u.email || u.username}</option>)}
-                       </SelectField>
-
-                       <InputField label={t.trackingNo} value={advFilters.trackingNo} onChange={e => setAdvFilters({...advFilters, trackingNo: e.target.value})} isRtl={isRtl} dir="ltr" />
-                       <InputField label={t.headerDesc} value={advFilters.headerDesc} onChange={e => setAdvFilters({...advFilters, headerDesc: e.target.value})} isRtl={isRtl} />
-                       <InputField label={t.itemDesc} value={advFilters.itemDesc} onChange={e => setAdvFilters({...advFilters, itemDesc: e.target.value})} isRtl={isRtl} />
-                    </>
-                )}
-            </div>
-
-            {/* Actions Bar */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-               <Button variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)} icon={showAdvanced ? ChevronUp : ChevronDown}>
-                   {showAdvanced ? t.lessFilters : t.moreFilters}
-               </Button>
-               
-               <div className="flex gap-2">
-                   <Button variant="outline" onClick={handleClearSearch} className="h-9 w-24 justify-center">{t.cancel}</Button>
-                   <Button variant="primary" onClick={fetchReportData} icon={RefreshCw} className="h-9 w-36 justify-center" isLoading={isFetchingData}>{t.fetchData}</Button>
-               </div>
-            </div>
+            </FilterSection>
 
             {/* Chips Area */}
             {Object.keys(drillPath).length > 0 && (
                <div className="flex flex-wrap items-center gap-2 mt-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
                    {renderFilterChips()}
-                   <button onClick={handleClearAllDrillFilters} className="text-[10px] text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-full flex items-center gap-1 font-bold transition-colors mr-auto">
+                   <button onClick={handleClearAllDrillFilters} className="text-[10px] text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-full flex items-center gap-1 font-bold transition-colors mr-auto border border-red-200">
                        <Trash2 size={12}/> {t.clearAll}
                    </button>
                </div>
@@ -767,33 +767,41 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                           columns={getColumns()} 
                           data={transactionsWithBalance} 
                           isRtl={isRtl} 
-                          selectedIds={drillPath[activeTab] || []}
-                          onSelectRow={handleRowSelect}
+                          selectedIds={activeTab !== 'transactions' ? (drillPath[activeTab] || []) : undefined}
+                          onSelectRow={activeTab !== 'transactions' ? handleRowSelect : undefined}
+                          onSelectAll={activeTab !== 'transactions' ? handleSelectAll : undefined}
+                          actions={activeTab === 'transactions' ? (r) => (
+                              <div className="flex gap-1 justify-center items-center">
+                                  <Button variant="ghost" size="iconSm" icon={Eye} onClick={() => setSelectedVoucherId(r.voucher_id)} title={t.viewDoc} className="text-slate-400 hover:text-indigo-600" />
+                                  <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => setVoucherToPrint(r.voucher_id)} title={t.print} className="text-slate-400 hover:text-indigo-600" />
+                              </div>
+                          ) : undefined}
                        />
                        
                        {/* Exactly Aligned Custom Footer */}
-                       <div className="bg-slate-100 border-t border-slate-300 p-0 shrink-0 flex items-center h-12">
+                       <div className="bg-slate-100 border-t border-slate-300 p-0 shrink-0 flex items-center h-12 text-[11px]">
                           {activeTab === 'transactions' ? (
                               <>
-                                 <div className="w-20"></div> {/* doc_no */}
-                                 <div className="w-24"></div> {/* date */}
-                                 <div className="w-48"></div> {/* account */}
-                                 <div className="w-64 font-black text-slate-700 px-3 text-left">{t.sum}:</div> {/* description */}
-                                 <div className="w-32 text-left dir-ltr font-mono font-black text-indigo-800 px-3">{formatNumber(totalSums.debit)}</div>
-                                 <div className="w-32 text-left dir-ltr font-mono font-black text-indigo-800 px-3">{formatNumber(totalSums.credit)}</div>
-                                 <div className="w-32 text-left dir-ltr font-mono font-black text-indigo-800 px-3"></div> {/* balance */}
-                                 <div className="w-16"></div> {/* nature */}
-                                 <div className="w-24"></div> {/* actions */}
+                                 <div className="w-20 shrink-0"></div> {/* doc_no */}
+                                 <div className="w-24 shrink-0"></div> {/* date */}
+                                 <div className="w-48 shrink-0"></div> {/* account */}
+                                 <div className="w-64 shrink-0 font-black text-slate-700 px-3 flex justify-end items-center">{t.sum}:</div> {/* description -> Right aligned sum label */}
+                                 <div className="w-32 shrink-0 text-left dir-ltr font-mono font-black text-indigo-800 px-3 flex items-center">{formatNumber(totalSums.debit)}</div>
+                                 <div className="w-32 shrink-0 text-left dir-ltr font-mono font-black text-indigo-800 px-3 flex items-center">{formatNumber(totalSums.credit)}</div>
+                                 <div className="w-32 shrink-0"></div> {/* balance */}
+                                 <div className="w-16 shrink-0"></div> {/* nature */}
+                                 <div className="w-24 shrink-0"></div> {/* actions */}
                               </>
                           ) : (
                               <>
-                                 <div className="w-32"></div> {/* code */}
-                                 <div className={`font-black text-slate-700 px-3 text-left ${activeTab === 'detail' ? 'w-96' : 'w-64'}`}>{t.sum}:</div> {/* title (+ extra if detail) */}
-                                 <div className="w-36 text-left dir-ltr font-mono font-black text-indigo-800 px-3">{formatNumber(totalSums.debit)}</div>
-                                 <div className="w-36 text-left dir-ltr font-mono font-black text-indigo-800 px-3">{formatNumber(totalSums.credit)}</div>
-                                 <div className="w-36 text-left dir-ltr font-mono font-black text-emerald-700 px-3">{formatNumber(totalSums.balDebit)}</div>
-                                 <div className="w-36 text-left dir-ltr font-mono font-black text-rose-700 px-3">{formatNumber(totalSums.balCredit)}</div>
-                                 <div className="w-20"></div> {/* nature */}
+                                 <div className="w-12 shrink-0"></div> {/* checkbox space */}
+                                 <div className="w-32 shrink-0"></div> {/* code */}
+                                 <div className={`${activeTab === 'detail' ? 'w-96' : 'w-64'} shrink-0 font-black text-slate-700 px-3 flex justify-end items-center`}>{t.sum}:</div> {/* title (+ extra if detail) */}
+                                 <div className="w-36 shrink-0 text-left dir-ltr font-mono font-black text-indigo-800 px-3 flex items-center">{formatNumber(totalSums.debit)}</div>
+                                 <div className="w-36 shrink-0 text-left dir-ltr font-mono font-black text-indigo-800 px-3 flex items-center">{formatNumber(totalSums.credit)}</div>
+                                 <div className="w-36 shrink-0 text-left dir-ltr font-mono font-black text-emerald-700 px-3 flex items-center">{formatNumber(totalSums.balDebit)}</div>
+                                 <div className="w-36 shrink-0 text-left dir-ltr font-mono font-black text-rose-700 px-3 flex items-center">{formatNumber(totalSums.balCredit)}</div>
+                                 <div className="w-20 shrink-0"></div> {/* nature */}
                               </>
                           )}
                        </div>
@@ -811,7 +819,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                             <window.VoucherForm 
                                 voucherId={selectedVoucherId} 
                                 isCopy={false} 
-                                contextVals={contextVals} 
+                                contextVals={currentContextVals} 
                                 lookups={lookups} 
                                 language={language}
                                 onClose={() => setSelectedVoucherId(null)} 
