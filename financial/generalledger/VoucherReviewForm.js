@@ -26,6 +26,28 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showAttachModal, setShowAttachModal] = useState(false);
 
+  const ledgerStructureCode = useMemo(() => {
+     const ledger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher?.ledger_id));
+     return String(ledger?.structure || '').trim();
+  }, [lookups.ledgers, currentVoucher?.ledger_id]);
+
+  const validAccountsOptions = useMemo(() => {
+     const targetStructure = lookups.accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
+     const structureId = targetStructure ? String(targetStructure.id) : null;
+     return lookups.accounts.filter(a => {
+        const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
+        return String(a.structure_id) === structureId && isSubsidiary;
+     }).map(a => ({ value: a.id, label: `${a.full_code} - ${a.title}`, subLabel: a.path }));
+  }, [lookups.accounts, lookups.accountStructures, ledgerStructureCode]);
+
+  const allDetailInstancesFormatted = useMemo(() => {
+      return lookups.allDetailInstances.map(d => ({
+          id: d.id,
+          category_code: d.detail_type_code,
+          label: (d.detail_code ? d.detail_code + ' - ' : '') + d.title
+      }));
+  }, [lookups.allDetailInstances]);
+
   useEffect(() => {
     if (voucherId) fetchVoucherData(voucherId);
   }, [voucherId]);
@@ -220,29 +242,6 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
 
   const ledgerCurrencyLabel = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency || lookups.currencyGlobals?.op_currency;
 
-  const ledgerStructureCode = useMemo(() => {
-     const ledger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher?.ledger_id));
-     return String(ledger?.structure || '').trim();
-  }, [lookups.ledgers, currentVoucher?.ledger_id]);
-
-  const validAccountsOptions = useMemo(() => {
-     const targetStructure = lookups.accountStructures.find(s => String(s.code).trim() === ledgerStructureCode);
-     const structureId = targetStructure ? String(targetStructure.id) : null;
-     return lookups.accounts.filter(a => {
-        const isSubsidiary = a.level === 'subsidiary' || a.level === 'معین' || a.level === '4';
-        return String(a.structure_id) === structureId && isSubsidiary;
-     }).map(a => ({ value: a.id, label: `${a.full_code} - ${a.title}`, subLabel: a.path }));
-  }, [lookups.accounts, lookups.accountStructures, ledgerStructureCode]);
-
-  const allDetailInstancesFormatted = useMemo(() => {
-      return lookups.allDetailInstances.map(d => ({
-          id: d.id,
-          category_code: d.detail_type_code,
-          label: (d.detail_code ? d.detail_code + ' - ' : '') + d.title
-      }));
-  }, [lookups.allDetailInstances]);
-
-  // بررسی وضعیت FX در زمان بررسی
   const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
   const defaultCurrency = currentLedger?.currency || '';
   const isFxVoucher = voucherItems.some(i => i.currency_code !== defaultCurrency);
@@ -279,7 +278,7 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
             isReadonly ? (
               <>
                  <div className="h-6 w-px bg-slate-200 mx-1"></div>
-                 <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={Save}>{t.revertToTemp}</Button>
+                 <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={RotateCcw}>{t.revertToTemp}</Button>
               </>
             ) : (
               <>
@@ -387,20 +386,29 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
         </div>
       </div>
 
-      {showPrintModal && window.VoucherPrint && (
-          <Modal isOpen={true} onClose={() => setShowPrintModal(false)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
-              <window.VoucherPrint voucherId={voucherId} onClose={() => setShowPrintModal(false)} />
-          </Modal>
-      )}
+      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
+          {voucherToPrint && window.VoucherPrint ? (
+              <window.VoucherPrint voucherId={voucherToPrint.id || voucherId} onClose={() => setVoucherToPrint(null)} />
+          ) : (
+              <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                  <FileWarning size={48} className="text-amber-400" />
+                  <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
+              </div>
+          )}
+      </Modal>
 
-      {showAttachModal && window.VoucherAttachments && (
-          <Modal isOpen={true} onClose={() => setShowAttachModal(false)} title={t.attachments || 'ضمائم'} size="md">
-              <window.VoucherAttachments voucherId={voucherId} onClose={() => setShowAttachModal(false)} readOnly={isReadonly} />
-          </Modal>
-      )}
+      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'ضمائم'} size="md">
+          {voucherForAttachments && window.VoucherAttachments ? (
+              <window.VoucherAttachments voucherId={voucherForAttachments.id || voucherId} onClose={() => setVoucherForAttachments(null)} readOnly={isReadonly} />
+          ) : (
+              <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                  <FileWarning size={48} className="text-amber-400" />
+                  <p>{isRtl ? 'کامپوننت ضمائم یافت نشد. لطفاً فایل VoucherAttachments.js را در پروژه قرار دهید.' : 'Attachments component not found. Please include VoucherAttachments.js.'}</p>
+              </div>
+          )}
+      </Modal>
     </div>
   );
 };
 
 window.VoucherReviewForm = VoucherReviewForm;
-export default VoucherReviewForm;
