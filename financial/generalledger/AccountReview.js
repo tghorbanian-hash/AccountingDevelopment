@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Layers, ChevronDown, ChevronUp,
-  Printer, Download, X, Calculator, Eye
+  Printer, Download, X, Calculator, RefreshCw, Eye, Trash2
 } from 'lucide-react';
 
 const AccountReview = ({ language = 'fa', setHeaderNode }) => {
   const isRtl = language === 'fa';
   const UI = window.UI || {};
-  const { Button, InputField, SelectField, DataGrid, FilterSection, Badge } = UI;
+  const { Button, InputField, SelectField, DataGrid, FilterSection, Badge, Modal } = UI;
   const { formatNumber, parseNumber } = UI.utils || { formatNumber: (v) => v, parseNumber: (v) => v };
   const supabase = window.supabase;
 
@@ -22,6 +22,9 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     loading: isRtl ? 'در حال بارگذاری...' : 'Loading...',
     fetchData: isRtl ? 'اجرای گزارش' : 'Run Report',
     noData: isRtl ? 'داده‌ای یافت نشد' : 'No data found',
+    clearAll: isRtl ? 'حذف همه فیلترها' : 'Clear All Filters',
+    actions: isRtl ? 'عملیات' : 'Actions',
+    viewDoc: isRtl ? 'مشاهده سند' : 'View Document',
     
     // Tabs
     tabBranch: isRtl ? 'شعبه' : 'Branch',
@@ -145,6 +148,8 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
   ];
   const [activeTab, setActiveTab] = useState('col');
   const [drillPath, setDrillPath] = useState({});
+  const [selectedVoucherId, setSelectedVoucherId] = useState(null);
+  const [voucherToPrint, setVoucherToPrint] = useState(null);
 
   // --- Init App ---
   useEffect(() => {
@@ -314,6 +319,10 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       setAdvFilters(defaultAdvFilters);
       setDrillPath({});
       setRawData([]);
+  };
+
+  const handleClearAllDrillFilters = () => {
+      setDrillPath({});
   };
 
   // --- Aggregation Engine ---
@@ -490,6 +499,12 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
               { field: 'credit', header: t.colCredit, width: 'w-32', className: 'text-left dir-ltr font-mono text-slate-800', render: (r) => formatNumber(r.credit) },
               { field: 'balance', header: t.colBalance, width: 'w-32', className: 'text-left dir-ltr font-mono font-bold text-indigo-700', render: (r) => formatNumber(r.balance) },
               { field: 'nature', header: t.colNature, width: 'w-16', className: 'text-center font-bold text-slate-500' },
+              { field: 'actions', header: t.actions, width: 'w-24', className: 'text-center', render: (r) => (
+                  <div className="flex items-center justify-center gap-1">
+                      <Button variant="ghost" size="iconSm" icon={Eye} onClick={() => setSelectedVoucherId(r.voucher_id)} title={t.viewDoc} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" />
+                      <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => setVoucherToPrint(r.voucher_id)} title={t.print} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50" />
+                  </div>
+              )}
           ];
       }
 
@@ -581,10 +596,15 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
            </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="shrink-0 mb-3">
-            <FilterSection onSearch={fetchReportData} onClear={handleClearSearch} isRtl={isRtl} title={t.search} defaultOpen={true}>
-                {/* --- Row 1: Basic Filters (6 Cols) --- */}
+        {/* Filters Section (Integrated 6 Columns) */}
+        <div className="shrink-0 mb-4 bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold">
+                <Layers size={18} className="text-indigo-600" />
+                <h2 className="text-sm">{t.search}</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                {/* --- Row 1 & 2: Basic Filters (9 items -> fits nicely in 6 cols spanning 1.5 rows) --- */}
                 <SelectField label={t.ledger} value={mainFilters.ledgerId} onChange={e => setMainFilters({...mainFilters, ledgerId: e.target.value})} isRtl={isRtl}>
                     <option value="" disabled>-</option>
                     {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
@@ -623,30 +643,30 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                     {lookups.docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
                 </SelectField>
 
-                {/* Advanced Filters Toggle Button */}
-                <div className="col-span-full border-t border-slate-100 pt-3 mt-1 flex justify-start">
-                    <Button variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)} icon={showAdvanced ? ChevronUp : ChevronDown}>
-                        {showAdvanced ? t.lessFilters : t.moreFilters}
-                    </Button>
+                <SelectField label={t.mainCurrency} value={baseCurrencyMode} onChange={e => setBaseCurrencyMode(e.target.value)} isRtl={isRtl}>
+                    <option value="op">{isRtl ? 'عملیاتی' : 'Operational'} ({lookups.currencyGlobals?.op_currency})</option>
+                    {lookups.currencyGlobals?.rep1_currency && <option value="rep1">{isRtl ? 'گزارشگری ۱' : 'Reporting 1'} ({lookups.currencyGlobals.rep1_currency})</option>}
+                    {lookups.currencyGlobals?.rep2_currency && <option value="rep2">{isRtl ? 'گزارشگری ۲' : 'Reporting 2'} ({lookups.currencyGlobals.rep2_currency})</option>}
+                </SelectField>
+
+                <SelectField label={t.accountType} value={mainFilters.accountType} onChange={e => setMainFilters({...mainFilters, accountType: e.target.value})} isRtl={isRtl}>
+                    <option value="">{t.all}</option>
+                    <option value="دائم">{isRtl ? 'دائم' : 'Permanent'}</option>
+                    <option value="موقت">{isRtl ? 'موقت' : 'Temporary'}</option>
+                    <option value="انتظامی">{isRtl ? 'انتظامی' : 'Disciplinary'}</option>
+                </SelectField>
+
+                <div className="flex items-center h-9 pb-1">
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-700">
+                        <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" checked={showWithBalanceOnly} onChange={e => setShowWithBalanceOnly(e.target.checked)} />
+                        {t.showWithBalanceOnly}
+                    </label>
                 </div>
 
-                {/* --- Row 2+: Advanced Filters --- */}
+                {/* --- Row 3+: Advanced Filters (Expandable) --- */}
                 {showAdvanced && (
                     <>
-                       <SelectField label={t.mainCurrency} value={baseCurrencyMode} onChange={e => setBaseCurrencyMode(e.target.value)} isRtl={isRtl}>
-                           <option value="op">{isRtl ? 'عملیاتی' : 'Operational'} ({lookups.currencyGlobals?.op_currency})</option>
-                           {lookups.currencyGlobals?.rep1_currency && <option value="rep1">{isRtl ? 'گزارشگری ۱' : 'Reporting 1'} ({lookups.currencyGlobals.rep1_currency})</option>}
-                           {lookups.currencyGlobals?.rep2_currency && <option value="rep2">{isRtl ? 'گزارشگری ۲' : 'Reporting 2'} ({lookups.currencyGlobals.rep2_currency})</option>}
-                       </SelectField>
-
-                       <SelectField label={t.accountType} value={mainFilters.accountType} onChange={e => setMainFilters({...mainFilters, accountType: e.target.value})} isRtl={isRtl}>
-                           <option value="">{t.all}</option>
-                           <option value="دائم">{isRtl ? 'دائم' : 'Permanent'}</option>
-                           <option value="موقت">{isRtl ? 'موقت' : 'Temporary'}</option>
-                           <option value="انتظامی">{isRtl ? 'انتظامی' : 'Disciplinary'}</option>
-                       </SelectField>
-
-                       <div className="lg:col-span-2 xl:col-span-4 flex items-center flex-wrap gap-4 p-2 bg-slate-50 border border-slate-200 rounded h-9 mt-[18px]">
+                       <div className="lg:col-span-2 xl:col-span-3 flex items-center flex-wrap gap-4 p-2 bg-slate-50 border border-slate-200 rounded h-9">
                            <span className="font-bold text-slate-500 text-[10px] tracking-wider">{t.advFeatures}:</span>
                            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featCurrency} onChange={e => setAdvFilters({...advFilters, featCurrency: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />{t.featCurrency}</label>
                            <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featTracking} onChange={e => setAdvFilters({...advFilters, featTracking: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5" />{t.featTracking}</label>
@@ -687,19 +707,29 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                        <InputField label={t.itemDesc} value={advFilters.itemDesc} onChange={e => setAdvFilters({...advFilters, itemDesc: e.target.value})} isRtl={isRtl} />
                     </>
                 )}
-            </FilterSection>
+            </div>
 
-            {/* Visual Options & Chips Outside the standard filter bounding box */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-3 px-2 gap-3">
-               <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-                  <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" checked={showWithBalanceOnly} onChange={e => setShowWithBalanceOnly(e.target.checked)} />
-                  {t.showWithBalanceOnly}
-               </label>
+            {/* Actions Bar */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+               <Button variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)} icon={showAdvanced ? ChevronUp : ChevronDown}>
+                   {showAdvanced ? t.lessFilters : t.moreFilters}
+               </Button>
                
-               <div className="flex flex-wrap items-center justify-end gap-2">
-                   {renderFilterChips()}
+               <div className="flex gap-2">
+                   <Button variant="outline" onClick={handleClearSearch} className="h-9 w-24 justify-center">{t.cancel}</Button>
+                   <Button variant="primary" onClick={fetchReportData} icon={RefreshCw} className="h-9 w-36 justify-center" isLoading={isFetchingData}>{t.fetchData}</Button>
                </div>
             </div>
+
+            {/* Chips Area */}
+            {Object.keys(drillPath).length > 0 && (
+               <div className="flex flex-wrap items-center gap-2 mt-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                   {renderFilterChips()}
+                   <button onClick={handleClearAllDrillFilters} className="text-[10px] text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-full flex items-center gap-1 font-bold transition-colors mr-auto">
+                       <Trash2 size={12}/> {t.clearAll}
+                   </button>
+               </div>
+            )}
         </div>
 
         {/* Tabs & Grid Area */}
@@ -753,6 +783,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                                  <div className="w-32 text-left dir-ltr font-mono font-black text-indigo-800 px-3">{formatNumber(totalSums.credit)}</div>
                                  <div className="w-32 text-left dir-ltr font-mono font-black text-indigo-800 px-3"></div> {/* balance */}
                                  <div className="w-16"></div> {/* nature */}
+                                 <div className="w-24"></div> {/* actions */}
                               </>
                           ) : (
                               <>
@@ -770,6 +801,43 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                </div>
             </div>
         </div>
+
+        {/* Voucher View Modal */}
+        {selectedVoucherId && (
+            <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 overflow-hidden">
+                <div className="bg-white w-full h-full rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex-1 overflow-hidden relative">
+                        {window.VoucherForm ? (
+                            <window.VoucherForm 
+                                voucherId={selectedVoucherId} 
+                                isCopy={false} 
+                                contextVals={contextVals} 
+                                lookups={lookups} 
+                                language={language}
+                                onClose={() => setSelectedVoucherId(null)} 
+                            />
+                        ) : (
+                            <div className="p-10 flex flex-col items-center justify-center text-slate-500 h-full">
+                                <p>VoucherForm Component Not Found</p>
+                                <Button variant="outline" className="mt-4" onClick={() => setSelectedVoucherId(null)}>{t.cancel}</Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Voucher Print Modal */}
+        <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.print} size="full">
+            {voucherToPrint && window.VoucherPrint ? (
+                <window.VoucherPrint voucherId={voucherToPrint} onClose={() => setVoucherToPrint(null)} />
+            ) : (
+                <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                    <p>VoucherPrint Component Not Found</p>
+                    <Button variant="outline" className="mt-4" onClick={() => setVoucherToPrint(null)}>{t.cancel}</Button>
+                </div>
+            )}
+        </Modal>
     </div>
   );
 };
