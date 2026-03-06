@@ -48,7 +48,6 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
       if (!window.IS_ADMIN) {
         if (perms.allowed_branches.length > 0) query = query.in('branch_id', perms.allowed_branches);
         
-        // اعمال دسترسی‌های انواع سند (اسناد کاربری همیشه مجاز هستند)
         if (perms.allowed_doc_types && perms.allowed_doc_types.length > 0) {
             const userTypes = lookups.docTypes.filter(d => d.type === 'user').map(d => d.code);
             const combinedAllowed = [...perms.allowed_doc_types, ...userTypes];
@@ -99,12 +98,19 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
     try {
         const { data: authData } = await supabase.auth.getUser();
         const currentUserId = authData?.user?.id || null;
-        let updatePayload = { status: newStatus };
+        
+        let updatePayload = { 
+            status: newStatus,
+            updated_at: new Date().toISOString(),
+            updated_by: currentUserId
+        };
+        
         if (newStatus === 'reviewed') {
             updatePayload.reviewed_by = currentUserId;
         } else {
             updatePayload.reviewed_by = null;
         }
+        
         const { error } = await supabase.schema('gl').from('vouchers').update(updatePayload).in('id', selectedIds);
         if (error) throw error;
         setSelectedIds([]);
@@ -175,6 +181,9 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
               byDate[v.voucher_date].push(v);
           });
 
+          const { data: authData } = await supabase.auth.getUser();
+          const currentUserId = authData?.user?.id || null;
+
           const updates = [];
           for (const date in byDate) {
               byDate[date].forEach((v, idx) => {
@@ -186,7 +195,11 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
           const batchSize = 50;
           for (let i = 0; i < updates.length; i += batchSize) {
               const batch = updates.slice(i, i + batchSize);
-              await Promise.all(batch.map(u => supabase.schema('gl').from('vouchers').update({ daily_number: u.daily_number }).eq('id', u.id)));
+              await Promise.all(batch.map(u => supabase.schema('gl').from('vouchers').update({ 
+                  daily_number: u.daily_number,
+                  updated_at: new Date().toISOString(),
+                  updated_by: currentUserId
+              }).eq('id', u.id)));
           }
 
           alert(t.sortSuccess);
@@ -220,6 +233,9 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
           
           arr.splice(insertIndex, 0, { id: sortParams.singleVoucherId, daily_number: parseInt(sortParams.targetDailyNumber, 10), voucher_date: sortParams.singleVoucherDate });
 
+          const { data: authData } = await supabase.auth.getUser();
+          const currentUserId = authData?.user?.id || null;
+
           const updates = [];
           arr.forEach((v, idx) => {
               const newDaily = idx + 1;
@@ -229,7 +245,11 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
           const batchSize = 50;
           for (let i = 0; i < updates.length; i += batchSize) {
               const batch = updates.slice(i, i + batchSize);
-              await Promise.all(batch.map(u => supabase.schema('gl').from('vouchers').update({ daily_number: u.daily_number }).eq('id', u.id)));
+              await Promise.all(batch.map(u => supabase.schema('gl').from('vouchers').update({ 
+                  daily_number: u.daily_number,
+                  updated_at: new Date().toISOString(),
+                  updated_by: currentUserId
+              }).eq('id', u.id)));
           }
 
           alert(t.sortSuccess);

@@ -271,16 +271,26 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
       const cleanData = (val) => (val === '' ? null : val);
       const { data: authData } = await supabase.auth.getUser();
       const currentUserId = authData?.user?.id || null;
+      const nowIso = new Date().toISOString();
 
       const voucherData = { 
         ...currentVoucher, status, fiscal_year_id: activeYearId, fiscal_period_id: targetPeriod.id,
         total_debit: opTotalDebit, total_credit: opTotalCredit,
         subsidiary_number: cleanData(currentVoucher.subsidiary_number), reference_number: cleanData(currentVoucher.reference_number),
         voucher_number: cleanData(currentVoucher.voucher_number), daily_number: cleanData(currentVoucher.daily_number), cross_reference: cleanData(currentVoucher.cross_reference),
+        updated_at: nowIso,
+        updated_by: currentUserId
       };
 
-      if (status === 'reviewed') voucherData.reviewed_by = currentUserId;
-      if (status === 'final') voucherData.approved_by = currentUserId;
+      if (status === 'reviewed') {
+          voucherData.reviewed_by = currentUserId;
+          voucherData.approved_by = null;
+      } else if (status === 'final' || status === 'finalized') {
+          voucherData.approved_by = currentUserId;
+      } else {
+          voucherData.reviewed_by = null;
+          voucherData.approved_by = null;
+      }
 
       let savedVoucherId = voucherData.id;
 
@@ -290,7 +300,9 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
         await supabase.schema('gl').from('voucher_items').delete().eq('voucher_id', savedVoucherId);
       } else {
         const { nextDaily, nextCross, nextVoucher, config } = await fetchAutoNumbers(voucherData.voucher_date, voucherData.ledger_id, voucherData.fiscal_year_id, voucherData.branch_id, supabase);
-        voucherData.daily_number = nextDaily; voucherData.cross_reference = nextCross; voucherData.created_by = currentUserId;
+        voucherData.daily_number = nextDaily; voucherData.cross_reference = nextCross; 
+        voucherData.created_by = currentUserId;
+        voucherData.created_at = nowIso;
         
         const meta = config?.metadata || {};
         const scope = meta.uniquenessScope || 'ledger';
@@ -363,7 +375,7 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
   const ledgerCurrencyLabel = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency || lookups.currencyGlobals?.op_currency;
 
   const getStatusBadgeUI = (status) => {
-    const config = { 'draft': { label: t.statusDraft, bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' }, 'temporary': { label: t.statusTemporary, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' }, 'reviewed': { label: t.statusReviewed, bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' }, 'final': { label: t.statusFinal, bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' }};
+    const config = { 'draft': { label: t.statusDraft, bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' }, 'temporary': { label: t.statusTemporary, bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' }, 'reviewed': { label: t.statusReviewed, bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' }, 'final': { label: t.statusFinal, bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' }, 'finalized': { label: t.statusFinal, bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' }};
     const c = config[status] || { label: status, bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-200' };
     return <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${c.bg} ${c.text} ${c.border}`}>{c.label}</span>;
   };

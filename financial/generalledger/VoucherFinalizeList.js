@@ -115,7 +115,17 @@ const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals
 
     setLoading(true);
     try {
-        const { error } = await supabase.schema('gl').from('vouchers').update({ status: 'finalized' }).in('id', vouchersToProcess.map(v => v.id));
+        const { data: authData } = await supabase.auth.getUser();
+        const currentUserId = authData?.user?.id || null;
+
+        const updatePayload = { 
+            status: 'finalized', 
+            approved_by: currentUserId,
+            updated_at: new Date().toISOString(),
+            updated_by: currentUserId
+        };
+
+        const { error } = await supabase.schema('gl').from('vouchers').update(updatePayload).in('id', vouchersToProcess.map(v => v.id));
         if (error) throw error;
         alert(t.finalizeSuccess);
         setSelectedIds([]);
