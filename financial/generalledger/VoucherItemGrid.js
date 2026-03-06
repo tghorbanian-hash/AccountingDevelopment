@@ -258,7 +258,6 @@ const VoucherItemsGrid = ({
 
     const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
     const defaultCurrency = currentLedger?.currency || '';
-
     const emptyRowIndex = voucherItems.findIndex(item => parseNumber(item.debit) === 0 && parseNumber(item.credit) === 0);
 
     if (emptyRowIndex !== -1) {
@@ -338,11 +337,11 @@ const VoucherItemsGrid = ({
         let rate = null;
         let isReverse = false;
 
+        // حذف سورت بر اساس created_at
         const { data, error } = await supabase.schema('gen').from(TABLE_NAME)
             .select('rate')
             .eq(FROM_FIELD, queryFromVal)
             .eq(TO_FIELD, queryToVal)
-            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
@@ -351,11 +350,11 @@ const VoucherItemsGrid = ({
         if (data && data.rate) {
             rate = data.rate;
         } else {
+            // چک کردن حالت معکوس
             const { data: revData, error: revErr } = await supabase.schema('gen').from(TABLE_NAME)
                 .select('rate')
                 .eq(FROM_FIELD, queryToVal)
                 .eq(TO_FIELD, queryFromVal)
-                .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
             
