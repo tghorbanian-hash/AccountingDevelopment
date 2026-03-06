@@ -199,22 +199,17 @@ const VoucherItemsGrid = ({
   const handleRowReorder = (id, newRowStr) => {
       const newIndex = parseInt(newRowStr, 10) - 1;
       if (isNaN(newIndex) || newIndex < 0 || newIndex >= voucherItems.length) return;
-      
-      const currentIdx = voucherItems.findIndex(i => i.id === id);
-      if (currentIdx === -1 || currentIdx === newIndex) return;
-      
       let itemsCpy = [...voucherItems];
+      const currentIdx = itemsCpy.findIndex(i => i.id === id);
+      if (currentIdx === -1 || currentIdx === newIndex) return;
       const [movedItem] = itemsCpy.splice(currentIdx, 1);
       itemsCpy.splice(newIndex, 0, movedItem);
-      itemsCpy = itemsCpy.map((it, idx) => ({...it, row_number: idx + 1}));
-      
-      setVoucherItems(itemsCpy);
+      setVoucherItems(itemsCpy.map((it, idx) => ({...it, row_number: idx + 1})));
   };
 
   const addItemRow = () => {
     const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher?.ledger_id));
     const lastDescription = voucherItems.length > 0 ? voucherItems[voucherItems.length - 1].description : '';
-
     const newId = 'temp_' + Date.now();
     setVoucherItems([...voucherItems, { 
       id: newId, row_number: voucherItems.length + 1, account_id: '', details_dict: {},
@@ -328,7 +323,9 @@ const VoucherItemsGrid = ({
 
         const fromCurrObj = lookups.currencies.find(c => c.code === fromCode);
         const toCurrObj = lookups.currencies.find(c => c.code === toCode);
-        const TABLE_NAME = 'currency_rate'; 
+        
+        // نام جدول در دیتابیس دقیقاً با s تنظیم شده است
+        const TABLE_NAME = 'currency_rates'; 
         const FROM_FIELD = 'from_currency_id'; 
         const TO_FIELD = 'to_currency_id';     
         
@@ -369,13 +366,11 @@ const VoucherItemsGrid = ({
         }
     } catch (e) {
         console.error('Auto rate fetch failed:', e);
-        alert(isRtl ? 'خطای 400: عدم همخوانی نوع فیلدها با دیتابیس.' : 'Error fetching rate. Check console.');
+        alert(isRtl ? 'خطای اتصال به دیتابیس: لطفاً از صحت نام ستون‌های from_currency_id و to_currency_id در جدول currency_rates اطمینان حاصل کنید.' : 'Error fetching rate. Check console.');
     } finally {
         setFetchingRate(false);
     }
   };
-
-  const ledgerCurrencyLabel = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency || lookups.currencyGlobals?.op_currency;
 
   return (
     <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col min-w-0" onClick={(e) => e.stopPropagation()}>
@@ -567,12 +562,13 @@ const VoucherItemsGrid = ({
                               </tr>
                           </thead>
                           <tbody>
-                              {ledgerCurrencyLabel && (() => {
-                                  const isMatch = voucherItems[currencyModalIndex].currency_code === ledgerCurrencyLabel;
+                              {lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency && (() => {
+                                  const ledgerCur = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency;
+                                  const isMatch = voucherItems[currencyModalIndex].currency_code === ledgerCur;
                                   return (
                                       <tr className="border-b border-slate-100 hover:bg-slate-50">
                                           <td className="py-2 px-3 font-bold text-slate-700">{t.opCurrency}</td>
-                                          <td className="py-2 px-3">{getCurrencyTitle(ledgerCurrencyLabel)}</td>
+                                          <td className="py-2 px-3">{getCurrencyTitle(ledgerCur)}</td>
                                           <td className="py-2 px-3">
                                               <div className="flex items-center gap-1 h-7">
                                                 <input type="text" className={`w-full flex-1 border rounded h-full px-2 text-left dir-ltr outline-none ${isMatch || isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].op_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'op_rate', e.target.value)} disabled={isMatch || isReadonly} />
