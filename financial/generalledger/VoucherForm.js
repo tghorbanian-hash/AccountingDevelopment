@@ -3,10 +3,10 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ArrowRight, ArrowLeft, Save, CheckCircle, FileText, Scale, Plus, 
   PanelRightClose, PanelRightOpen, Coins, CopyPlus, Trash2, Copy, Layers, FileWarning, Calculator, X,
-  Printer, Paperclip, ChevronRight, ChevronLeft
+  Printer, Paperclip, ChevronRight, ChevronLeft, RefreshCw
 } from 'lucide-react';
 
-const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, language = 'fa' }) => {
+const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClose, language = 'fa' }) => {
   const { fetchAutoNumbers, validateFiscalPeriod, calcConv, localTranslations } = window.VoucherUtils || {};
   const t = localTranslations ? (localTranslations[language] || localTranslations['en']) : {};
   const isRtl = language === 'fa';
@@ -32,6 +32,8 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
   const [currencyModalIndex, setCurrencyModalIndex] = useState(null);
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
+  const [isFxVoucher, setIsFxVoucher] = useState(isFxMode || false);
+  const [fetchingRate, setFetchingRate] = useState(false);
 
   useEffect(() => {
      setLocalVoucherId(voucherId);
@@ -92,13 +94,20 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
           if (itemsError) throw itemsError;
 
           let targetVoucher = { ...vData };
+          const currentLedger = lookups.ledgers.find(l => String(l.id) === String(targetVoucher.ledger_id));
+          const defaultCurrency = currentLedger?.currency || '';
+          let hasFx = false;
+
           let mappedItems = (itemsData || []).map((item, index) => {
             const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
+            const code = item.currency_code || detailsObj.currency_code || defaultCurrency;
+            if (code !== defaultCurrency) hasFx = true;
+
             return { 
                ...item, 
                id: isCopy ? 'temp_' + Date.now() + '_' + index : item.id,
                voucher_id: isCopy ? null : item.voucher_id,
-               currency_code: item.currency_code || detailsObj.currency_code || '',
+               currency_code: code,
                details_dict: detailsObj.selected_details || {},
                op_rate: item.op_rate ?? 1, op_is_reverse: item.op_is_reverse ?? false, op_debit: item.op_debit ?? 0, op_credit: item.op_credit ?? 0,
                rep1_rate: item.rep1_rate ?? 1, rep1_is_reverse: item.rep1_is_reverse ?? false, rep1_debit: item.rep1_debit ?? 0, rep1_credit: item.rep1_credit ?? 0,
@@ -123,8 +132,10 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                   fiscal_year_id: contextVals.fiscal_year_id
               };
               setIsHeaderOpen(true);
+              setIsFxVoucher(isFxMode); 
           } else {
               setIsHeaderOpen(false);
+              setIsFxVoucher(hasFx);
           }
 
           setCurrentVoucher(targetVoucher);
@@ -134,6 +145,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
           console.error('Error initializing form:', error);
         }
       } else {
+        setIsFxVoucher(isFxMode);
         const initialLedgerId = contextVals.ledger_id;
         const initialFyId = contextVals.fiscal_year_id;
         const currentLedger = lookups.ledgers.find(l => String(l.id) === String(initialLedgerId));
@@ -182,7 +194,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     };
 
     initializeForm();
-  }, [localVoucherId, isCopy, contextVals, filteredBranches]);
+  }, [localVoucherId, isCopy, contextVals, filteredBranches, isFxMode]);
 
   const getValidDetailTypes = (accountId) => {
      if (!accountId) return [];
@@ -288,7 +300,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
       const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
       let newCurrency = currentLedger?.currency || '';
 
-      if (selectedAcc && selectedAcc.metadata) {
+      if (isFxVoucher && selectedAcc && selectedAcc.metadata) {
         const meta = typeof selectedAcc.metadata === 'string' ? JSON.parse(selectedAcc.metadata) : selectedAcc.metadata;
         if (meta.currencyFeature && meta.currency_code) {
              newCurrency = meta.currency_code;
@@ -388,7 +400,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     }
   };
 
-  // محاسبه تراز کل سند بر اساس "ارز عملیاتی"
   const globalBalance = () => {
     let opTotalDebit = 0, opTotalCredit = 0;
     voucherItems.forEach(item => {
@@ -406,7 +417,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
 
     if (emptyRowIndex !== -1) {
        const newItems = [...voucherItems];
-       // تنظیم ارز ردیف خالی روی ارز عملیاتی دفتر برای جبران اختلاف تراز
        newItems[emptyRowIndex].currency_code = defaultCurrency;
        newItems[emptyRowIndex].op_rate = 1;
        newItems[emptyRowIndex].op_is_reverse = false;
@@ -460,6 +470,67 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
        }]);
        setFocusedRowId(newId);
        setIsHeaderOpen(false);
+    }
+  };
+
+  const handleFetchAutoRate = async (type) => {
+    if (!supabase) return;
+    setFetchingRate(true);
+    try {
+        const item = voucherItems[currencyModalIndex];
+        const fromCode = item.currency_code;
+        const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
+        
+        let toCode;
+        if (type === 'op') toCode = currentLedger?.currency || lookups.currencyGlobals?.op_currency;
+        if (type === 'rep1') toCode = lookups.currencyGlobals?.rep1_currency;
+        if (type === 'rep2') toCode = lookups.currencyGlobals?.rep2_currency;
+
+        if (!fromCode || !toCode) {
+             alert(isRtl ? 'کد ارز مبدا یا مقصد نامشخص است.' : 'Source or target currency is missing.');
+             setFetchingRate(false);
+             return;
+        }
+
+        let rate = null;
+        let isReverse = false;
+
+        const { data, error } = await supabase.schema('gen').from('exchange_rates')
+            .select('rate')
+            .eq('from_currency', fromCode)
+            .eq('to_currency', toCode)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (data && data.rate) {
+            rate = data.rate;
+        } else {
+            const { data: revData } = await supabase.schema('gen').from('exchange_rates')
+                .select('rate')
+                .eq('from_currency', toCode)
+                .eq('to_currency', fromCode)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            
+            if (revData && revData.rate) {
+                rate = revData.rate;
+                isReverse = true;
+            }
+        }
+
+        if (rate) {
+            handleItemChange(currencyModalIndex, `${type}_rate`, rate);
+            handleItemChange(currencyModalIndex, `${type}_is_reverse`, isReverse);
+        } else {
+            alert(isRtl ? `نرخی برای تبدیل ${fromCode} به ${toCode} یافت نشد.` : `No rate found for ${fromCode} to ${toCode}.`);
+        }
+    } catch (e) {
+        console.warn('Auto rate fetch failed:', e);
+        alert(isRtl ? 'خطا در دریافت نرخ. لطفا جدول exchange_rates را بررسی کنید.' : 'Error fetching rate. Please check exchange_rates table.');
+    } finally {
+        setFetchingRate(false);
     }
   };
 
@@ -548,7 +619,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         }
     }
 
-    // مجموع کل سند برای ذخیره در هدر بر اساس ارز عملیاتی محاسبه می‌شود
     let opTotalDebit = 0, opTotalCredit = 0;
     voucherItems.forEach(item => {
         opTotalDebit += parseNumber(item.op_debit); 
@@ -557,7 +627,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     
     if (opTotalDebit === 0 && opTotalCredit === 0) { alert(t.zeroAmountError); return; }
     
-    // کنترل تراز بودن بر اساس ارز عملیاتی
     const diffRound = Math.round((opTotalDebit - opTotalCredit) * 100) / 100;
     if (status === 'temporary' && diffRound !== 0) { alert(t.unbalancedError); return; }
 
@@ -658,7 +727,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
       return <div className="h-full flex items-center justify-center bg-slate-50"><div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div></div>;
   }
 
-  // محاسبات مقادیر سایدبار با تفکیک ارز مبنا
   let opTotalDebit = 0, opTotalCredit = 0, rep1TotalDebit = 0, rep1TotalCredit = 0, rep2TotalDebit = 0, rep2TotalCredit = 0;
   const baseTotalsByCurrency = {};
 
@@ -895,13 +963,15 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                                        <div className="col-span-6 lg:col-span-2 flex flex-col gap-1">
                                           <div className="text-[10px] font-bold text-slate-500">{t.currency}</div>
                                           <div className="flex items-center gap-1 h-8">
-                                            <select className={`flex-1 w-full border rounded h-full px-1 text-[12px] outline-none border-indigo-300 bg-white`} value={item.currency_code || ''} onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)} disabled={isReadonly} onFocus={() => handleItemFocus(item.id)}>
+                                            <select className={`flex-1 w-full border rounded h-full px-1 text-[12px] outline-none border-indigo-300 bg-white`} value={item.currency_code || ''} onChange={(e) => handleItemChange(index, 'currency_code', e.target.value)} disabled={isReadonly || !isFxVoucher} onFocus={() => handleItemFocus(item.id)}>
                                                <option value="">-</option>
                                                {lookups.currencies.map(c => <option key={c.id} value={c.code}>{c.title}</option>)}
                                             </select>
-                                            <button className={`w-8 h-full shrink-0 flex items-center justify-center rounded border transition-colors bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100`} onClick={(e) => { e.stopPropagation(); setCurrencyModalIndex(index); }} title={t.currencyConversions}>
-                                              <Coins size={14}/>
-                                            </button>
+                                            {isFxVoucher && (
+                                                <button className={`w-8 h-full shrink-0 flex items-center justify-center rounded border transition-colors bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100`} onClick={(e) => { e.stopPropagation(); setCurrencyModalIndex(index); }} title={t.currencyConversions}>
+                                                <Coins size={14}/>
+                                                </button>
+                                            )}
                                           </div>
                                        </div>
                                        <div className="col-span-12 lg:col-span-3 flex flex-col gap-1">
@@ -964,7 +1034,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                   </div>
                   <div className="flex flex-col gap-3 p-3 text-xs">
                      
-                     {/* مبالغ پایه گروه بندی شده بر اساس کد ارز ردیف ها */}
                      {Object.keys(baseTotalsByCurrency).map(code => (
                          <div key={code} className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors">
                              <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
@@ -976,7 +1045,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                          </div>
                      ))}
                      
-                     {/* مبالغ عملیاتی (بر اساس تنظیمات دفتر) */}
                      <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
                              <span className="uppercase tracking-wider">{t.summaryOp}</span>
@@ -986,7 +1054,6 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                          <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNumber(opTotalCredit)}</span></div>
                      </div>
                      
-                     {/* مبالغ گزارشگری ۱ و ۲ */}
                      {lookups.currencyGlobals?.rep1_currency && (
                          <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                              <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5"><span className="uppercase tracking-wider">{t.summaryRep1}</span><Badge variant="slate" size="sm">{getCurrencyTitle(lookups.currencyGlobals.rep1_currency)}</Badge></div>
@@ -1026,7 +1093,7 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                               <tr>
                                   <th className="py-2 px-3 font-bold">{isRtl ? 'نوع ارز' : 'Type'}</th>
                                   <th className="py-2 px-3 font-bold">{isRtl ? 'ارز مقصد' : 'Target'}</th>
-                                  <th className="py-2 px-3 font-bold w-32">{t.exchangeRate}</th>
+                                  <th className="py-2 px-3 font-bold w-36">{t.exchangeRate}</th>
                                   <th className="py-2 px-3 font-bold text-center">{t.reverseCalc}</th>
                                   <th className="py-2 px-3 font-bold w-40">{t.convertedAmount}</th>
                               </tr>
@@ -1039,7 +1106,14 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                                           <td className="py-2 px-3 font-bold text-slate-700">{t.opCurrency}</td>
                                           <td className="py-2 px-3">{getCurrencyTitle(ledgerCurrencyLabel)}</td>
                                           <td className="py-2 px-3">
-                                              <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].op_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'op_rate', e.target.value)} disabled={isMatch || isReadonly} />
+                                              <div className="flex items-center gap-1 h-7">
+                                                <input type="text" className={`w-full flex-1 border rounded h-full px-2 text-left dir-ltr outline-none ${isMatch || isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].op_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'op_rate', e.target.value)} disabled={isMatch || isReadonly} />
+                                                {!isMatch && !isReadonly && (
+                                                   <button onClick={() => handleFetchAutoRate('op')} disabled={fetchingRate} className="w-7 h-full flex items-center justify-center bg-indigo-50 text-indigo-500 hover:text-indigo-700 border border-indigo-200 rounded transition-colors shrink-0" title={isRtl ? 'دریافت نرخ اتوماتیک' : 'Fetch Auto Rate'}>
+                                                      <RefreshCw size={12} className={fetchingRate ? "animate-spin" : ""} />
+                                                   </button>
+                                                )}
+                                              </div>
                                           </td>
                                           <td className="py-2 px-3 text-center">
                                               <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`} checked={voucherItems[currencyModalIndex].op_is_reverse} onChange={(e) => handleItemChange(currencyModalIndex, 'op_is_reverse', e.target.checked)} disabled={isMatch || isReadonly} />
@@ -1055,7 +1129,14 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                                           <td className="py-2 px-3 font-bold text-slate-700">{t.rep1Currency}</td>
                                           <td className="py-2 px-3">{getCurrencyTitle(lookups.currencyGlobals.rep1_currency)}</td>
                                           <td className="py-2 px-3">
-                                              <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].rep1_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_rate', e.target.value)} disabled={isMatch || isReadonly} />
+                                              <div className="flex items-center gap-1 h-7">
+                                                <input type="text" className={`w-full flex-1 border rounded h-full px-2 text-left dir-ltr outline-none ${isMatch || isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].rep1_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_rate', e.target.value)} disabled={isMatch || isReadonly} />
+                                                {!isMatch && !isReadonly && (
+                                                   <button onClick={() => handleFetchAutoRate('rep1')} disabled={fetchingRate} className="w-7 h-full flex items-center justify-center bg-indigo-50 text-indigo-500 hover:text-indigo-700 border border-indigo-200 rounded transition-colors shrink-0" title={isRtl ? 'دریافت نرخ اتوماتیک' : 'Fetch Auto Rate'}>
+                                                      <RefreshCw size={12} className={fetchingRate ? "animate-spin" : ""} />
+                                                   </button>
+                                                )}
+                                              </div>
                                           </td>
                                           <td className="py-2 px-3 text-center">
                                               <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`} checked={voucherItems[currencyModalIndex].rep1_is_reverse} onChange={(e) => handleItemChange(currencyModalIndex, 'rep1_is_reverse', e.target.checked)} disabled={isMatch || isReadonly} />
@@ -1071,7 +1152,14 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                                           <td className="py-2 px-3 font-bold text-slate-700">{t.rep2Currency}</td>
                                           <td className="py-2 px-3">{getCurrencyTitle(lookups.currencyGlobals.rep2_currency)}</td>
                                           <td className="py-2 px-3">
-                                              <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].rep2_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_rate', e.target.value)} disabled={isMatch || isReadonly} />
+                                              <div className="flex items-center gap-1 h-7">
+                                                <input type="text" className={`w-full flex-1 border rounded h-full px-2 text-left dir-ltr outline-none ${isMatch || isReadonly ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].rep2_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_rate', e.target.value)} disabled={isMatch || isReadonly} />
+                                                {!isMatch && !isReadonly && (
+                                                   <button onClick={() => handleFetchAutoRate('rep2')} disabled={fetchingRate} className="w-7 h-full flex items-center justify-center bg-indigo-50 text-indigo-500 hover:text-indigo-700 border border-indigo-200 rounded transition-colors shrink-0" title={isRtl ? 'دریافت نرخ اتوماتیک' : 'Fetch Auto Rate'}>
+                                                      <RefreshCw size={12} className={fetchingRate ? "animate-spin" : ""} />
+                                                   </button>
+                                                )}
+                                              </div>
                                           </td>
                                           <td className="py-2 px-3 text-center">
                                               <input type="checkbox" className={`w-4 h-4 rounded ${isMatch || isReadonly ? 'text-slate-400 cursor-not-allowed' : 'text-indigo-600 cursor-pointer'}`} checked={voucherItems[currencyModalIndex].rep2_is_reverse} onChange={(e) => handleItemChange(currencyModalIndex, 'rep2_is_reverse', e.target.checked)} disabled={isMatch || isReadonly} />
@@ -1087,28 +1175,17 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
           </Modal>
       )}
 
-      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
-         {voucherForAttachments && window.VoucherAttachments ? (
-             <window.VoucherAttachments voucherId={voucherForAttachments.id} onClose={() => setVoucherForAttachments(null)} />
-         ) : (
-             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
-                <FileWarning size={48} className="text-amber-400" />
-                <p>{isRtl ? 'کامپوننت ضمائم یافت نشد. لطفاً فایل VoucherAttachments.js را در پروژه قرار دهید.' : 'Attachments component not found. Please include VoucherAttachments.js.'}</p>
-             </div>
-         )}
-      </Modal>
+      {showPrintModal && window.VoucherPrint && (
+          <Modal isOpen={true} onClose={() => setShowPrintModal(false)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
+              <window.VoucherPrint voucherId={voucherId} onClose={() => setShowPrintModal(false)} />
+          </Modal>
+      )}
 
-      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="full">
-         {voucherToPrint && window.VoucherPrint ? (
-             <window.VoucherPrint voucherId={voucherToPrint.id} onClose={() => setVoucherToPrint(null)} />
-         ) : (
-             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
-                <FileWarning size={48} className="text-amber-400" />
-                <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
-             </div>
-         )}
-      </Modal>
-
+      {showAttachModal && window.VoucherAttachments && (
+          <Modal isOpen={true} onClose={() => setShowAttachModal(false)} title={t.attachments || 'ضمائم'} size="md">
+              <window.VoucherAttachments voucherId={voucherId} onClose={() => setShowAttachModal(false)} readOnly={isReadonly} />
+          </Modal>
+      )}
     </div>
   );
 };

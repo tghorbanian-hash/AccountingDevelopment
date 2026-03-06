@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Edit, Trash2, Plus, FileText, CheckCircle, FileWarning, Filter, 
-  Copy, Printer, Paperclip, DownloadCloud, FileSpreadsheet, Lock, Ban, ChevronDown
+  Copy, Printer, Paperclip, DownloadCloud, FileSpreadsheet, Lock, Ban, ChevronDown, Coins
 } from 'lucide-react';
 
 const Vouchers = ({ language = 'fa', setHeaderNode }) => {
@@ -37,6 +37,7 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
   const [loading, setLoading] = useState(false);
   const [currentVoucherId, setCurrentVoucherId] = useState(null);
   const [isCopying, setIsCopying] = useState(false);
+  const [isFxMode, setIsFxMode] = useState(false);
   
   const [vouchers, setVouchers] = useState([]);
   const [contextVals, setContextVals] = useState({ fiscal_year_id: '', ledger_id: '' });
@@ -350,13 +351,14 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
      fetchVouchers(cleared);
   };
 
-  const handleOpenForm = (voucher = null, copy = false) => {
+  const handleOpenForm = (voucher = null, copy = false, fxMode = false) => {
     if (!voucher && !permissions?.actions?.includes('create')) {
         alert(t.accessDenied || 'دسترسی غیرمجاز برای ایجاد');
         return;
     }
     setCurrentVoucherId(voucher ? voucher.id : null);
     setIsCopying(copy);
+    setIsFxMode(fxMode);
     setView('form');
   };
 
@@ -471,12 +473,14 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
           <VoucherForm 
               voucherId={currentVoucherId}
               isCopy={isCopying}
+              isFxMode={isFxMode}
               contextVals={contextVals}
               lookups={lookups}
               onClose={(needsRefresh) => {
                   setView('list');
                   setCurrentVoucherId(null);
                   setIsCopying(false);
+                  setIsFxMode(false);
                   if (needsRefresh) fetchVouchers();
               }}
               language={language}
@@ -507,7 +511,10 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
                 </>
             )}
             {permissions?.actions?.includes('create') && (
-                <Button variant="primary" size="default" onClick={() => handleOpenForm(null, false)} icon={Plus} disabled={ledgers.length === 0}>{t.newVoucher || (isRtl ? 'سند جدید' : 'New Voucher')}</Button>
+                <div className="flex gap-2">
+                    <Button variant="primary" size="default" onClick={() => handleOpenForm(null, false, false)} icon={Plus} disabled={ledgers.length === 0}>{t.newVoucher || (isRtl ? 'سند جدید' : 'New Voucher')}</Button>
+                    <Button variant="outline" size="default" className="border-indigo-600 text-indigo-600 bg-indigo-50 hover:bg-indigo-100" onClick={() => handleOpenForm(null, false, true)} icon={Coins} disabled={ledgers.length === 0}>{isRtl ? 'سند ارزی جدید' : 'New FX Voucher'}</Button>
+                </div>
             )}
         </div>
       </div>
@@ -555,7 +562,7 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
           onSelectRow={(id, c) => setSelectedIds(c ? [...selectedIds, id] : selectedIds.filter(i => i !== id))} 
           onSelectAll={(c) => setSelectedIds(c ? vouchers.map(v => v.id) : [])} 
           onDelete={(ids) => { setVoucherToDelete(vouchers.find(v => v.id === ids[0])); setShowDeleteModal(true); }} 
-          onDoubleClick={(r) => handleOpenForm(r, false)} 
+          onDoubleClick={(r) => handleOpenForm(r, false, false)} 
           isRtl={isRtl} 
           isLoading={loading} 
           bulkActions={
@@ -574,13 +581,13 @@ const Vouchers = ({ language = 'fa', setHeaderNode }) => {
                 <Button variant="ghost" size="iconSm" icon={Paperclip} onClick={() => setVoucherForAttachments(r)} title={t.attachments || 'ضمائم'} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
               )}
               {permissions?.actions?.includes('create') && (
-                <Button variant="ghost" size="iconSm" icon={Copy} onClick={() => handleOpenForm(r, true)} title={t.copyVoucher || 'کپی سند'} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50" />
+                <Button variant="ghost" size="iconSm" icon={Copy} onClick={() => handleOpenForm(r, true, false)} title={t.copyVoucher || 'کپی سند'} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50" />
               )}
               {permissions?.actions?.includes('print') && (
                 <Button variant="ghost" size="iconSm" icon={Printer} onClick={() => setVoucherToPrint(r)} title={t.print || 'چاپ'} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />
               )}
               {permissions?.actions?.includes('edit') && (
-                <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r, false)} />
+                <Button variant="ghost" size="iconSm" icon={Edit} onClick={() => handleOpenForm(r, false, false)} />
               )}
               {permissions?.actions?.includes('delete') && (
                 <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => promptDelete(r)} />
