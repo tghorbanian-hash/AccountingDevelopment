@@ -459,42 +459,6 @@ const CurrencySettings = ({ t, isRtl }) => {
   ];
 
   const historyColumns = [
-    {
-       field: '_select',
-       header: (
-          <div className="flex justify-center">
-             <input 
-               type="checkbox" 
-               className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
-               checked={historyLog.length > 0 && selectedHistoryIds.length === historyLog.length}
-               onChange={(e) => {
-                  if (e.target.checked) {
-                     setSelectedHistoryIds(historyLog.map(h => h.id));
-                  } else {
-                     setSelectedHistoryIds([]);
-                  }
-               }}
-             />
-          </div>
-       ),
-       width: 'w-12',
-       render: (row) => (
-          <div className="flex justify-center">
-             <input 
-               type="checkbox" 
-               className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
-               checked={selectedHistoryIds.includes(row.id)}
-               onChange={(e) => {
-                  if (e.target.checked) {
-                     setSelectedHistoryIds([...selectedHistoryIds, row.id]);
-                  } else {
-                     setSelectedHistoryIds(selectedHistoryIds.filter(id => id !== row.id));
-                  }
-               }}
-             />
-          </div>
-       )
-    },
     { field: 'date', header: t.curr_date || (isRtl ? 'تاریخ' : 'Date'), width: 'w-24', className: 'font-mono' },
     { field: 'time', header: t.curr_time || (isRtl ? 'زمان' : 'Time'), width: 'w-24', className: 'font-mono' },
     { field: 'source', header: t.curr_source || (isRtl ? 'مبدا' : 'Source'), width: 'w-20', className: 'font-mono text-center font-bold' },
@@ -791,7 +755,22 @@ const CurrencySettings = ({ t, isRtl }) => {
                <DataGrid 
                  columns={historyColumns} 
                  data={historyLog} 
-                 isRtl={isRtl} 
+                 isRtl={isRtl}
+                 selectedIds={selectedHistoryIds}
+                 onSelectAll={(checked) => {
+                    if (checked) {
+                       setSelectedHistoryIds(historyLog.map(h => h.id));
+                    } else {
+                       setSelectedHistoryIds([]);
+                    }
+                 }}
+                 onSelectRow={(id, checked) => {
+                    if (checked) {
+                       setSelectedHistoryIds(prev => [...prev, id]);
+                    } else {
+                       setSelectedHistoryIds(prev => prev.filter(selectedId => selectedId !== id));
+                    }
+                 }}
                  actions={(row) => (
                    canDelete ? <Button variant="ghost" size="iconSm" icon={Trash2} className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHistory(row.id)} /> : null
                  )}
