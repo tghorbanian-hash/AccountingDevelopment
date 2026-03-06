@@ -30,8 +30,10 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
   const [isHeaderOpen, setIsHeaderOpen] = useState(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
   const [currencyModalIndex, setCurrencyModalIndex] = useState(null);
+  
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
+  
   const [isFxVoucher, setIsFxVoucher] = useState(isFxMode || false);
   const [fetchingRate, setFetchingRate] = useState(false);
 
@@ -495,14 +497,10 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
         const fromCurrObj = lookups.currencies.find(c => c.code === fromCode);
         const toCurrObj = lookups.currencies.find(c => c.code === toCode);
 
-        // --- تنظیمات دیتابیس شما ---
         const TABLE_NAME = 'currency_rate'; 
-        // نام فیلدهای مبدا و مقصد در جدول شما. اگر نامشان فرق دارد همینجا عوض کنید:
-        const FROM_FIELD = 'from_currency_id'; // نکته: اگر ستون‌های شما from_currency و to_currency هستند، این مقادیر را تغییر دهید
+        const FROM_FIELD = 'from_currency_id'; 
         const TO_FIELD = 'to_currency_id';     
         
-        // اگر دیتابیس شما ID عددی میگیرد این خطوط درست است.
-        // اما اگر خود کلمه مثل 'USD' در دیتابیس ذخیره شده، fromCurrObj?.id را به fromCode و toCurrObj?.id را به toCode تغییر دهید.
         const queryFromVal = fromCurrObj?.id; 
         const queryToVal = toCurrObj?.id;
 
@@ -528,7 +526,6 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
         if (data && data.rate) {
             rate = data.rate;
         } else {
-            // بررسی حالت معکوس (مثلا اگر به جای ریال به دلار، دلار به ریال ثبت شده باشد)
             const { data: revData, error: revErr } = await supabase.schema('gen').from(TABLE_NAME)
                 .select('rate')
                 .eq(FROM_FIELD, queryToVal)
@@ -1200,17 +1197,27 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
           </Modal>
       )}
 
-      {showPrintModal && window.VoucherPrint && (
-          <Modal isOpen={true} onClose={() => setShowPrintModal(false)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
-              <window.VoucherPrint voucherId={voucherId} onClose={() => setShowPrintModal(false)} />
-          </Modal>
-      )}
+      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="full">
+          {voucherToPrint && window.VoucherPrint ? (
+              <window.VoucherPrint voucherId={voucherToPrint.id || localVoucherId} onClose={() => setVoucherToPrint(null)} />
+          ) : (
+              <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                  <FileWarning size={48} className="text-amber-400" />
+                  <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
+              </div>
+          )}
+      </Modal>
 
-      {showAttachModal && window.VoucherAttachments && (
-          <Modal isOpen={true} onClose={() => setShowAttachModal(false)} title={t.attachments || 'ضمائم'} size="md">
-              <window.VoucherAttachments voucherId={voucherId} onClose={() => setShowAttachModal(false)} readOnly={isReadonly} />
-          </Modal>
-      )}
+      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
+          {voucherForAttachments && window.VoucherAttachments ? (
+              <window.VoucherAttachments voucherId={voucherForAttachments.id || localVoucherId} onClose={() => setVoucherForAttachments(null)} readOnly={isReadonly} />
+          ) : (
+              <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                  <FileWarning size={48} className="text-amber-400" />
+                  <p>{isRtl ? 'کامپوننت ضمائم یافت نشد. لطفاً فایل VoucherAttachments.js را در پروژه قرار دهید.' : 'Attachments component not found. Please include VoucherAttachments.js.'}</p>
+              </div>
+          )}
+      </Modal>
     </div>
   );
 };
