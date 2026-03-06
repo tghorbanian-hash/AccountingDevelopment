@@ -165,7 +165,7 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
         const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
         return { 
            ...item, 
-           currency_code: detailsObj.currency_code || '',
+           currency_code: item.currency_code || detailsObj.currency_code || '',
            details_dict: detailsObj.selected_details || {},
            op_rate: item.op_rate ?? 1, op_is_reverse: item.op_is_reverse ?? false, op_debit: item.op_debit ?? 0, op_credit: item.op_credit ?? 0,
            rep1_rate: item.rep1_rate ?? 1, rep1_is_reverse: item.rep1_is_reverse ?? false, rep1_debit: item.rep1_debit ?? 0, rep1_credit: item.rep1_credit ?? 0,
@@ -191,12 +191,9 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
      return lookups.detailTypes.filter(dt => allowedTafsilCodesOrIds.some(t => String(dt.id) === String(t) || dt.code === String(t)));
   };
 
-  const validateFiscalPeriod = async (date, fyId) => {
+  const validateFiscalPeriod = async (date, periodId) => {
     try {
-        const { data: periods, error: pError } = await supabase.schema('gl').from('fiscal_periods').select('*').eq('year_id', fyId);
-        if (pError) throw pError;
-        if (!periods || periods.length === 0) return { valid: false, msg: t.noPeriodsFound };
-        const period = periods.find(p => date >= p.start_date && date <= p.end_date);
+        const period = lookups.fiscalPeriods?.find(p => p.id === periodId);
         if (!period) return { valid: false, msg: t.dateNotInPeriods };
         if (period.status === 'open') return { valid: true };
 
@@ -216,11 +213,29 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
     if (!supabase || !currentVoucher?.id) return;
     if (!currentVoucher.branch_id) return alert(t.branchReqError);
 
-    const periodCheck = await validateFiscalPeriod(currentVoucher.voucher_date, currentVoucher.fiscal_period_id);
-    if (!periodCheck.valid) return alert(periodCheck.msg);
+    const activeDate = currentVoucher.voucher_date;
+    const activeYearId = contextVals.fiscal_year_id;
+
+    const targetPeriod = lookups.fiscalPeriods?.find(p => 
+        String(p.year_id) === String(activeYearId) && 
+        p.start_date <= activeDate && 
+        p.end_date >= activeDate
+    );
+
+    if (!targetPeriod) {
+        alert(isRtl ? 'دوره‌ای برای تاریخ سند در سال مالی انتخاب شده یافت نشد.' : 'No fiscal period found for this date in the selected year.');
+        setLoading(false);
+        return;
+    }
+
+    const periodCheck = await validateFiscalPeriod(activeDate, targetPeriod.id);
+    if (!periodCheck.valid) {
+        alert(periodCheck.msg);
+        return;
+    }
 
     if (currentVoucher.subsidiary_number && currentVoucher.subsidiary_number.trim() !== '') {
-        const { data: subData } = await supabase.schema('gl').from('vouchers').select('id').eq('fiscal_period_id', currentVoucher.fiscal_period_id).eq('subsidiary_number', currentVoucher.subsidiary_number.trim()).neq('id', currentVoucher.id);
+        const { data: subData } = await supabase.schema('gl').from('vouchers').select('id').eq('fiscal_year_id', activeYearId).eq('subsidiary_number', currentVoucher.subsidiary_number.trim()).neq('id', currentVoucher.id);
         if (subData && subData.length > 0) return alert(t.subDupError);
     }
 
@@ -263,6 +278,8 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
 
       const voucherData = { 
         ...currentVoucher, status, total_debit: totalDebit, total_credit: totalCredit,
+        fiscal_year_id: activeYearId,
+        fiscal_period_id: targetPeriod.id,
         subsidiary_number: cleanData(currentVoucher.subsidiary_number), reference_number: cleanData(currentVoucher.reference_number),
         voucher_number: cleanData(currentVoucher.voucher_number), daily_number: cleanData(currentVoucher.daily_number), cross_reference: cleanData(currentVoucher.cross_reference), updated_at: new Date().toISOString()
       };
@@ -277,7 +294,8 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
         voucher_id: voucherData.id, row_number: item.row_number, account_id: cleanData(item.account_id),
         debit: parseNum(item.debit), credit: parseNum(item.credit), description: item.description,
         tracking_number: cleanData(item.tracking_number), tracking_date: cleanData(item.tracking_date), quantity: parseNum(item.quantity) === 0 ? null : parseNum(item.quantity),
-        details: { currency_code: item.currency_code, selected_details: item.details_dict || {} },
+        currency_code: cleanData(item.currency_code),
+        details: { selected_details: item.details_dict || {} },
         op_rate: parseNum(item.op_rate), op_is_reverse: item.op_is_reverse, op_debit: parseNum(item.op_debit), op_credit: parseNum(item.op_credit),
         rep1_rate: parseNum(item.rep1_rate), rep1_is_reverse: item.rep1_is_reverse, rep1_debit: parseNum(item.rep1_debit), rep1_credit: parseNum(item.rep1_credit),
         rep2_rate: parseNum(item.rep2_rate), rep2_is_reverse: item.rep2_is_reverse, rep2_debit: parseNum(item.rep2_debit), rep2_credit: parseNum(item.rep2_credit)
@@ -496,7 +514,7 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
       <div className="flex-1 overflow-auto flex flex-col gap-3">
         <Accordion title={t.headerInfo} isOpen={isHeaderOpen} onToggle={() => setIsHeaderOpen(!isHeaderOpen)} isRtl={isRtl} icon={FileText} className="shrink-0">
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4" onClick={(e) => e.stopPropagation()}>
-            <InputField label={t.fiscalYear} value={lookups.fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || ''} disabled isRtl={isRtl} />
+            <InputField label={t.fiscalYear} value={lookups.fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_year_id || contextVals.fiscal_year_id))?.title || ''} disabled isRtl={isRtl} />
             <InputField label={t.ledger} value={lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || ''} disabled isRtl={isRtl} />
             <SelectField label={t.branch} value={currentVoucher.branch_id || ''} onChange={(e) => setCurrentVoucher({...currentVoucher, branch_id: e.target.value})} disabled={isReadonly} isRtl={isRtl}>
                <option value="" disabled>{t.selectBranch}</option>

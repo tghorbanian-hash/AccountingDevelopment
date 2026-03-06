@@ -242,7 +242,7 @@ const VoucherReview = ({ language = 'fa', setHeaderNode }) => {
         };
 
         const [
-          brData, fyData, ledData, structData, dtData, diData, doctypeData, currData
+          brData, fyData, ledData, structData, dtData, diData, doctypeData, currData, fpData
         ] = await Promise.all([
           safeFetch(supabase.schema('gen').from('branches').select('*')),
           safeFetch(supabase.schema('gl').from('fiscal_years').select('id, code, title, status').eq('is_active', true).order('code', { ascending: false })),
@@ -251,7 +251,8 @@ const VoucherReview = ({ language = 'fa', setHeaderNode }) => {
           safeFetch(supabase.schema('gl').from('detail_types').select('id, code, title').eq('is_active', true)),
           safeFetch(supabase.schema('gl').from('detail_instances').select('id, detail_code, title, detail_type_code, ref_entity_name, entity_code').eq('status', true)),
           safeFetch(supabase.schema('gl').from('doc_types').select('id, code, title, type').eq('is_active', true)),
-          safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true))
+          safeFetch(supabase.schema('gen').from('currencies').select('id, code, title').eq('is_active', true)),
+          safeFetch(supabase.schema('gl').from('fiscal_periods').select('id, year_id, start_date, end_date, status'))
         ]);
 
         let currencyGlobals = null;
@@ -312,6 +313,7 @@ const VoucherReview = ({ language = 'fa', setHeaderNode }) => {
         setLookups({
           branches: filteredBranches,
           fiscalYears: fyData,
+          fiscalPeriods: fpData,
           ledgers: filteredLedgers,
           accountStructures: structData,
           detailTypes: dtData,

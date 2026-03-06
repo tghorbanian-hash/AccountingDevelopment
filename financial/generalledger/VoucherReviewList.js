@@ -39,7 +39,7 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
     try {
       let query = supabase.schema('gl').from('vouchers')
         .select('*')
-        .eq('fiscal_period_id', contextVals.fiscal_year_id)
+        .eq('fiscal_year_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
         .in('status', ['temporary', 'reviewed'])
         .order('voucher_date', { ascending: false })
@@ -160,7 +160,7 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
           const { data, error } = await supabase.schema('gl').from('vouchers')
               .select('id, voucher_date, daily_number, created_at')
               .eq('ledger_id', contextVals.ledger_id)
-              .eq('fiscal_period_id', contextVals.fiscal_year_id)
+              .eq('fiscal_year_id', contextVals.fiscal_year_id)
               .gte('voucher_date', sortParams.fromDate)
               .lte('voucher_date', sortParams.toDate)
               .order('voucher_date', { ascending: true })
@@ -208,7 +208,7 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
           const { data, error } = await supabase.schema('gl').from('vouchers')
               .select('id, voucher_date, daily_number, created_at')
               .eq('ledger_id', contextVals.ledger_id)
-              .eq('fiscal_period_id', contextVals.fiscal_year_id)
+              .eq('fiscal_year_id', contextVals.fiscal_year_id)
               .eq('voucher_date', sortParams.singleVoucherDate)
               .order('daily_number', { ascending: true })
               .order('created_at', { ascending: true });
@@ -281,8 +281,6 @@ const VoucherReviewList = ({ language, t, lookups, contextVals, setContextVals, 
 
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
-      {/* فیلتر سراسری از اینجا حذف شده است */}
-
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
