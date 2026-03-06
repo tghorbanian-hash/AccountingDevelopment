@@ -388,57 +388,75 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
     }
   };
 
+  // محاسبه تراز کل سند بر اساس "ارز عملیاتی"
   const globalBalance = () => {
-    const totalDebit = voucherItems.reduce((sum, item) => sum + parseNumber(item.debit), 0);
-    const totalCredit = voucherItems.reduce((sum, item) => sum + parseNumber(item.credit), 0);
-    const diff = totalDebit - totalCredit;
+    let opTotalDebit = 0, opTotalCredit = 0;
+    voucherItems.forEach(item => {
+        opTotalDebit += parseNumber(item.op_debit);
+        opTotalCredit += parseNumber(item.op_credit);
+    });
     
-    if (diff === 0) return;
+    const diffRound = Math.round((opTotalDebit - opTotalCredit) * 100) / 100;
+    if (diffRound === 0) return;
+
+    const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
+    const defaultCurrency = currentLedger?.currency || '';
 
     const emptyRowIndex = voucherItems.findIndex(item => parseNumber(item.debit) === 0 && parseNumber(item.credit) === 0);
 
     if (emptyRowIndex !== -1) {
        const newItems = [...voucherItems];
-       if (diff < 0) {
-           newItems[emptyRowIndex].debit = Math.abs(diff);
+       // تنظیم ارز ردیف خالی روی ارز عملیاتی دفتر برای جبران اختلاف تراز
+       newItems[emptyRowIndex].currency_code = defaultCurrency;
+       newItems[emptyRowIndex].op_rate = 1;
+       newItems[emptyRowIndex].op_is_reverse = false;
+
+       if (diffRound < 0) {
+           const absDiff = Math.abs(diffRound);
+           newItems[emptyRowIndex].debit = absDiff;
            newItems[emptyRowIndex].credit = 0;
-           newItems[emptyRowIndex].op_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].op_rate, newItems[emptyRowIndex].op_is_reverse);
+           newItems[emptyRowIndex].op_debit = absDiff;
            newItems[emptyRowIndex].op_credit = 0;
-           newItems[emptyRowIndex].rep1_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].rep1_rate, newItems[emptyRowIndex].rep1_is_reverse);
+           newItems[emptyRowIndex].rep1_debit = calcConv(absDiff, newItems[emptyRowIndex].rep1_rate, newItems[emptyRowIndex].rep1_is_reverse);
            newItems[emptyRowIndex].rep1_credit = 0;
-           newItems[emptyRowIndex].rep2_debit = calcConv(Math.abs(diff), newItems[emptyRowIndex].rep2_rate, newItems[emptyRowIndex].rep2_is_reverse);
+           newItems[emptyRowIndex].rep2_debit = calcConv(absDiff, newItems[emptyRowIndex].rep2_rate, newItems[emptyRowIndex].rep2_is_reverse);
            newItems[emptyRowIndex].rep2_credit = 0;
        } else {
-           newItems[emptyRowIndex].credit = diff;
+           newItems[emptyRowIndex].credit = diffRound;
            newItems[emptyRowIndex].debit = 0;
-           newItems[emptyRowIndex].op_credit = calcConv(diff, newItems[emptyRowIndex].op_rate, newItems[emptyRowIndex].op_is_reverse);
+           newItems[emptyRowIndex].op_credit = diffRound;
            newItems[emptyRowIndex].op_debit = 0;
-           newItems[emptyRowIndex].rep1_credit = calcConv(diff, newItems[emptyRowIndex].rep1_rate, newItems[emptyRowIndex].rep1_is_reverse);
+           newItems[emptyRowIndex].rep1_credit = calcConv(diffRound, newItems[emptyRowIndex].rep1_rate, newItems[emptyRowIndex].rep1_is_reverse);
            newItems[emptyRowIndex].rep1_debit = 0;
-           newItems[emptyRowIndex].rep2_credit = calcConv(diff, newItems[emptyRowIndex].rep2_rate, newItems[emptyRowIndex].rep2_is_reverse);
+           newItems[emptyRowIndex].rep2_credit = calcConv(diffRound, newItems[emptyRowIndex].rep2_rate, newItems[emptyRowIndex].rep2_is_reverse);
            newItems[emptyRowIndex].rep2_debit = 0;
        }
        setVoucherItems(newItems);
        setFocusedRowId(newItems[emptyRowIndex].id);
        setIsHeaderOpen(false);
     } else {
-       const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
        const newId = 'temp_' + Date.now();
        setVoucherItems([...voucherItems, { 
          id: newId, 
          row_number: voucherItems.length + 1, 
          account_id: '', 
          details_dict: {},
-         debit: diff < 0 ? Math.abs(diff) : 0, 
-         credit: diff > 0 ? diff : 0, 
-         currency_code: currentLedger?.currency || '',
+         debit: diffRound < 0 ? Math.abs(diffRound) : 0, 
+         credit: diffRound > 0 ? diffRound : 0, 
+         currency_code: defaultCurrency,
          description: '', 
          tracking_number: '', 
          tracking_date: '',
          quantity: '',
-         op_rate: 1, op_is_reverse: false, op_debit: diff < 0 ? Math.abs(diff) : 0, op_credit: diff > 0 ? diff : 0,
-         rep1_rate: 1, rep1_is_reverse: false, rep1_debit: diff < 0 ? Math.abs(diff) : 0, rep1_credit: diff > 0 ? diff : 0,
-         rep2_rate: 1, rep2_is_reverse: false, rep2_debit: diff < 0 ? Math.abs(diff) : 0, rep2_credit: diff > 0 ? diff : 0
+         op_rate: 1, op_is_reverse: false, 
+         op_debit: diffRound < 0 ? Math.abs(diffRound) : 0, 
+         op_credit: diffRound > 0 ? diffRound : 0,
+         rep1_rate: 1, rep1_is_reverse: false, 
+         rep1_debit: diffRound < 0 ? Math.abs(diffRound) : 0, 
+         rep1_credit: diffRound > 0 ? diffRound : 0,
+         rep2_rate: 1, rep2_is_reverse: false, 
+         rep2_debit: diffRound < 0 ? Math.abs(diffRound) : 0, 
+         rep2_credit: diffRound > 0 ? diffRound : 0
        }]);
        setFocusedRowId(newId);
        setIsHeaderOpen(false);
@@ -530,13 +548,18 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         }
     }
 
-    let totalDebit = 0, totalCredit = 0;
+    // مجموع کل سند برای ذخیره در هدر بر اساس ارز عملیاتی محاسبه می‌شود
+    let opTotalDebit = 0, opTotalCredit = 0;
     voucherItems.forEach(item => {
-        totalDebit += parseNumber(item.debit); totalCredit += parseNumber(item.credit);
+        opTotalDebit += parseNumber(item.op_debit); 
+        opTotalCredit += parseNumber(item.op_credit);
     });
     
-    if (totalDebit === 0 && totalCredit === 0) { alert(t.zeroAmountError); return; }
-    if (status === 'temporary' && totalDebit !== totalCredit) { alert(t.unbalancedError); return; }
+    if (opTotalDebit === 0 && opTotalCredit === 0) { alert(t.zeroAmountError); return; }
+    
+    // کنترل تراز بودن بر اساس ارز عملیاتی
+    const diffRound = Math.round((opTotalDebit - opTotalCredit) * 100) / 100;
+    if (status === 'temporary' && diffRound !== 0) { alert(t.unbalancedError); return; }
 
     setLoading(true);
     try {
@@ -548,7 +571,8 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
         ...currentVoucher, status,
         fiscal_year_id: activeYearId,
         fiscal_period_id: targetPeriod.id,
-        total_debit: totalDebit, total_credit: totalCredit,
+        total_debit: opTotalDebit, 
+        total_credit: opTotalCredit,
         subsidiary_number: cleanData(currentVoucher.subsidiary_number),
         reference_number: cleanData(currentVoucher.reference_number),
         voucher_number: cleanData(currentVoucher.voucher_number),
@@ -634,19 +658,34 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
       return <div className="h-full flex items-center justify-center bg-slate-50"><div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div></div>;
   }
 
-  let totalDebit = 0, totalCredit = 0, opTotalDebit = 0, opTotalCredit = 0, rep1TotalDebit = 0, rep1TotalCredit = 0, rep2TotalDebit = 0, rep2TotalCredit = 0;
+  // محاسبات مقادیر سایدبار با تفکیک ارز مبنا
+  let opTotalDebit = 0, opTotalCredit = 0, rep1TotalDebit = 0, rep1TotalCredit = 0, rep2TotalDebit = 0, rep2TotalCredit = 0;
+  const baseTotalsByCurrency = {};
+
   voucherItems.forEach(item => {
-      totalDebit += parseNumber(item.debit); totalCredit += parseNumber(item.credit);
-      opTotalDebit += parseNumber(item.op_debit); opTotalCredit += parseNumber(item.op_credit);
-      rep1TotalDebit += parseNumber(item.rep1_debit); rep1TotalCredit += parseNumber(item.rep1_credit);
-      rep2TotalDebit += parseNumber(item.rep2_debit); rep2TotalCredit += parseNumber(item.rep2_credit);
+      const cCode = item.currency_code || '-';
+      if (!baseTotalsByCurrency[cCode]) {
+          baseTotalsByCurrency[cCode] = { debit: 0, credit: 0 };
+      }
+      baseTotalsByCurrency[cCode].debit += parseNumber(item.debit);
+      baseTotalsByCurrency[cCode].credit += parseNumber(item.credit);
+
+      opTotalDebit += parseNumber(item.op_debit); 
+      opTotalCredit += parseNumber(item.op_credit);
+      rep1TotalDebit += parseNumber(item.rep1_debit); 
+      rep1TotalCredit += parseNumber(item.rep1_credit);
+      rep2TotalDebit += parseNumber(item.rep2_debit); 
+      rep2TotalCredit += parseNumber(item.rep2_credit);
   });
 
-  const isBalanced = totalDebit === totalCredit;
+  const diffRound = Math.round((opTotalDebit - opTotalCredit) * 100) / 100;
+  const isBalanced = diffRound === 0;
+
   const isReadonly = currentVoucher.status === 'reviewed' || currentVoucher.status === 'final' || (!canEdit && currentVoucher.id && !isCopy);
   const isVoucherNoManual = currentLedgerMeta.uniquenessScope === 'none';
   const currentFiscalYearTitle = lookups.fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_year_id || contextVals.fiscal_year_id))?.title || '';
-  const currentLedgerTitle = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || '';
+  
+  const ledgerCurrencyLabel = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.currency || lookups.currencyGlobals?.op_currency;
 
   const getStatusBadgeUI = (status) => {
     const config = {
@@ -780,9 +819,8 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                         }
 
                         const allowedDetailTypes = getValidDetailTypes(item.account_id);
-                        const hasDetails = allowedDetailTypes.length > 0;
                         const hasRow2Data = Object.keys(item.details_dict || {}).length > 0 || item.tracking_number || item.tracking_date || item.quantity;
-                        const showRow2 = hasDetails || hasTracking || hasQuantity || hasRow2Data;
+                        const showRow2 = allowedDetailTypes.length > 0 || hasTracking || hasQuantity || hasRow2Data;
 
                         if (!isEditing) {
                             const currentLedger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id));
@@ -921,22 +959,34 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                       <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5"><Layers size={14} className="text-indigo-500"/>{t.summary}</h3>
                       <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border bg-white shadow-sm ${isBalanced ? 'text-emerald-700 border-emerald-200' : 'text-red-700 border-red-200'}`}>
                           {isBalanced ? <CheckCircle size={12}/> : <FileWarning size={12}/>}
-                          <span className="font-bold text-[10px] dir-ltr">{isBalanced ? t.balanced : formatNumber(Math.abs(totalDebit - totalCredit))}</span>
+                          <span className="font-bold text-[10px] dir-ltr">{isBalanced ? t.balanced : formatNumber(Math.abs(opTotalDebit - opTotalCredit))}</span>
                       </div>
                   </div>
                   <div className="flex flex-col gap-3 p-3 text-xs">
-                     <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors">
-                         <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5"><span className="uppercase tracking-wider">{t.summaryBase}</span><Badge variant="indigo" size="sm">{getCurrencyTitle(lookups.ledgers.find(l=>l.id===contextVals.ledger_id)?.currency)}</Badge></div>
-                         <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-indigo-700 dir-ltr text-[13px]">{formatNumber(totalDebit)}</span></div>
-                         <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-indigo-700 dir-ltr text-[13px]">{formatNumber(totalCredit)}</span></div>
-                     </div>
-                     {lookups.currencyGlobals?.op_currency && (
-                         <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
-                             <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5"><span className="uppercase tracking-wider">{t.summaryOp}</span><Badge variant="slate" size="sm">{getCurrencyTitle(lookups.currencyGlobals.op_currency)}</Badge></div>
-                             <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNumber(opTotalDebit)}</span></div>
-                             <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNumber(opTotalCredit)}</span></div>
+                     
+                     {/* مبالغ پایه گروه بندی شده بر اساس کد ارز ردیف ها */}
+                     {Object.keys(baseTotalsByCurrency).map(code => (
+                         <div key={code} className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors">
+                             <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                                 <span className="uppercase tracking-wider">{t.summaryBase}</span>
+                                 <Badge variant="indigo" size="sm">{getCurrencyTitle(code)}</Badge>
+                             </div>
+                             <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-indigo-700 dir-ltr text-[13px]">{formatNumber(baseTotalsByCurrency[code].debit)}</span></div>
+                             <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-indigo-700 dir-ltr text-[13px]">{formatNumber(baseTotalsByCurrency[code].credit)}</span></div>
                          </div>
-                     )}
+                     ))}
+                     
+                     {/* مبالغ عملیاتی (بر اساس تنظیمات دفتر) */}
+                     <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
+                         <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5">
+                             <span className="uppercase tracking-wider">{t.summaryOp}</span>
+                             <Badge variant="slate" size="sm">{getCurrencyTitle(ledgerCurrencyLabel)}</Badge>
+                         </div>
+                         <div className="flex justify-between items-center"><span className="text-slate-500">{t.debit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNumber(opTotalDebit)}</span></div>
+                         <div className="flex justify-between items-center"><span className="text-slate-500">{t.credit}:</span> <span className="font-bold text-slate-700 dir-ltr text-[13px]">{formatNumber(opTotalCredit)}</span></div>
+                     </div>
+                     
+                     {/* مبالغ گزارشگری ۱ و ۲ */}
                      {lookups.currencyGlobals?.rep1_currency && (
                          <div className="flex flex-col gap-1.5 bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-slate-300 transition-colors">
                              <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 mb-1 border-b border-slate-100 pb-1.5"><span className="uppercase tracking-wider">{t.summaryRep1}</span><Badge variant="slate" size="sm">{getCurrencyTitle(lookups.currencyGlobals.rep1_currency)}</Badge></div>
@@ -982,12 +1032,12 @@ const VoucherForm = ({ voucherId, isCopy, contextVals, lookups, onClose, languag
                               </tr>
                           </thead>
                           <tbody>
-                              {lookups.currencyGlobals?.op_currency && (() => {
-                                  const isMatch = voucherItems[currencyModalIndex].currency_code === lookups.currencyGlobals.op_currency;
+                              {ledgerCurrencyLabel && (() => {
+                                  const isMatch = voucherItems[currencyModalIndex].currency_code === ledgerCurrencyLabel;
                                   return (
                                       <tr className="border-b border-slate-100 hover:bg-slate-50">
                                           <td className="py-2 px-3 font-bold text-slate-700">{t.opCurrency}</td>
-                                          <td className="py-2 px-3">{getCurrencyTitle(lookups.currencyGlobals.op_currency)}</td>
+                                          <td className="py-2 px-3">{getCurrencyTitle(ledgerCurrencyLabel)}</td>
                                           <td className="py-2 px-3">
                                               <input type="text" className={`w-full border rounded h-7 px-2 text-left dir-ltr outline-none ${isMatch ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border-slate-300 focus:border-indigo-500'}`} value={voucherItems[currencyModalIndex].op_rate} onChange={(e) => handleItemChange(currencyModalIndex, 'op_rate', e.target.value)} disabled={isMatch || isReadonly} />
                                           </td>
