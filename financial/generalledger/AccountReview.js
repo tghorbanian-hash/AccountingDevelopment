@@ -1,14 +1,14 @@
 /* Filename: financial/generalledger/AccountReview.js */
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Search, Filter, Layers, FileText, ChevronLeft, ChevronRight, 
-  Printer, Download, RefreshCw, X, Eye, Calculator, ArrowRight, ArrowLeft
+  Layers, ChevronDown, ChevronUp,
+  Printer, Download, X, Calculator, RefreshCw
 } from 'lucide-react';
 
 const AccountReview = ({ language = 'fa', setHeaderNode }) => {
   const isRtl = language === 'fa';
   const UI = window.UI || {};
-  const { Button, InputField, SelectField, DataGrid, Modal, FilterSection, Badge } = UI;
+  const { Button, InputField, SelectField, DataGrid, FilterSection, Badge } = UI;
   const { formatNumber, parseNumber } = UI.utils || { formatNumber: (v) => v, parseNumber: (v) => v };
   const supabase = window.supabase;
 
@@ -46,7 +46,9 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     docType: isRtl ? 'نوع سند' : 'Doc Type',
     accountType: isRtl ? 'نوع حساب' : 'Account Type',
     showWithBalanceOnly: isRtl ? 'فقط حساب‌های با مانده' : 'Only Accounts with Balance',
-    advancedFilters: isRtl ? 'فیلترهای بیشتر' : 'Advanced Filters',
+    
+    moreFilters: isRtl ? 'فیلترهای بیشتر' : 'More Filters',
+    lessFilters: isRtl ? 'فیلترهای کمتر' : 'Less Filters',
 
     // Adv Filters
     advFeatures: isRtl ? 'ویژگی‌های حساب' : 'Account Features',
@@ -65,8 +67,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
     trackingNo: isRtl ? 'شماره پیگیری' : 'Tracking No',
     headerDesc: isRtl ? 'شرح سند' : 'Header Desc',
     itemDesc: isRtl ? 'شرح قلم' : 'Item Desc',
-    apply: isRtl ? 'اعمال' : 'Apply',
-    cancel: isRtl ? 'انصراف' : 'Cancel',
     all: isRtl ? 'همه' : 'All',
     active: isRtl ? 'فعال' : 'Active',
     inactive: isRtl ? 'غیرفعال' : 'Inactive',
@@ -99,29 +99,27 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
   // Raw Data State
   const [rawData, setRawData] = useState([]); 
 
-  // Filter States
-  const [baseCurrencyMode, setBaseCurrencyMode] = useState('op'); // op, rep1, rep2
-  const [mainFilters, setMainFilters] = useState({
-      fiscalYearIds: [],
-      timeRangeType: 'period', // 'period' | 'date'
-      fromPeriodId: '',
-      toPeriodId: '',
-      fromDate: '',
-      toDate: '',
-      docType: '',
-      accountType: '',
-      showWithBalanceOnly: false
-  });
+  // View States
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [baseCurrencyMode, setBaseCurrencyMode] = useState('op'); 
+  const [showWithBalanceOnly, setShowWithBalanceOnly] = useState(false);
   
-  const [advFilters, setAdvFilters] = useState({
+  // Filter States
+  const defaultMainFilters = {
+      fiscalYearIds: [], timeRangeType: 'period', fromPeriodId: '', toPeriodId: '',
+      fromDate: '', toDate: '', docType: '', accountType: ''
+  };
+  const [mainFilters, setMainFilters] = useState(defaultMainFilters);
+  
+  const defaultAdvFilters = {
       featCurrency: false, featTracking: false, featQty: false,
       docNoFrom: '', docNoTo: '', crossNoFrom: '', crossNoTo: '', subNo: '',
       accStatus: '', docStatus: '', creatorId: '', reviewerId: '',
       trackingNo: '', headerDesc: '', itemDesc: ''
-  });
-  const [isAdvFilterOpen, setIsAdvFilterOpen] = useState(false);
+  };
+  const [advFilters, setAdvFilters] = useState(defaultAdvFilters);
 
-  // View States
+  // View Navigation
   const tabs = [
       { id: 'branch', label: t.tabBranch },
       { id: 'group', label: t.tabGroup },
@@ -133,12 +131,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       { id: 'transactions', label: t.tabTransactions }
   ];
   const [activeTab, setActiveTab] = useState('col');
-  
-  // Selection Path for Drill-down
-  // Keeps track of selected IDs in previous tabs to filter current view
   const [drillPath, setDrillPath] = useState({});
-
-  // Voucher View Modal
   const [selectedVoucherId, setSelectedVoucherId] = useState(null);
 
   // --- Init App ---
@@ -154,18 +147,19 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
             };
 
             const [
-                branches, ledgers, accounts, allDetailInstances, docTypes, 
+                branches, ledgers, accounts, allDetailInstances, detailTypes, docTypes, 
                 currencies, fiscalYears, fiscalPeriods, users
             ] = await Promise.all([
                 fetchSafe('gen', 'branches'),
                 fetchSafe('gl', 'ledgers'),
                 fetchSafe('gl', 'accounts'),
                 fetchSafe('gl', 'detail_instances'),
+                fetchSafe('gl', 'detail_types'),
                 fetchSafe('gl', 'document_types'),
                 fetchSafe('gen', 'currencies'),
                 fetchSafe('gl', 'fiscal_years'),
                 fetchSafe('gl', 'fiscal_periods'),
-                fetchSafe('gen', 'users') // Assuming a users table exists for creator/reviewer
+                fetchSafe('gen', 'users') 
             ]);
 
             let currencyGlobals = {};
@@ -207,7 +201,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
             setMainFilters(prev => ({ ...prev, fiscalYearIds: [activeYear.id] }));
 
             setLookups({
-                branches, ledgers, accounts, accMap, allDetailInstances, 
+                branches, ledgers, accounts, accMap, allDetailInstances, detailTypes,
                 docTypes, currencies, currencyGlobals, fiscalYears, fiscalPeriods, users
             });
         } catch (err) {
@@ -228,7 +222,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
           <div className="relative flex items-center group">
             <select value={contextVals.ledger_id} onChange={e => {
                 setContextVals({...contextVals, ledger_id: e.target.value});
-                setRawData([]); // clear data on ledger change
+                setRawData([]); 
                 setDrillPath({});
             }} className="bg-transparent border-none text-xs font-bold text-slate-600 group-hover:text-indigo-700 focus:ring-0 outline-none cursor-pointer appearance-none py-0 pl-1 pr-5 rtl:pr-1 rtl:pl-5">
               {lookups.ledgers.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
@@ -248,9 +242,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       }
       setIsFetchingData(true);
       try {
-          // Build Query for Voucher Items Joined with Vouchers
-          // Note: Since Supabase inner joins might have a 1000 row limit depending on config, 
-          // we use standard syntax and assume API config allows fetching larger sets via .limit(100000)
           let query = supabase.schema('gl').from('voucher_items')
               .select(`
                   id, account_id, debit, credit, currency_code, op_rate, op_is_reverse, op_debit, op_credit, 
@@ -263,10 +254,9 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
               `)
               .eq('vouchers.ledger_id', contextVals.ledger_id)
               .in('vouchers.fiscal_year_id', mainFilters.fiscalYearIds)
-              .in('vouchers.status', advFilters.docStatus ? [advFilters.docStatus] : ['temporary', 'reviewed', 'finalized', 'final']) // Exclude drafts naturally
+              .in('vouchers.status', advFilters.docStatus ? [advFilters.docStatus] : ['temporary', 'reviewed', 'finalized', 'final'])
               .limit(50000); 
 
-          // Apply Main Filters
           if (mainFilters.timeRangeType === 'period') {
               if (mainFilters.fromPeriodId) {
                   const fp = lookups.fiscalPeriods.find(p => String(p.id) === String(mainFilters.fromPeriodId));
@@ -280,26 +270,22 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
               if (mainFilters.fromDate) query = query.gte('vouchers.voucher_date', mainFilters.fromDate);
               if (mainFilters.toDate) query = query.lte('vouchers.voucher_date', mainFilters.toDate);
           }
+          
           if (mainFilters.docType) query = query.eq('vouchers.voucher_type', mainFilters.docType);
-
-          // Apply Advanced Filters (Header level)
           if (advFilters.docNoFrom) query = query.gte('vouchers.voucher_number', advFilters.docNoFrom);
           if (advFilters.docNoTo) query = query.lte('vouchers.voucher_number', advFilters.docNoTo);
           if (advFilters.crossNoFrom) query = query.gte('vouchers.cross_reference', advFilters.crossNoFrom);
           if (advFilters.crossNoTo) query = query.lte('vouchers.cross_reference', advFilters.crossNoTo);
-          if (advFilters.subNo) query = query.eq('vouchers.subsidiary_number', advFilters.subNo); // Simplified for =, in real app parse >, < etc.
+          if (advFilters.subNo) query = query.eq('vouchers.subsidiary_number', advFilters.subNo);
           if (advFilters.creatorId) query = query.eq('vouchers.created_by', advFilters.creatorId);
           if (advFilters.reviewerId) query = query.eq('vouchers.reviewed_by', advFilters.reviewerId);
           if (advFilters.headerDesc) query = query.ilike('vouchers.description', `%${advFilters.headerDesc}%`);
-
-          // Item Level Advanced Filters
           if (advFilters.trackingNo) query = query.eq('tracking_number', advFilters.trackingNo);
           if (advFilters.itemDesc) query = query.ilike('description', `%${advFilters.itemDesc}%`);
 
           const { data, error } = await query;
           if (error) throw error;
 
-          // Post-processing for filters that are hard to do in PostgREST natively (like JSONB or Account metadata)
           let finalData = data || [];
 
           if (mainFilters.accountType || advFilters.accStatus || advFilters.featCurrency || advFilters.featTracking || advFilters.featQty) {
@@ -322,38 +308,53 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
           }
 
           setRawData(finalData);
-          setDrillPath({}); // Reset drill down on new fetch
+          setDrillPath({});
       } catch (err) {
           console.error("Error fetching report data:", err);
           alert(isRtl ? 'خطا در واکشی اطلاعات.' : 'Error fetching report data.');
       } finally {
           setIsFetchingData(false);
-          setIsAdvFilterOpen(false);
       }
+  };
+
+  const handleClearSearch = () => {
+      const activeYear = lookups.fiscalYears.find(y => y.is_active) || lookups.fiscalYears[0] || {};
+      setMainFilters({ ...defaultMainFilters, fiscalYearIds: [activeYear.id] });
+      setAdvFilters(defaultAdvFilters);
+      setDrillPath({});
   };
 
   // --- Aggregation Engine ---
   const reportData = useMemo(() => {
       if (rawData.length === 0) return [];
 
-      // 1. Filter raw data based on current Drill Path
       let filteredData = rawData;
-      if (drillPath.branch) filteredData = filteredData.filter(d => drillPath.branch.includes(d.vouchers.branch_id));
-      if (drillPath.group) filteredData = filteredData.filter(d => drillPath.group.includes(lookups.accMap[d.account_id]?.parentGroup?.id));
-      if (drillPath.col) filteredData = filteredData.filter(d => drillPath.col.includes(lookups.accMap[d.account_id]?.parentCol?.id));
-      if (drillPath.moe) filteredData = filteredData.filter(d => drillPath.moe.includes(d.account_id));
-      if (drillPath.currency) filteredData = filteredData.filter(d => drillPath.currency.includes(d.currency_code));
-      if (drillPath.tracking) filteredData = filteredData.filter(d => drillPath.tracking.includes(d.tracking_number));
-      
-      if (drillPath.detail) {
-          filteredData = filteredData.filter(d => {
+
+      // Helper function to check if a row matches the selected IDs for a specific tab
+      const rowMatchesPath = (d, tabKey, selectedIds) => {
+          if (!selectedIds || selectedIds.length === 0) return true;
+          if (tabKey === 'branch') return selectedIds.includes(d.vouchers.branch_id);
+          if (tabKey === 'group') return selectedIds.includes(lookups.accMap[d.account_id]?.parentGroup?.id);
+          if (tabKey === 'col') return selectedIds.includes(lookups.accMap[d.account_id]?.parentCol?.id);
+          if (tabKey === 'moe') return selectedIds.includes(d.account_id);
+          if (tabKey === 'currency') return selectedIds.includes(d.currency_code);
+          if (tabKey === 'tracking') return selectedIds.includes(d.tracking_number);
+          if (tabKey === 'detail') {
               const detailsObj = typeof d.details === 'string' ? JSON.parse(d.details || '{}') : (d.details || {});
               const selDet = detailsObj.selected_details || {};
-              return Object.values(selDet).some(id => drillPath.detail.includes(id));
-          });
-      }
+              return Object.values(selDet).some(id => selectedIds.includes(id));
+          }
+          return true;
+      };
 
-      // If tab is transactions (ریز گردش), return raw formatted lines
+      // APPLY DRILL-DOWN FILTERS (Crucial rule: Do NOT filter the active tab by its own selection)
+      Object.keys(drillPath).forEach(tabKey => {
+          if (tabKey !== activeTab) { 
+              filteredData = filteredData.filter(d => rowMatchesPath(d, tabKey, drillPath[tabKey]));
+          }
+      });
+
+      // If active tab is transactions (ریز گردش)
       if (activeTab === 'transactions') {
           return filteredData.sort((a,b) => {
               const dateDiff = new Date(a.vouchers.voucher_date) - new Date(b.vouchers.voucher_date);
@@ -374,7 +375,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
           });
       }
 
-      // Aggregation Map
+      // Aggregation Map for Grouping
       const aggMap = new Map();
 
       filteredData.forEach(d => {
@@ -383,7 +384,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
           else if (baseCurrencyMode === 'rep1') { dAmount = parseNumber(d.rep1_debit); cAmount = parseNumber(d.rep1_credit); }
           else if (baseCurrencyMode === 'rep2') { dAmount = parseNumber(d.rep2_debit); cAmount = parseNumber(d.rep2_credit); }
 
-          // Determine grouping Key & Info based on active tab
           let keys = []; 
 
           if (activeTab === 'branch') {
@@ -392,19 +392,23 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
               keys.push({ id: bId, code: b?.code || '-', title: b?.title || 'No Branch' });
           } else if (activeTab === 'group') {
               const grp = lookups.accMap[d.account_id]?.parentGroup;
-              if (grp) keys.push({ id: grp.id, code: grp.code, title: grp.title });
+              if (grp) keys.push({ id: grp.id, code: grp.full_code || grp.code, title: grp.title });
           } else if (activeTab === 'col') {
               const col = lookups.accMap[d.account_id]?.parentCol;
-              if (col) keys.push({ id: col.id, code: col.code, title: col.title });
+              if (col) keys.push({ id: col.id, code: col.full_code || col.code, title: col.title });
           } else if (activeTab === 'moe') {
               const moe = lookups.accMap[d.account_id];
-              if (moe) keys.push({ id: moe.id, code: moe.code, title: moe.title });
+              if (moe) keys.push({ id: moe.id, code: moe.full_code || moe.code, title: moe.title });
           } else if (activeTab === 'detail') {
               const detailsObj = typeof d.details === 'string' ? JSON.parse(d.details || '{}') : (d.details || {});
               const selDet = detailsObj.selected_details || {};
               Object.values(selDet).forEach(detId => {
                   const det = lookups.allDetailInstances.find(x => String(x.id) === String(detId));
-                  if (det) keys.push({ id: det.id, code: det.detail_code || '-', title: det.title });
+                  if (det) {
+                      const dt = lookups.detailTypes?.find(type => type.code === det.detail_type_code);
+                      const typeTitle = dt ? dt.title : (isRtl ? 'ناشناخته' : 'Unknown');
+                      keys.push({ id: det.id, code: det.detail_code || '-', title: det.title, extra: typeTitle });
+                  }
               });
           } else if (activeTab === 'currency') {
               const currCode = d.currency_code || '-';
@@ -416,7 +420,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
 
           keys.forEach(k => {
               if (!aggMap.has(k.id)) {
-                  aggMap.set(k.id, { _id: k.id, code: k.code, title: k.title, debit: 0, credit: 0 });
+                  aggMap.set(k.id, { _id: k.id, code: k.code, title: k.title, extra: k.extra, debit: 0, credit: 0 });
               }
               const group = aggMap.get(k.id);
               group.debit += dAmount;
@@ -424,7 +428,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
           });
       });
 
-      // Post-process balances
       let results = Array.from(aggMap.values()).map(row => {
           const diff = row.debit - row.credit;
           row.balanceDebit = diff > 0 ? diff : 0;
@@ -434,15 +437,14 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
           return row;
       });
 
-      if (mainFilters.showWithBalanceOnly) {
+      if (showWithBalanceOnly) {
           results = results.filter(r => r.balance > 0);
       }
 
       return results.sort((a,b) => String(a.code).localeCompare(String(b.code)));
 
-  }, [rawData, activeTab, drillPath, baseCurrencyMode, mainFilters.showWithBalanceOnly, lookups]);
+  }, [rawData, activeTab, drillPath, baseCurrencyMode, showWithBalanceOnly, lookups, isRtl]);
 
-  // Calculate running balance for transactions tab
   const transactionsWithBalance = useMemo(() => {
       if (activeTab !== 'transactions') return reportData;
       let runningSum = 0;
@@ -456,9 +458,8 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       });
   }, [reportData, activeTab, isRtl]);
 
-
   const handleRowSelect = (id) => {
-      if (activeTab === 'transactions') return; // Cannot drill further
+      if (activeTab === 'transactions') return; 
       
       const newPath = { ...drillPath };
       if (!newPath[activeTab]) newPath[activeTab] = [];
@@ -483,7 +484,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       return <div className="h-full flex items-center justify-center bg-slate-50"><div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div></div>;
   }
 
-  // Generate Columns dynamically
   const getColumns = () => {
       if (activeTab === 'transactions') {
           return [
@@ -499,8 +499,19 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       }
 
       return [
-          { field: 'code', header: t.colCode, width: 'w-24', className: 'font-mono text-slate-600', sortable: true },
-          { field: 'title', header: t.colTitle, width: 'w-64', sortable: true, render: (r) => <span className="font-bold text-slate-700">{r.title}</span> },
+          { field: 'code', header: t.colCode, width: 'w-32', className: 'font-mono text-slate-600', sortable: true },
+          { 
+            field: 'title', 
+            header: t.colTitle, 
+            width: 'w-64', 
+            sortable: true, 
+            render: (r) => (
+               <div className="flex items-center gap-2">
+                   <span className="font-bold text-slate-700">{r.title}</span>
+                   {r.extra && <Badge variant="slate" size="sm">{r.extra}</Badge>}
+               </div>
+            ) 
+          },
           { field: 'debit', header: t.colDebit, width: 'w-36', className: 'text-left dir-ltr font-mono', render: (r) => formatNumber(r.debit) },
           { field: 'credit', header: t.colCredit, width: 'w-36', className: 'text-left dir-ltr font-mono', render: (r) => formatNumber(r.credit) },
           { field: 'balanceDebit', header: t.colBalanceDebit, width: 'w-36', className: 'text-left dir-ltr font-mono font-bold text-emerald-600', render: (r) => r.balanceDebit > 0 ? formatNumber(r.balanceDebit) : '' },
@@ -509,7 +520,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       ];
   };
 
-  // Footer Sum calculation
   const totalSums = transactionsWithBalance.reduce((acc, row) => {
       acc.debit += row.debit || 0;
       acc.credit += row.credit || 0;
@@ -524,16 +534,32 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
       let chips = [];
       Object.keys(drillPath).forEach(tabKey => {
           drillPath[tabKey].forEach(id => {
-              let label = id;
-              if (tabKey === 'branch') label = lookups.branches.find(x => x.id === id)?.title;
-              if (tabKey === 'group' || tabKey === 'col' || tabKey === 'moe') label = lookups.accMap[id]?.title;
-              if (tabKey === 'detail') label = lookups.allDetailInstances.find(x => String(x.id) === String(id))?.title;
-              if (tabKey === 'currency') label = lookups.currencies.find(x => x.code === id)?.title || id;
+              let label = String(id);
+              let codeStr = '';
+
+              if (tabKey === 'branch') {
+                  const b = lookups.branches.find(x => String(x.id) === String(id));
+                  if(b) { label = b.title; codeStr = b.code; }
+              }
+              if (tabKey === 'group' || tabKey === 'col' || tabKey === 'moe') {
+                  const acc = lookups.accMap[id];
+                  if(acc) { label = acc.title; codeStr = acc.full_code || acc.code; }
+              }
+              if (tabKey === 'detail') {
+                  const det = lookups.allDetailInstances.find(x => String(x.id) === String(id));
+                  if(det) { label = det.title; codeStr = det.detail_code; }
+              }
+              if (tabKey === 'currency') {
+                  const curr = lookups.currencies.find(x => x.code === String(id));
+                  if(curr) { label = curr.title; codeStr = curr.code; }
+              }
               
+              const displayText = codeStr ? `${label} (${codeStr})` : label;
+
               chips.push(
                   <div key={`${tabKey}-${id}`} className="flex items-center gap-1.5 bg-indigo-100 text-indigo-800 text-[11px] px-2.5 py-1 rounded-full font-bold border border-indigo-200 shadow-sm animate-in fade-in slide-in-from-bottom-2">
                      <span className="text-indigo-500 text-[9px]">{tabs.find(t=>t.id===tabKey)?.label}:</span>
-                     <span className="truncate max-w-[150px]">{label}</span>
+                     <span className="truncate max-w-[200px]" title={displayText}>{displayText}</span>
                      <X size={12} className="cursor-pointer hover:text-red-500 transition-colors" onClick={() => removeDrillFilter(tabKey, id)}/>
                   </div>
               );
@@ -548,7 +574,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
         {/* Header Title */}
         <div className="flex items-center justify-between mb-4 shrink-0">
            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
+              <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200 flex items-center justify-center shrink-0">
                  <Calculator size={24} />
               </div>
               <div>
@@ -562,9 +588,10 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
            </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-4 shrink-0 flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-7 gap-4 items-end">
+        {/* Filters Section (Integrated) */}
+        <div className="shrink-0 mb-4">
+            <FilterSection onSearch={fetchReportData} onClear={handleClearSearch} isRtl={isRtl} title={t.search} defaultOpen={true}>
+                {/* --- Row 1: Basic Filters --- */}
                 <SelectField label={t.mainCurrency} value={baseCurrencyMode} onChange={e => setBaseCurrencyMode(e.target.value)} isRtl={isRtl}>
                     <option value="op">{isRtl ? 'عملیاتی' : 'Operational'} ({lookups.currencyGlobals?.op_currency})</option>
                     {lookups.currencyGlobals?.rep1_currency && <option value="rep1">{isRtl ? 'گزارشگری ۱' : 'Reporting 1'} ({lookups.currencyGlobals.rep1_currency})</option>}
@@ -606,18 +633,74 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                     {lookups.docTypes.map(d => <option key={d.id} value={d.code}>{d.title}</option>)}
                 </SelectField>
 
-                <div className="flex gap-2 w-full">
-                    <Button variant="secondary" onClick={() => setIsAdvFilterOpen(true)} icon={Filter} className="flex-1 h-9 mb-1" title={t.advancedFilters}>{t.advancedFilters}</Button>
-                    <Button variant="primary" onClick={fetchReportData} icon={RefreshCw} className="flex-1 h-9 mb-1" isLoading={isFetchingData}>{t.fetchData}</Button>
+                {/* Advanced Filters Toggle Button inside Grid */}
+                <div className="col-span-full flex justify-start mt-2 border-t border-slate-100 pt-3">
+                    <Button variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)} icon={showAdvanced ? ChevronUp : ChevronDown}>
+                        {showAdvanced ? t.lessFilters : t.moreFilters}
+                    </Button>
                 </div>
-            </div>
-            <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+
+                {/* --- Row 2+: Advanced Filters --- */}
+                {showAdvanced && (
+                    <>
+                       <SelectField label={t.accountType} value={mainFilters.accountType} onChange={e => setMainFilters({...mainFilters, accountType: e.target.value})} isRtl={isRtl}>
+                           <option value="">{t.all}</option>
+                           <option value="دائم">{isRtl ? 'دائم' : 'Permanent'}</option>
+                           <option value="موقت">{isRtl ? 'موقت' : 'Temporary'}</option>
+                           <option value="انتظامی">{isRtl ? 'انتظامی' : 'Disciplinary'}</option>
+                       </SelectField>
+
+                       <div className="md:col-span-2 flex items-center flex-wrap gap-4 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                           <span className="font-bold text-slate-600 text-[10px] uppercase tracking-wider">{t.advFeatures}:</span>
+                           <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featCurrency} onChange={e => setAdvFilters({...advFilters, featCurrency: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" />{t.featCurrency}</label>
+                           <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featTracking} onChange={e => setAdvFilters({...advFilters, featTracking: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" />{t.featTracking}</label>
+                           <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700"><input type="checkbox" checked={advFilters.featQty} onChange={e => setAdvFilters({...advFilters, featQty: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" />{t.featQty}</label>
+                       </div>
+
+                       <InputField label={t.docNoFrom} value={advFilters.docNoFrom} onChange={e => setAdvFilters({...advFilters, docNoFrom: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                       <InputField label={t.docNoTo} value={advFilters.docNoTo} onChange={e => setAdvFilters({...advFilters, docNoTo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                       <InputField label={t.crossNoFrom} value={advFilters.crossNoFrom} onChange={e => setAdvFilters({...advFilters, crossNoFrom: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                       <InputField label={t.crossNoTo} value={advFilters.crossNoTo} onChange={e => setAdvFilters({...advFilters, crossNoTo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                       <InputField label={t.subNo} value={advFilters.subNo} onChange={e => setAdvFilters({...advFilters, subNo: e.target.value})} isRtl={isRtl} dir="ltr" className="text-center" />
+                       
+                       <SelectField label={t.docStatus} value={advFilters.docStatus} onChange={e => setAdvFilters({...advFilters, docStatus: e.target.value})} isRtl={isRtl}>
+                           <option value="">{t.all}</option>
+                           <option value="temporary">{t.statusTemp}</option>
+                           <option value="reviewed">{t.statusRev}</option>
+                           <option value="finalized">{t.statusFin}</option>
+                       </SelectField>
+                       
+                       <SelectField label={t.accStatus} value={advFilters.accStatus} onChange={e => setAdvFilters({...advFilters, accStatus: e.target.value})} isRtl={isRtl}>
+                           <option value="">{t.all}</option>
+                           <option value="active">{t.active}</option>
+                           <option value="inactive">{t.inactive}</option>
+                       </SelectField>
+
+                       <SelectField label={t.creator} value={advFilters.creatorId} onChange={e => setAdvFilters({...advFilters, creatorId: e.target.value})} isRtl={isRtl}>
+                           <option value="">{t.all}</option>
+                           {lookups?.users?.map(u => <option key={u.id} value={u.id}>{u.title || u.email || u.username}</option>)}
+                       </SelectField>
+
+                       <SelectField label={t.reviewer} value={advFilters.reviewerId} onChange={e => setAdvFilters({...advFilters, reviewerId: e.target.value})} isRtl={isRtl}>
+                           <option value="">{t.all}</option>
+                           {lookups?.users?.map(u => <option key={u.id} value={u.id}>{u.title || u.email || u.username}</option>)}
+                       </SelectField>
+
+                       <InputField label={t.trackingNo} value={advFilters.trackingNo} onChange={e => setAdvFilters({...advFilters, trackingNo: e.target.value})} isRtl={isRtl} dir="ltr" />
+                       <InputField label={t.headerDesc} value={advFilters.headerDesc} onChange={e => setAdvFilters({...advFilters, headerDesc: e.target.value})} isRtl={isRtl} />
+                       <InputField label={t.itemDesc} value={advFilters.itemDesc} onChange={e => setAdvFilters({...advFilters, itemDesc: e.target.value})} isRtl={isRtl} />
+                    </>
+                )}
+            </FilterSection>
+
+            {/* Chips & Visual Balance Check */}
+            <div className="flex items-center justify-between mt-3 px-1">
                <div className="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" id="chkBal" className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" checked={mainFilters.showWithBalanceOnly} onChange={e => setMainFilters({...mainFilters, showWithBalanceOnly: e.target.checked})} />
-                  <label htmlFor="chkBal" className="cursor-pointer select-none font-bold">{t.showWithBalanceOnly}</label>
+                  <input type="checkbox" id="chkBal" className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer" checked={showWithBalanceOnly} onChange={e => setShowWithBalanceOnly(e.target.checked)} />
+                  <label htmlFor="chkBal" className="cursor-pointer select-none font-bold text-xs">{t.showWithBalanceOnly}</label>
                </div>
                
-               <div className="flex flex-wrap items-center gap-2">
+               <div className="flex flex-wrap items-center justify-end gap-2">
                    {renderFilterChips()}
                </div>
             </div>
@@ -657,7 +740,7 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                {/* Fixed Summary Footer */}
                <div className="bg-slate-100 border-t border-slate-300 p-2 shrink-0 flex items-center">
                   <div className="flex-1 font-black text-slate-700 px-4">{t.sum}:</div>
-                  <div className="flex w-full max-w-[calc(100%-250px)]">
+                  <div className="flex w-full max-w-[calc(100%-280px)]">
                      {activeTab === 'transactions' ? (
                          <>
                              <div className="flex-1"></div>
@@ -679,53 +762,6 @@ const AccountReview = ({ language = 'fa', setHeaderNode }) => {
                </div>
             </div>
         </div>
-
-        {/* Advanced Filters Modal */}
-        <Modal isOpen={isAdvFilterOpen} onClose={() => setIsAdvFilterOpen(false)} title={t.advancedFilters} size="lg" footer={<><Button variant="ghost" onClick={() => setIsAdvFilterOpen(false)}>{t.cancel}</Button><Button variant="primary" onClick={() => {setIsAdvFilterOpen(false); fetchReportData();}} icon={Filter}>{t.apply}</Button></>}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-2">
-                <div className="md:col-span-2 flex gap-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                    <span className="font-bold text-slate-600 text-sm flex items-center">{t.advFeatures}:</span>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-700"><input type="checkbox" checked={advFilters.featCurrency} onChange={e => setAdvFilters({...advFilters, featCurrency: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500" />{t.featCurrency}</label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-700"><input type="checkbox" checked={advFilters.featTracking} onChange={e => setAdvFilters({...advFilters, featTracking: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500" />{t.featTracking}</label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-700"><input type="checkbox" checked={advFilters.featQty} onChange={e => setAdvFilters({...advFilters, featQty: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500" />{t.featQty}</label>
-                </div>
-
-                <InputField label={t.docNoFrom} value={advFilters.docNoFrom} onChange={e => setAdvFilters({...advFilters, docNoFrom: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <InputField label={t.docNoTo} value={advFilters.docNoTo} onChange={e => setAdvFilters({...advFilters, docNoTo: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <InputField label={t.crossNoFrom} value={advFilters.crossNoFrom} onChange={e => setAdvFilters({...advFilters, crossNoFrom: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <InputField label={t.crossNoTo} value={advFilters.crossNoTo} onChange={e => setAdvFilters({...advFilters, crossNoTo: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <InputField label={t.subNo} value={advFilters.subNo} onChange={e => setAdvFilters({...advFilters, subNo: e.target.value})} isRtl={isRtl} dir="ltr" />
-                
-                <SelectField label={t.docStatus} value={advFilters.docStatus} onChange={e => setAdvFilters({...advFilters, docStatus: e.target.value})} isRtl={isRtl}>
-                    <option value="">{t.all}</option>
-                    <option value="temporary">{t.statusTemp}</option>
-                    <option value="reviewed">{t.statusRev}</option>
-                    <option value="finalized">{t.statusFin}</option>
-                </SelectField>
-                
-                <SelectField label={t.accStatus} value={advFilters.accStatus} onChange={e => setAdvFilters({...advFilters, accStatus: e.target.value})} isRtl={isRtl}>
-                    <option value="">{t.all}</option>
-                    <option value="active">{t.active}</option>
-                    <option value="inactive">{t.inactive}</option>
-                </SelectField>
-
-                <SelectField label={t.creator} value={advFilters.creatorId} onChange={e => setAdvFilters({...advFilters, creatorId: e.target.value})} isRtl={isRtl}>
-                    <option value="">{t.all}</option>
-                    {lookups?.users?.map(u => <option key={u.id} value={u.id}>{u.title || u.email}</option>)}
-                </SelectField>
-
-                <SelectField label={t.reviewer} value={advFilters.reviewerId} onChange={e => setAdvFilters({...advFilters, reviewerId: e.target.value})} isRtl={isRtl}>
-                    <option value="">{t.all}</option>
-                    {lookups?.users?.map(u => <option key={u.id} value={u.id}>{u.title || u.email}</option>)}
-                </SelectField>
-
-                <InputField label={t.trackingNo} value={advFilters.trackingNo} onChange={e => setAdvFilters({...advFilters, trackingNo: e.target.value})} isRtl={isRtl} dir="ltr" />
-                <InputField label={t.headerDesc} value={advFilters.headerDesc} onChange={e => setAdvFilters({...advFilters, headerDesc: e.target.value})} isRtl={isRtl} />
-                <div className="md:col-span-2">
-                   <InputField label={t.itemDesc} value={advFilters.itemDesc} onChange={e => setAdvFilters({...advFilters, itemDesc: e.target.value})} isRtl={isRtl} />
-                </div>
-            </div>
-        </Modal>
 
         {/* Voucher View Modal */}
         {selectedVoucherId && (
