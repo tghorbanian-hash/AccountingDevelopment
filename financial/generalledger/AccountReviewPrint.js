@@ -1,6 +1,6 @@
 /* Filename: financial/generalledger/AccountReviewPrint.js */
 import React, { useState, useMemo } from 'react';
-import { Printer, Settings, CheckSquare, Square, X } from 'lucide-react';
+import { Printer, Settings, CheckSquare, Square } from 'lucide-react';
 
 const AccountReviewPrint = ({ 
     isOpen, onClose, rawData, drillPath, lookups, 
@@ -33,7 +33,6 @@ const AccountReviewPrint = ({
         branch: 'Branch', group: 'Group', col: 'General', moe: 'Subsidiary', detail: 'Detail', currency: 'Currency', tracking: 'Tracking'
     };
 
-    // Calculate data exactly as parent does, but based on `printTab`
     const reportData = useMemo(() => {
         if (!rawData || rawData.length === 0) return [];
   
@@ -223,7 +222,7 @@ const AccountReviewPrint = ({
     const renderActiveChips = () => {
         let chips = [];
         Object.keys(drillPath).forEach(tabKey => {
-            if (tabKey === printTab) return; // Don't show filter for the tab being printed
+            if (tabKey === printTab) return; 
             drillPath[tabKey].forEach(id => {
                 let label = String(id);
                 if (tabKey === 'branch') label = lookups.branches.find(x => String(x.id) === String(id))?.title || id;
@@ -238,14 +237,14 @@ const AccountReviewPrint = ({
 
     const activeFiltersStr = renderActiveChips();
 
-    // Print specific styling injection
+    // Print specific styling injection (A4 Portrait)
     const printStyles = `
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
             #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
             .print-modal { position: static !important; width: 100% !important; background: white !important; }
-            @page { size: A4 landscape; margin: 10mm; }
+            @page { size: A4 portrait; margin: 10mm; }
         }
     `;
 
@@ -303,19 +302,22 @@ const AccountReviewPrint = ({
                     </div>
                 </div>
 
-                {/* Preview Area (Becomes full page in print) */}
-                <div className="flex-1 bg-slate-200 p-8 overflow-y-auto print:p-0 print:bg-white" dir={isRtl ? 'rtl' : 'ltr'}>
-                    <div id="print-area" className="bg-white mx-auto shadow-lg print:shadow-none" style={{ maxWidth: '297mm', minHeight: '210mm', padding: '20mm' }}>
+                {/* Preview Area (A4 Portrait format) */}
+                <div className="flex-1 bg-slate-200 p-8 overflow-y-auto print:p-0 print:bg-white flex justify-center" dir={isRtl ? 'rtl' : 'ltr'}>
+                    <div id="print-area" className="bg-white shadow-lg print:shadow-none w-full max-w-[210mm] min-h-[297mm] p-[10mm]">
                         
                         {/* Print Header */}
                         <div className="border-b-2 border-slate-800 pb-4 mb-4">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="w-1/3 text-xs text-slate-600 leading-relaxed flex flex-col gap-1">
-                                    <div><strong>کاربر:</strong> {userName}</div>
-                                    <div><strong>تاریخ گزارش:</strong> <span className="dir-ltr inline-block">{repDate}</span></div>
-                                    <div><strong>تعداد اقلام:</strong> {reportData.length}</div>
-                                    <div><strong>ارز گزارش:</strong> {repCurrencyStr}</div>
+                            <div className="flex justify-between items-start">
+                                {/* Right Side (Ledger, Year, Dates) */}
+                                <div className="w-1/3 text-xs text-slate-700 leading-relaxed flex flex-col gap-1.5 text-right">
+                                    <div><strong>دفتر مالی:</strong> {ledger}</div>
+                                    <div><strong>سال مالی:</strong> {fYear}</div>
+                                    {mainFilters.fromDate && <div><strong>از تاریخ:</strong> <span className="dir-ltr inline-block">{mainFilters.fromDate}</span></div>}
+                                    {mainFilters.toDate && <div><strong>تا تاریخ:</strong> <span className="dir-ltr inline-block">{mainFilters.toDate}</span></div>}
                                 </div>
+                                
+                                {/* Center */}
                                 <div className="w-1/3 text-center">
                                     <h1 className="text-xl font-black text-slate-900 mb-1">{repName}</h1>
                                     <h2 className="text-sm font-bold text-slate-600">{orgName}</h2>
@@ -323,23 +325,26 @@ const AccountReviewPrint = ({
                                         سطح گزارش: {tabs.find(t=>t.id === printTab)?.label}
                                     </div>
                                 </div>
-                                <div className="w-1/3 text-xs text-slate-600 leading-relaxed flex flex-col gap-1 items-end">
-                                    <div><strong>سال مالی:</strong> {fYear}</div>
-                                    <div><strong>دفتر مالی:</strong> {ledger}</div>
-                                    {mainFilters.fromDate && <div><strong>از تاریخ:</strong> <span className="dir-ltr inline-block">{mainFilters.fromDate}</span></div>}
-                                    {mainFilters.toDate && <div><strong>تا تاریخ:</strong> <span className="dir-ltr inline-block">{mainFilters.toDate}</span></div>}
+
+                                {/* Left Side (User, Date, Items Count, Currency) */}
+                                <div className="w-1/3 text-xs text-slate-700 leading-relaxed flex flex-col gap-1.5 items-end text-left">
+                                    <div><strong>کاربر:</strong> {userName}</div>
+                                    <div><strong>تاریخ گزارش:</strong> <span className="dir-ltr inline-block">{repDate}</span></div>
+                                    <div><strong>تعداد اقلام:</strong> {reportData.length}</div>
+                                    <div><strong>ارز گزارش:</strong> {repCurrencyStr}</div>
                                 </div>
                             </div>
-                            
-                            {activeFiltersStr && (
-                                <div className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 leading-relaxed">
-                                    <strong>فیلترهای اعمال شده:</strong> {activeFiltersStr}
-                                </div>
-                            )}
                         </div>
 
+                        {/* Applied Filters */}
+                        {activeFiltersStr && (
+                            <div className="mb-4 text-[10px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-200 leading-relaxed text-right">
+                                <strong className="text-slate-800">فیلترهای اعمال شده:</strong> {activeFiltersStr}
+                            </div>
+                        )}
+
                         {/* Print Table */}
-                        <table className="w-full text-xs text-right border-collapse border border-slate-300">
+                        <table className="w-full text-[10px] text-right border-collapse border border-slate-300">
                             <thead>
                                 <tr className="bg-slate-100">
                                     {finalCols.map((c, i) => (
@@ -355,7 +360,7 @@ const AccountReviewPrint = ({
                                             const alignClass = isAmount ? 'text-left dir-ltr font-mono' : (c.field === 'code' || c.field === 'doc_no' || c.field === 'date' || c.field === 'nature' ? 'text-center' : '');
                                             let val = row[c.field] || '-';
                                             if (isAmount) val = parseNumber(val) > 0 ? formatNumber(val) : '';
-                                            return <td key={i} className={`border border-slate-300 p-2 text-slate-700 ${alignClass}`}>{val}</td>;
+                                            return <td key={i} className={`border border-slate-300 p-1.5 text-slate-700 ${alignClass}`}>{val}</td>;
                                         })}
                                     </tr>
                                 ))}
@@ -365,14 +370,14 @@ const AccountReviewPrint = ({
                                     <tr className="bg-slate-100 font-bold break-inside-avoid">
                                         {finalCols.map((c, i) => {
                                             if (i === 0) return <td key={i} colSpan={finalCols.length > 5 ? 2 : 1} className="border border-slate-300 p-2 text-left">{t.sum}:</td>;
-                                            if (i === 1 && finalCols.length > 5) return null; // Skip title col if merged
+                                            if (i === 1 && finalCols.length > 5) return null; 
                                             
-                                            if (c.field === 'debit') return <td key={i} className="border border-slate-300 p-2 text-indigo-700 dir-ltr text-left font-mono">{formatNumber(totalSums.debit)}</td>;
-                                            if (c.field === 'credit') return <td key={i} className="border border-slate-300 p-2 text-indigo-700 dir-ltr text-left font-mono">{formatNumber(totalSums.credit)}</td>;
-                                            if (c.field === 'balanceDebit' && printTab !== 'transactions') return <td key={i} className="border border-slate-300 p-2 text-emerald-700 dir-ltr text-left font-mono">{formatNumber(totalSums.balDebit)}</td>;
-                                            if (c.field === 'balanceCredit' && printTab !== 'transactions') return <td key={i} className="border border-slate-300 p-2 text-rose-700 dir-ltr text-left font-mono">{formatNumber(totalSums.balCredit)}</td>;
+                                            if (c.field === 'debit') return <td key={i} className="border border-slate-300 p-1.5 text-indigo-700 dir-ltr text-left font-mono">{formatNumber(totalSums.debit)}</td>;
+                                            if (c.field === 'credit') return <td key={i} className="border border-slate-300 p-1.5 text-indigo-700 dir-ltr text-left font-mono">{formatNumber(totalSums.credit)}</td>;
+                                            if (c.field === 'balanceDebit' && printTab !== 'transactions') return <td key={i} className="border border-slate-300 p-1.5 text-emerald-700 dir-ltr text-left font-mono">{formatNumber(totalSums.balDebit)}</td>;
+                                            if (c.field === 'balanceCredit' && printTab !== 'transactions') return <td key={i} className="border border-slate-300 p-1.5 text-rose-700 dir-ltr text-left font-mono">{formatNumber(totalSums.balCredit)}</td>;
                                             
-                                            return <td key={i} className="border border-slate-300 p-2"></td>;
+                                            return <td key={i} className="border border-slate-300 p-1.5"></td>;
                                         })}
                                     </tr>
                                 )}
