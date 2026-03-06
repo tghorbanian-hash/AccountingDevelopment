@@ -411,7 +411,8 @@ const App = () => {
       KpiDashboard, UserManagement, GeneralWorkspace, ComponentShowcase, LoginPage, 
       Roles, Parties, UserProfile, OrganizationInfo, CurrencySettings, CostCenters, 
       Projects, Branches, OrgChart, Ledgers, Details, FiscalPeriods, DocTypes, 
-      AutoNumbering, ChartofAccounts, Vouchers, VoucherReview, VoucherFinalize, VoucherList
+      AutoNumbering, ChartofAccounts, Vouchers, VoucherReview, VoucherFinalize, 
+      VoucherList, AccountReview
     } = window;
 
     if (activeId === 'user_profile') return UserProfile ? <UserProfile t={t} isRtl={isRtl} onLanguageChange={setLang} /> : <div className="p-4 text-red-500">Error: UserProfile Component Not Loaded</div>;
@@ -433,6 +434,8 @@ const App = () => {
     if (activeId === 'doc_review') return VoucherReview ? <VoucherReview language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error: VoucherReview (بررسی اسناد) Component Not Loaded</div>;
     if (activeId === 'doc_finalize') return VoucherFinalize ? <VoucherFinalize language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error: VoucherFinalize (قطعی کردن اسناد) Component Not Loaded</div>;
     if (activeId === 'voucher_list_view') return VoucherList ? <VoucherList language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error: VoucherList (فهرست اسناد) Component Not Loaded</div>;
+
+    if (activeId === 'acc_review') return AccountReview ? <AccountReview language={lang} setHeaderNode={setHeaderNode} /> : <div className="p-4 text-red-500">Error: AccountReview (مرور حساب‌ها) Component Not Loaded</div>;
 
     if (activeId === 'users_list') return UserManagement ? <UserManagement t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: UserManagement Not Loaded</div>;
     if (activeId === 'roles') return Roles ? <Roles t={t} isRtl={isRtl} /> : <div className="p-4 text-red-500">Error: Roles Component Not Loaded</div>;
