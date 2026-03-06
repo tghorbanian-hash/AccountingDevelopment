@@ -23,8 +23,9 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
   const [isHeaderOpen, setIsHeaderOpen] = useState(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
 
-  const [showPrintModal, setShowPrintModal] = useState(false);
-  const [showAttachModal, setShowAttachModal] = useState(false);
+  // رفع ارور: اضافه شدن مجدد استیت‌های مربوط به مدال چاپ و پیوست
+  const [voucherToPrint, setVoucherToPrint] = useState(null);
+  const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
   const ledgerStructureCode = useMemo(() => {
      const ledger = lookups.ledgers.find(l => String(l.id) === String(currentVoucher?.ledger_id));
@@ -271,8 +272,8 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
           {getStatusBadgeUI(currentVoucher.status)}
         </div>
         <div className="flex items-center gap-2">
-          {canAttach && <Button variant="ghost" size="icon" icon={Paperclip} onClick={() => setShowAttachModal(true)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />}
-          {canPrint && <Button variant="ghost" size="icon" icon={Printer} onClick={() => setShowPrintModal(true)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />}
+          {canAttach && <Button variant="ghost" size="icon" icon={Paperclip} onClick={() => setVoucherForAttachments(currentVoucher)} title={t.attachments} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />}
+          {canPrint && <Button variant="ghost" size="icon" icon={Printer} onClick={() => setVoucherToPrint(currentVoucher)} title={t.print} className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50" />}
           
           {canEdit && (
             isReadonly ? (
@@ -386,7 +387,7 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
         </div>
       </div>
 
-      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
+      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="full">
           {voucherToPrint && window.VoucherPrint ? (
               <window.VoucherPrint voucherId={voucherToPrint.id || voucherId} onClose={() => setVoucherToPrint(null)} />
           ) : (
@@ -412,3 +413,4 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
 };
 
 window.VoucherReviewForm = VoucherReviewForm;
+export default VoucherReviewForm;
