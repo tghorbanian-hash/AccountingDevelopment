@@ -1175,17 +1175,27 @@ const VoucherForm = ({ voucherId, isCopy, isFxMode, contextVals, lookups, onClos
           </Modal>
       )}
 
-      {showPrintModal && window.VoucherPrint && (
-          <Modal isOpen={true} onClose={() => setShowPrintModal(false)} title={t.printVoucher || 'چاپ سند حسابداری'} size="lg">
-              <window.VoucherPrint voucherId={voucherId} onClose={() => setShowPrintModal(false)} />
-          </Modal>
-      )}
+      <Modal isOpen={!!voucherToPrint} onClose={() => setVoucherToPrint(null)} title={t.printVoucher || 'چاپ سند حسابداری'} size="full">
+         {voucherToPrint && window.VoucherPrint ? (
+             <window.VoucherPrint voucherId={voucherToPrint.id || voucherId} onClose={() => setVoucherToPrint(null)} />
+         ) : (
+             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                <FileWarning size={48} className="text-amber-400" />
+                <p>{isRtl ? 'کامپوننت چاپ یافت نشد. لطفاً فایل VoucherPrint.js را در پروژه قرار دهید.' : 'Print component not found. Please include VoucherPrint.js.'}</p>
+             </div>
+         )}
+      </Modal>
 
-      {showAttachModal && window.VoucherAttachments && (
-          <Modal isOpen={true} onClose={() => setShowAttachModal(false)} title={t.attachments || 'ضمائم'} size="md">
-              <window.VoucherAttachments voucherId={voucherId} onClose={() => setShowAttachModal(false)} readOnly={isReadonly} />
-          </Modal>
-      )}
+      <Modal isOpen={!!voucherForAttachments} onClose={() => setVoucherForAttachments(null)} title={t.attachments || 'اسناد مثبته و ضمائم'} size="md">
+         {voucherForAttachments && window.VoucherAttachments ? (
+             <window.VoucherAttachments voucherId={voucherForAttachments.id || voucherId} onClose={() => setVoucherForAttachments(null)} readOnly={isReadonly} />
+         ) : (
+             <div className="p-10 flex flex-col items-center justify-center text-slate-500 gap-4">
+                <FileWarning size={48} className="text-amber-400" />
+                <p>{isRtl ? 'کامپوننت ضمائم یافت نشد. لطفاً فایل VoucherAttachments.js را در پروژه قرار دهید.' : 'Attachments component not found. Please include VoucherAttachments.js.'}</p>
+             </div>
+         )}
+      </Modal>
     </div>
   );
 };
