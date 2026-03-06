@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ArrowRight, ArrowLeft, Save, CheckCircle, FileText, 
-  Printer, Paperclip, ChevronRight, ChevronLeft, Layers, FileWarning
+  Printer, Paperclip, ChevronRight, ChevronLeft, Layers, FileWarning, RefreshCw
 } from 'lucide-react';
 
 const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, contextVals, perms, onClose, onNavigate }) => {
@@ -23,7 +23,6 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
   const [isHeaderOpen, setIsHeaderOpen] = useState(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
 
-  // رفع ارور: اضافه شدن مجدد استیت‌های مربوط به مدال چاپ و پیوست
   const [voucherToPrint, setVoucherToPrint] = useState(null);
   const [voucherForAttachments, setVoucherForAttachments] = useState(null);
 
@@ -159,6 +158,7 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
       const cleanData = (val) => (val === '' ? null : val);
       const { data: authData } = await supabase.auth.getUser();
       const currentUserId = authData?.user?.id || null;
+      const nowIso = new Date().toISOString();
 
       const voucherData = { 
         ...currentVoucher, status, 
@@ -167,10 +167,16 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
         fiscal_year_id: activeYearId,
         fiscal_period_id: targetPeriod.id,
         subsidiary_number: cleanData(currentVoucher.subsidiary_number), reference_number: cleanData(currentVoucher.reference_number),
-        voucher_number: cleanData(currentVoucher.voucher_number), daily_number: cleanData(currentVoucher.daily_number), cross_reference: cleanData(currentVoucher.cross_reference), updated_at: new Date().toISOString()
+        voucher_number: cleanData(currentVoucher.voucher_number), daily_number: cleanData(currentVoucher.daily_number), cross_reference: cleanData(currentVoucher.cross_reference), 
+        updated_at: nowIso,
+        updated_by: currentUserId
       };
-      if (status === 'reviewed') voucherData.reviewed_by = currentUserId;
-      else voucherData.reviewed_by = null;
+      
+      if (status === 'reviewed') {
+          voucherData.reviewed_by = currentUserId;
+      } else {
+          voucherData.reviewed_by = null;
+      }
 
       const { error } = await supabase.schema('gl').from('vouchers').update(voucherData).eq('id', voucherData.id);
       if (error) throw error;
@@ -279,13 +285,13 @@ const VoucherReviewForm = ({ language, t, voucherId, vouchersList, lookups, cont
             isReadonly ? (
               <>
                  <div className="h-6 w-px bg-slate-200 mx-1"></div>
-                 <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={RotateCcw}>{t.revertToTemp}</Button>
+                 <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={RefreshCw}>{t.revertToTemp || 'برگشت به موقت'}</Button>
               </>
             ) : (
               <>
                 <div className="h-6 w-px bg-slate-200 mx-1"></div>
                 <Button variant="outline" onClick={() => handleSaveVoucher('temporary')} icon={Save}>{t.saveTemp}</Button>
-                <Button variant="primary" onClick={() => handleSaveVoucher('reviewed')} icon={CheckCircle}>{t.saveReviewed}</Button>
+                <Button variant="primary" onClick={() => handleSaveVoucher('reviewed')} icon={CheckCircle}>{t.saveReviewed || 'بررسی و ذخیره'}</Button>
               </>
             )
           )}
