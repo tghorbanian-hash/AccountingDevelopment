@@ -48,7 +48,7 @@ const VoucherFinalizeView = ({ language, t, voucherId, vouchersList, lookups, co
         const detailsObj = typeof item.details === 'string' ? JSON.parse(item.details || '{}') : (item.details || {});
         return { 
            ...item, 
-           currency_code: detailsObj.currency_code || '',
+           currency_code: item.currency_code || detailsObj.currency_code || '',
            details_dict: detailsObj.selected_details || {},
            op_debit: item.op_debit ?? 0, op_credit: item.op_credit ?? 0,
            rep1_debit: item.rep1_debit ?? 0, rep1_credit: item.rep1_credit ?? 0,
@@ -73,7 +73,8 @@ const VoucherFinalizeView = ({ language, t, voucherId, vouchersList, lookups, co
     
     if (totDeb !== totCred) return alert(t.errNotBalanced.replace('{vNo}', currentVoucher.voucher_number || currentVoucher.daily_number || '-'));
 
-    const period = lookups.fiscalPeriods.find(x => String(x.year_id) === String(currentVoucher.fiscal_period_id) && currentVoucher.voucher_date >= x.start_date && currentVoucher.voucher_date <= x.end_date);
+    const activeYearId = currentVoucher.fiscal_year_id || contextVals.fiscal_year_id;
+    const period = lookups.fiscalPeriods.find(x => String(x.year_id) === String(activeYearId) && currentVoucher.voucher_date >= x.start_date && currentVoucher.voucher_date <= x.end_date);
     if (!period) return alert(t.errPeriodNotFound.replace('{vNo}', currentVoucher.voucher_number || currentVoucher.daily_number || '-'));
     
     if (period.status !== 'open') {
@@ -83,7 +84,11 @@ const VoucherFinalizeView = ({ language, t, voucherId, vouchersList, lookups, co
 
     setLoading(true);
     try {
-        const { error } = await supabase.schema('gl').from('vouchers').update({ status: 'finalized' }).eq('id', currentVoucher.id);
+        const { error } = await supabase.schema('gl').from('vouchers').update({ 
+            status: 'finalized',
+            fiscal_year_id: activeYearId,
+            fiscal_period_id: period.id
+        }).eq('id', currentVoucher.id);
         if (error) throw error;
         alert(t.finalizeSuccess);
         onRefreshList();
@@ -148,7 +153,7 @@ const VoucherFinalizeView = ({ language, t, voucherId, vouchersList, lookups, co
       <div className="flex-1 overflow-auto flex flex-col gap-3">
         <Accordion title={t.headerInfo} isOpen={isHeaderOpen} onToggle={() => setIsHeaderOpen(!isHeaderOpen)} isRtl={isRtl} icon={FileText} className="shrink-0">
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 pointer-events-none opacity-90">
-            <InputField label={t.fiscalYear} value={lookups.fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_period_id))?.title || ''} disabled isRtl={isRtl} />
+            <InputField label={t.fiscalYear} value={lookups.fiscalYears.find(f => String(f.id) === String(currentVoucher.fiscal_year_id || contextVals.fiscal_year_id))?.title || ''} disabled isRtl={isRtl} />
             <InputField label={t.ledger} value={lookups.ledgers.find(l => String(l.id) === String(currentVoucher.ledger_id))?.title || ''} disabled isRtl={isRtl} />
             <InputField label={t.branch} value={lookups.branches.find(b => String(b.id) === String(currentVoucher.branch_id))?.title || ''} disabled isRtl={isRtl} />
             <InputField label={t.voucherNumber} value={currentVoucher.voucher_number || ''} disabled isRtl={isRtl} dir="ltr" className="text-center" />

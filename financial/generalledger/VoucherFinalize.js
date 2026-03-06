@@ -251,7 +251,6 @@ const VoucherFinalize = ({ language = 'fa', setHeaderNode }) => {
     initApp();
   }, []);
 
-  // --- ارسال فیلترها به هدر سیستم (تغییر شیک و حرفه‌ای UX) ---
   useEffect(() => {
     if (setHeaderNode && lookups && contextVals) {
       const node = (

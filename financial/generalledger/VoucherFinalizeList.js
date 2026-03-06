@@ -51,7 +51,7 @@ const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals
     try {
       let query = supabase.schema('gl').from('vouchers')
         .select('*')
-        .eq('fiscal_period_id', contextVals.fiscal_year_id)
+        .eq('fiscal_year_id', contextVals.fiscal_year_id)
         .eq('ledger_id', contextVals.ledger_id)
         .in('status', ['reviewed', 'finalized'])
         .order('voucher_date', { ascending: false })
@@ -165,8 +165,6 @@ const VoucherFinalizeList = ({ language, t, lookups, contextVals, setContextVals
 
   return (
     <div className={`h-full flex flex-col p-4 md:p-6 bg-slate-50/50`}>
-      {/* هیچ کادر فیلتر عمومی (دفتر و سال مالی) در اینجا وجود ندارد و کاملاً حذف شده است */}
-      
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-200">
