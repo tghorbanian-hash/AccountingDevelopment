@@ -258,7 +258,7 @@ const AccountReviewPrint = ({
                     <div>
                         <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-3"><Settings size={16}/> تنظیمات گزارش</h3>
                         <label className="text-xs font-bold text-slate-500 mb-1 block">تب گزارش‌گیری:</label>
-                        <select className="w-full border border-slate-300 rounded bg-white h-9 px-2 outline-none text-xs focus:ring-2 focus:ring-indigo-500" value={printTab} onChange={(e) => setPrintTab(e.target.value)}>
+                        <select className="w-full border border-slate-300 rounded bg-white h-9 px-2 outline-none text-xs" value={printTab} onChange={(e) => setPrintTab(e.target.value)}>
                             {tabs.map(tab => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
                         </select>
                     </div>
@@ -307,48 +307,48 @@ const AccountReviewPrint = ({
                     <div id="print-area" className="bg-white shadow-lg print:shadow-none w-full max-w-[210mm] min-h-[297mm] p-[10mm]">
                         
                         {/* Print Header */}
-                        <div className="border-b-2 border-slate-800 pb-2 mb-2">
+                        <div className="border-b-2 border-slate-800 pb-4 mb-4">
                             <div className="flex justify-between items-start">
-                                {/* Right Side (Ledger, Year, Dates) -> since RTL, flex-row-reverse or text-right */}
-                                <div className="w-1/3 text-[10px] text-slate-800 leading-relaxed flex flex-col gap-1 text-right font-bold">
-                                    <div>دفتر مالی: {ledger}</div>
-                                    <div>سال مالی: {fYear}</div>
-                                    {mainFilters.fromDate && <div>از تاریخ: <span className="dir-ltr inline-block font-mono">{mainFilters.fromDate}</span></div>}
-                                    {mainFilters.toDate && <div>تا تاریخ: <span className="dir-ltr inline-block font-mono">{mainFilters.toDate}</span></div>}
+                                {/* Right Side (Ledger, Year, Dates) */}
+                                <div className="w-1/3 text-xs text-slate-700 leading-relaxed flex flex-col gap-1.5 text-right">
+                                    <div><strong>دفتر مالی:</strong> {ledger}</div>
+                                    <div><strong>سال مالی:</strong> {fYear}</div>
+                                    {mainFilters.fromDate && <div><strong>از تاریخ:</strong> <span className="dir-ltr inline-block">{mainFilters.fromDate}</span></div>}
+                                    {mainFilters.toDate && <div><strong>تا تاریخ:</strong> <span className="dir-ltr inline-block">{mainFilters.toDate}</span></div>}
                                 </div>
                                 
                                 {/* Center */}
                                 <div className="w-1/3 text-center">
-                                    <h1 className="text-lg font-black text-slate-900 mb-1">{repName}</h1>
-                                    <h2 className="text-xs font-bold text-slate-700">{orgName}</h2>
-                                    <div className="mt-1 text-[10px] font-bold text-indigo-800 bg-indigo-50 inline-block px-3 py-0.5 rounded-full border border-indigo-100">
+                                    <h1 className="text-xl font-black text-slate-900 mb-1">{repName}</h1>
+                                    <h2 className="text-sm font-bold text-slate-600">{orgName}</h2>
+                                    <div className="mt-2 text-xs font-bold text-indigo-700 bg-indigo-50 inline-block px-3 py-1 rounded-full border border-indigo-100">
                                         سطح گزارش: {tabs.find(t=>t.id === printTab)?.label}
                                     </div>
                                 </div>
 
                                 {/* Left Side (User, Date, Items Count, Currency) */}
-                                <div className="w-1/3 text-[10px] text-slate-800 leading-relaxed flex flex-col gap-1 items-end text-left font-bold">
-                                    <div>کاربر: {userName}</div>
-                                    <div>تاریخ گزارش: <span className="dir-ltr inline-block font-mono">{repDate}</span></div>
-                                    <div>تعداد اقلام: {reportData.length}</div>
-                                    <div>ارز گزارش: {repCurrencyStr}</div>
+                                <div className="w-1/3 text-xs text-slate-700 leading-relaxed flex flex-col gap-1.5 items-end text-left">
+                                    <div><strong>کاربر:</strong> {userName}</div>
+                                    <div><strong>تاریخ گزارش:</strong> <span className="dir-ltr inline-block">{repDate}</span></div>
+                                    <div><strong>تعداد اقلام:</strong> {reportData.length}</div>
+                                    <div><strong>ارز گزارش:</strong> {repCurrencyStr}</div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Applied Filters Below Header Line */}
+                        {/* Applied Filters */}
                         {activeFiltersStr && (
-                            <div className="mb-4 text-[9px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-200 leading-relaxed text-right">
+                            <div className="mb-4 text-[10px] text-slate-600 bg-slate-50 p-2 rounded border border-slate-200 leading-relaxed text-right">
                                 <strong className="text-slate-800">فیلترهای اعمال شده:</strong> {activeFiltersStr}
                             </div>
                         )}
 
                         {/* Print Table */}
-                        <table className="w-full text-[9px] text-right border-collapse border border-slate-300">
+                        <table className="w-full text-[10px] text-right border-collapse border border-slate-300">
                             <thead>
                                 <tr className="bg-slate-100">
                                     {finalCols.map((c, i) => (
-                                        <th key={i} className="border border-slate-300 p-1.5 font-bold text-slate-800 text-center">{c.header}</th>
+                                        <th key={i} className="border border-slate-300 p-2 font-bold text-slate-700 text-center">{c.header}</th>
                                     ))}
                                 </tr>
                             </thead>
@@ -357,10 +357,10 @@ const AccountReviewPrint = ({
                                     <tr key={idx} className="border-b border-slate-200 break-inside-avoid hover:bg-slate-50">
                                         {finalCols.map((c, i) => {
                                             const isAmount = ['debit', 'credit', 'balanceDebit', 'balanceCredit', 'balance'].includes(c.field);
-                                            const alignClass = isAmount ? 'text-left dir-ltr font-mono' : (c.field === 'code' || c.field === 'doc_no' || c.field === 'date' || c.field === 'nature' ? 'text-center font-mono' : '');
+                                            const alignClass = isAmount ? 'text-left dir-ltr font-mono' : (c.field === 'code' || c.field === 'doc_no' || c.field === 'date' || c.field === 'nature' ? 'text-center' : '');
                                             let val = row[c.field] || '-';
                                             if (isAmount) val = parseNumber(val) > 0 ? formatNumber(val) : '';
-                                            return <td key={i} className={`border border-slate-300 p-1.5 text-slate-800 ${alignClass}`}>{val}</td>;
+                                            return <td key={i} className={`border border-slate-300 p-1.5 text-slate-700 ${alignClass}`}>{val}</td>;
                                         })}
                                     </tr>
                                 ))}
@@ -369,11 +369,11 @@ const AccountReviewPrint = ({
                                 {reportData.length > 0 && (
                                     <tr className="bg-slate-100 font-bold break-inside-avoid">
                                         {finalCols.map((c, i) => {
-                                            if (i === 0) return <td key={i} colSpan={finalCols.length > 5 ? 2 : 1} className="border border-slate-300 p-1.5 text-left">{t.sum}:</td>;
+                                            if (i === 0) return <td key={i} colSpan={finalCols.length > 5 ? 2 : 1} className="border border-slate-300 p-2 text-left">{t.sum}:</td>;
                                             if (i === 1 && finalCols.length > 5) return null; 
                                             
-                                            if (c.field === 'debit') return <td key={i} className="border border-slate-300 p-1.5 text-indigo-800 dir-ltr text-left font-mono">{formatNumber(totalSums.debit)}</td>;
-                                            if (c.field === 'credit') return <td key={i} className="border border-slate-300 p-1.5 text-indigo-800 dir-ltr text-left font-mono">{formatNumber(totalSums.credit)}</td>;
+                                            if (c.field === 'debit') return <td key={i} className="border border-slate-300 p-1.5 text-indigo-700 dir-ltr text-left font-mono">{formatNumber(totalSums.debit)}</td>;
+                                            if (c.field === 'credit') return <td key={i} className="border border-slate-300 p-1.5 text-indigo-700 dir-ltr text-left font-mono">{formatNumber(totalSums.credit)}</td>;
                                             if (c.field === 'balanceDebit' && printTab !== 'transactions') return <td key={i} className="border border-slate-300 p-1.5 text-emerald-700 dir-ltr text-left font-mono">{formatNumber(totalSums.balDebit)}</td>;
                                             if (c.field === 'balanceCredit' && printTab !== 'transactions') return <td key={i} className="border border-slate-300 p-1.5 text-rose-700 dir-ltr text-left font-mono">{formatNumber(totalSums.balCredit)}</td>;
                                             
